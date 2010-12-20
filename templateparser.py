@@ -232,5 +232,5 @@ def HtmlEscape(text):
 TEMPLATE_FUNCTIONS = {
         'default': HtmlEscape,
         'html': HtmlEscape,
-        'raw': unicode,
+        'raw': lambda x: x,
         'url': urllib.quote_plus}
