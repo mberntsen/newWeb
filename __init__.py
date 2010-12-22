@@ -14,6 +14,7 @@ except ImportError:
   import standalone
   STANDALONE = True
 
+
 import htmlentitydefs
 import mimetypes
 import os
@@ -49,7 +50,7 @@ class ReloadModules(Exception):
   """Communicates the handler that it should reload the pageclass"""
 
 
-class BasePageMaker(object):
+class PageMaker(object):
   """Provides the base pagemaker methods for all the html generators
   """
   # Default content-type for the pagemaker
@@ -246,6 +247,11 @@ class BasePageMaker(object):
       return Page(content=message, httpcode=404, content_type='text/plain')
 
 
+#TODO(Elmer): Deprecate BasePageMaker in favor of PageMaker.
+class BasePageMaker(PageMaker):
+  pass
+
+
 class Page(object):
   def __init__(self, content, httpcode=200, cookies=(),
                headers=None, content_type='text/html'):
@@ -254,38 +260,6 @@ class Page(object):
     self.httpcode = httpcode
     self.headers = headers or {}
     self.content_type = content_type
-
-
-class Record(dict):
-  def __init__(self, record, fields=None):
-    super(Record, self).__init__(record)
-    #XXX(Elmer): Can use these fields to validate data @ Save() time.
-    # A record with inappropriate NULLs can be rejected.
-    self._fields = fields
-
-
-class RecordFactory(object):
-  ID_FIELD = 'ID'  #XXX(Elmer): Could dump this in favor of the prikey field?
-  RECORD_CLASS = Record
-  TABLE = 'subclass_defined'
-
-  def __init__(self, connection):
-    self.connection = connection
-    self._fields = []
-    with self.connection as cursor:
-      for row in cursor.Execute('EXPLAIN %s' % self.TABLE):
-        self._fields.append(dict(row.items))
-
-  def _SelectNaiveRecords(self, **sqltalk_options):
-    with self.connection as cursor:
-      records = cursor.Select(table=self.TABLE, **sqltalk_options)
-    for record in records:
-      yield self.RECORD_CLASS(record.items)
-
-  def GetById(self, record_id):
-    conditions = '%s = %s' % (self.ID_FIELD,
-                              self.connection.EscapeValues(record_id))
-    return self._SelectNaiveRecords(conditions=conditions).next()
 
 
 def Handler(req, pageclass, routes, config_file='config.cfg'):
@@ -409,27 +383,6 @@ def Router(routes, url):
     if matches:
       return handler, matches.groups()
   raise NoRouteError(url +' cannot be handled')
-
-
-def HtmlEscape(text):
-  """Escapes the 5 characters deemed by XML to be unsafe if left unescaped.
-
-  The relevant defined set consists of the following characters: &'"<>
-
-  Takes:
-    @ html: str
-      The html string with html character entities.
-
-  Returns:
-    str: the input, after turning entites back into raw characters.
-  """
-  if not isinstance(text, basestring):
-    text = unicode(text)
-  html = text.replace('&', '&amp;')
-  html = html.replace('"', '&quot;')
-  html = html.replace('\'', '&#39;')  # &apos; is valid, but poorly supported.
-  html = html.replace('>', '&gt;')
-  return html.replace('<', '&lt;')
 
 
 def HtmlUnescape(html):
