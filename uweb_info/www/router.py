@@ -3,7 +3,7 @@
 
 # Custom modules
 from underdark.libs import uweb
-from underdark.home.failbaitr.uweb_info import pages
+from underdark.libs.uweb.uweb_info import pages
 
 __author__ = 'Jan Klopper <jan@underdark.nl>'
 __version__ = '0.1'
