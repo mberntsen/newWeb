@@ -1,0 +1,43 @@
+[header]
+    <div id="content">
+      <div>
+        <p>
+          Both standalone and mod_python should be returning the same content here:
+        </p>
+        <strong>Method: <em>[method]</em></strong>
+      </div>
+      <div>
+        <h2>Incoming headers:</h2>
+        <ul>[headers|raw]</ul>
+      </div>
+      <div>
+        <h2>Query arguments (GET):</h2>
+        <ul>[getvars|raw]</ul>
+      </div>
+      <div>
+        <h2>POST data:</h2>
+        <ul>[postvars|raw]</ul><br />
+        <form action="#" method="post">
+          <ul class="nodot">
+            <li>
+                <label for="example_post">Test POST data:</label>
+                <input type="text" id="example_post" name="ExamplePost" />
+                <input type="submit" value="Submit" />
+            </li>
+          </ul>
+        </form>
+      </div>
+      <div>
+        <h2>Cookies:</h2>
+        <ul>[cookies|raw]</ul>
+      </div>
+      <div>
+        <h2>Environment variables:</h2>
+        <ul>[env|raw]</ul>
+      </div>
+      <div>
+        <h2>Extended environment variables:</h2>
+        <ul>[ext_env|raw]</ul>
+      </div>
+    </div>
+[footer]
