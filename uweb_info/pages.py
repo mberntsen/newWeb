@@ -1,7 +1,7 @@
 #!/usr/bin/python
 """Html generators for the minimal uweb server"""
 
-__author__ = 'Jan Klopper <jan@underdark.nl>'
+__author__ = 'Elmer de Looff <elmer@underdark.nl>'
 __version__ = '0.3'
 
 # Standard modules

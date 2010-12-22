@@ -192,11 +192,10 @@ def HeadersIntoEnviron(environ, headers, skip_pre_existing_http=True):
   Returns
    dict: the environ as passed in, with added HTTP environment variables.
   """
+  pre_existing_http = ()
   if skip_pre_existing_http:
-    pre_existing_http = [var[5:] for var in environ if var[:5] == 'HTTP_']
-  else:
-    pre_existing_http = ()
-  for name, value in headers.items():
+    pre_existing_http = set(var[5:] for var in environ if var[:5] == 'HTTP_')
+  for name, value in headers.iteritems():
     name = name.replace('-', '_').upper()
     if name in environ or name in pre_existing_http:
       continue  # Skip headers we already have in environ

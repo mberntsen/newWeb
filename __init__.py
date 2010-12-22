@@ -42,10 +42,6 @@ class NoRouteError(Exception):
   """The server does not know how to route this request"""
 
 
-class HttpMovedPermanently(Exception):
-  """Communicate a http redirect to the upper layers"""
-
-
 class ReloadModules(Exception):
   """Communicates the handler that it should reload the pageclass"""
 
@@ -252,14 +248,19 @@ class BasePageMaker(PageMaker):
   pass
 
 
-class Page(object):
-  def __init__(self, content, httpcode=200, cookies=(),
-               headers=None, content_type='text/html'):
-    self.content = content
-    self.cookies = cookies
-    self.httpcode = httpcode
-    self.headers = headers or {}
-    self.content_type = content_type
+class Page(str):
+  def __new__(cls, content, httpcode=200, cookies=(),
+              headers=None, content_type='text/html'):
+    page = str.__new__(cls, content)
+    page.content = content
+    page.cookies = cookies
+    page.httpcode = httpcode
+    page.headers = headers or {}
+    page.content_type = content_type
+    return page
+
+  def __repr__(self):
+    return '<%s instance at %#x>' % (self.__class__.__name__, id(self))
 
 
 def Handler(req, pageclass, routes, config_file='config.cfg'):
@@ -275,15 +276,12 @@ def Handler(req, pageclass, routes, config_file='config.cfg'):
   object. When this is completed, the Handler will issue an apache.OK value,
   indicating that it has successfully processed the request.
 
-  The processing in this function knows three main interruptions:
+  The processing in this function knows two main interruptions:
     1) Exception `NoRouteError`:
        This raises apache.SERVER_RETURN with an apache.INTERNAL_SERVER_ERROR
        attached. No route exists to tell the Handler what to do, this situation
        should usually be prevented by a catchall route.
-    2) Exception `HttpMovedPermanently`
-       This raises apache.SERVER_RETURN with an apache.HTTP_MOVED_PERMANENTLY
-       attached, telling Apache there has been a redirect.
-    3) Exception `ReloadModules`
+    2) Exception `ReloadModules`
        This halts any running execution of web-requests and reloads the
        `pageclass`. The returned page will be the return of the relad() action.
 
@@ -319,35 +317,25 @@ def Handler(req, pageclass, routes, config_file='config.cfg'):
   try:
     pages = pageclass(req, config_file=config_file)
     content = getattr(pages, req_method)(*req_arguments)
-  except HttpMovedPermanently, location:
-    #TODO(Elmer): This will be removed next version, in favour of returning
-    # a Page with a Location header and a relevant httpcode.
-    req.SetHttpStatus(301)
-    req.AddHeader('Location', str(location))
-    raise apache.SERVER_RETURN(apache.DONE, apache.HTTP_MOVED_PERMANENTLY)
   except ReloadModules, content:
     content = str(content)
     if pageclass.__name__ in sys.modules:
-      content += HtmlEscape(reload(pageclass))
+      content += templateparser.HtmlEscape(reload(pageclass))
 
-  if isinstance(content, Page):
-    req.SetHttpStatus(content.httpcode)
-    req.SetContentType(content.content_type)
-    for header_pair in content.headers.iteritems():
-      #XXX(Elmer): `req.headers` is expected to be a dictionary.
-      req.AddHeader(*header_pair)
-    for cookie in content.cookies:
-      #XXX(Elmer): All cookies are expected to be dicts.
-      # Keys they MUST contain: `key`, `value`
-      # Keys they MAY contain:  `expires`, `path`, `comment`, `domain`,
-      #                         `max-age`, `secure`, `version`, `httponly`
-
-      req.AddCookie(**cookie)
-    req.Write(content.content)
-  else:
-    req.SetHttpStatus(200)
-    req.SetContentType(pages.DEFAULT_CONTENT_TYPE)
-    req.Write(content)
+  if not isinstance(content, Page):
+    content = Page(content)
+  req.SetHttpStatus(content.httpcode)
+  req.SetContentType(content.content_type)
+  for header_pair in content.headers.iteritems():
+    #USAGE(Elmer): `req.headers` is expected to be a dictionary.
+    req.AddHeader(*header_pair)
+  for cookie in content.cookies:
+    #USAGE(Elmer): All cookies are expected to be dicts.
+    # Keys they MUST contain: `key`, `value`
+    # Keys they MAY contain:  `expires`, `path`, `comment`, `domain`,
+    #                         `max-age`, `secure`, `version`, `httponly`
+    req.AddCookie(**cookie)
+  req.Write(content)
   return apache.DONE
 
 
