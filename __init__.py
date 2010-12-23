@@ -357,7 +357,7 @@ def Handler(req, pageclass, routes, config_file='config.cfg'):
     req.AddHeader(*header_pair)
   for cookie in content.cookies:
     req.AddCookie(**cookie)
-  req.Write(content)
+  req.Write(content.content)
   return apache.DONE
 
 
