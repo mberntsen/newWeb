@@ -67,6 +67,22 @@ class PageMaker(uweb.BasePageMaker):
                               ext_env=''.join(extenvhtml),
                               **self.CommonBlocks())
 
+  def RequestInternalFail(self):
+    """Triggers a HTTP 500 Internal Server Error in uWeb.
+
+    This is a demonstration of the (limited) debugging facilities in uWeb.
+    A small stack of calls is created, the last of which raises an error.
+    The resulting stack trace and a short introductory message is returned to
+    the browser, tagged with a HTTP response code 500.
+    """
+    def _Processor(instruction):
+      instruction('foo')
+
+    def _Numerize(number_as_string):
+      return int(number_as_string)
+
+    return _Processor(_Numerize)
+
   def RequestText(self):
     """Returns a page with data in text/plain.
 

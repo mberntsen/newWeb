@@ -13,6 +13,7 @@ PAGE_CLASS = pages.PageMaker
 ROUTES = (
     ('/static/(.*)', 'Static'),
     ('/(broken.*)', 'RequestInvalidcommand'),
+    ('/catchfire', 'RequestInternalFail'),
     ('/text', 'RequestText'),
     ('/redirect/(.*)', 'RequestRedirect'),
     ('/(.*)', 'RequestIndex'))

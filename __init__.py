@@ -47,11 +47,7 @@ class ReloadModules(Exception):
 
 
 class PageMaker(object):
-  """Provides the base pagemaker methods for all the html generators
-  """
-  # Default content-type for the pagemaker
-  DEFAULT_CONTENT_TYPE = 'text/html'
-
+  """Provides the base pagemaker methods for all the html generators."""
   # Base paths for templates and public data. These are used in the PageMaker
   # classmethods that set up paths specific for that pagemaker.
   PUBLIC_DIR = 'www'
@@ -202,6 +198,16 @@ class PageMaker(object):
     except (pysession.SessionError, ValueError):
       return False
 
+  def InternalServerError(self):
+    import traceback
+    template = ('<!DOCTYPE html><html><head><title>Well, that\'s embarassing'
+                '</title></head><body><h1>Internal Server Error (HTTP 500)</h1>'
+                '<p>Wow, no idea what you did there, but the server sure choked'
+                ' on it</p><pre>[traceback]</pre></body></html>')
+    return Page(
+        self.parser.ParseString(template, traceback=traceback.format_exc(),
+        httpcode=500))
+
   @staticmethod
   def Reload():
     """Raises `ReloadModules`, telling the Handler() to reload its pageclass."""
@@ -245,22 +251,50 @@ class PageMaker(object):
 
 #TODO(Elmer): Deprecate BasePageMaker in favor of PageMaker.
 class BasePageMaker(PageMaker):
-  pass
+  """A trivial subclass of PageMaker, maintaining backwards compatibility."""
 
 
-class Page(str):
-  def __new__(cls, content, httpcode=200, cookies=(),
-              headers=None, content_type='text/html'):
-    page = str.__new__(cls, content)
-    page.content = content
-    page.cookies = cookies
-    page.httpcode = httpcode
-    page.headers = headers or {}
-    page.content_type = content_type
-    return page
+#TODO(Elmer): Rename this 'Response', to better cover the purpose.
+class Page(object):
+  """Defines a full HTTP response.
+
+  The full response consists of a required content part, and then optional
+  http response code, cookies, additional headers, and a content-type.
+  """
+  # Default content-type for Page objects
+  CONTENT_TYPE = 'text/html'
+
+  def __init__(self, content, content_type=CONTENT_TYPE,
+               cookies=(), headers=None,  httpcode=200):
+    """Initializes a Page object.
+
+    Arguments:
+      @ content: str
+        The content to return to the client. This can be either plain text, html
+        or the contents of a file (images for example).
+      % content_type: str ~~ CONTENT_TYPE ('text/html' by default)
+        The content type of the response. This should NOT be set in headers.
+      % cookies: dict ~~ None
+        Cookies are expected to be dictionaries, made up of the following keys:
+        * Keys they MUST contain: `key`, `value`
+        * Keys they MAY contain:  `expires`, `path`, `comment`, `domain`,
+                                  `max-age`, `secure`, `version`, `httponly`
+      % headers: dictionary ~~ None
+        A dictionary mappging the header name to its value.
+      % httpcode: int ~~ 200
+        The HTTP response code to attach to the response.
+    """
+    self.content = content
+    self.cookies = cookies
+    self.httpcode = httpcode
+    self.headers = headers or {}
+    self.content_type = content_type
 
   def __repr__(self):
     return '<%s instance at %#x>' % (self.__class__.__name__, id(self))
+
+  def __str__(self):
+    return self.content
 
 
 def Handler(req, pageclass, routes, config_file='config.cfg'):
@@ -304,36 +338,24 @@ def Handler(req, pageclass, routes, config_file='config.cfg'):
     apache.SERVER_RETURN: Details on these exceptions included above.
   """
   req = request.Request(req)
-
+  pages = pageclass(req, config_file=config_file)
   try:
     req_method, req_arguments = Router(routes, req.env['PATH_INFO'])
-  except NoRouteError:
-    # This needs to be done, for BaseHTTP (as it always writes immediately):
-    req.SetHttpStatus(500)
-    req.SetContentType(pageclass.DEFAULT_CONTENT_TYPE)
-    req.Write('Sorry, badly configured server')
-    raise apache.SERVER_RETURN(apache.DONE, apache.HTTP_INTERNAL_SERVER_ERROR)
-
-  try:
-    pages = pageclass(req, config_file=config_file)
     content = getattr(pages, req_method)(*req_arguments)
   except ReloadModules, content:
     content = str(content)
     if pageclass.__name__ in sys.modules:
       content += templateparser.HtmlEscape(reload(pageclass))
+  except (Exception, NoRouteError):
+    content = pages.InternalServerError()
 
   if not isinstance(content, Page):
     content = Page(content)
   req.SetHttpStatus(content.httpcode)
   req.SetContentType(content.content_type)
   for header_pair in content.headers.iteritems():
-    #USAGE(Elmer): `req.headers` is expected to be a dictionary.
     req.AddHeader(*header_pair)
   for cookie in content.cookies:
-    #USAGE(Elmer): All cookies are expected to be dicts.
-    # Keys they MUST contain: `key`, `value`
-    # Keys they MAY contain:  `expires`, `path`, `comment`, `domain`,
-    #                         `max-age`, `secure`, `version`, `httponly`
     req.AddCookie(**cookie)
   req.Write(content)
   return apache.DONE
@@ -386,7 +408,7 @@ def HtmlUnescape(html):
   Returns:
     str: The input, with all entities and references replaces by unicode chars.
   """
-  def FixEntities(match):
+  def _FixEntities(match):
     text = match.group(0)
     if text[:2] == "&#":
       # character reference
@@ -403,7 +425,7 @@ def HtmlUnescape(html):
       except KeyError:
         pass
     return text # leave as is
-  return HTML_ENTITY_SEARCH.sub(FixEntities, html)
+  return HTML_ENTITY_SEARCH.sub(_FixEntities, html)
 
 
 def ServerSetup(router):
