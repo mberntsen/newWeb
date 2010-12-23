@@ -17,8 +17,10 @@ import os
 import re
 import urllib
 
-# Tags are delimited by square brackets.
-# They must contain one or more alphanumeric characters, and no whitespace.
+# Tags are delimited by square brackets, and must contain only the following:
+# - Alphanumeric characters (a-zA-Z0-9)
+# - underscores, pipes or colons (_|:)
+# Whitespace or other illegal characters trigger literal processing of brackets.
 TAGSPLITTER = re.compile(r'\[([\w:|]+)\]')
 
 
