@@ -162,19 +162,18 @@ class TemplateParserFunctions(unittest.TestCase):
 
   def testCustomFunction(self):
     """Custom functions added to the parser work as expected"""
-    templateparser.TEMPLATE_FUNCTIONS['twice'] = lambda x: x + ' ' + x
+    self.parser.RegisterFunction('twice', lambda x: x + ' ' + x)
     template = 'The following will be stated [again|twice].'
     output = 'The following will be stated twice twice.'
     self.assertEqual(output, self.parser.ParseString(template, again='twice'))
 
   def testMultipleFunctions(self):
     """Multiple functions can be piped after one another"""
-    templateparser.TEMPLATE_FUNCTIONS['len'] = len
-    templateparser.TEMPLATE_FUNCTIONS['count'] = lambda x: '%s characters' % x
+    self.parser.RegisterFunction('len', len)
+    self.parser.RegisterFunction('count', lambda x: '%s characters' % x)
     template = 'A replacement processed by two functions: [spam|len|count].'
     output = 'A replacement processed by two functions: 8 characters.'
     self.assertEqual(output, self.parser.ParseString(template, spam='ham&eggs'))
-
 
 
 if __name__ == '__main__':

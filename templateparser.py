@@ -205,6 +205,17 @@ class Parser(dict):
     """
     return Parser._Parse(Parser._SplitTags(template), replacements)
 
+  def RegisterFunction(self, name, function):
+    """Registers a templating `function`, allowing use in templates by `name`.
+
+    Arguments:
+      @ name: str
+        The name of the template function. This can be used behind a pipe ( | )
+      @ function: function
+        The function that should be used. Ideally this returns a string.
+    """
+    TEMPLATE_FUNCTIONS[name] = function
+
 
 class SafeString(str):
   """A template string, which has had all its processing done already."""
