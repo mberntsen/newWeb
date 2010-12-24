@@ -4,9 +4,37 @@
     <title>Well, that's embarrassing</title>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     <style type="text/css">
-    html{font:1em/1.2 monospace;}
-    ol ul{list-style:none;margin:0 0 2em 1em;padding:0;}
-    ul ul{margin:0 0 0 3em;list-style:disc;}
+    html{
+      font:1em/1.2 monospace
+    }
+    h2{
+      margin:2em 0 .5em;
+    }
+    ol, ul{
+      margin:0;
+      padding:0 0 0 2em;}
+    .frame{
+      background:#ddddc8;
+      border:2px solid #999;
+      margin:0 0 2em 1em;
+      padding:1em 0 .5em 1em;
+      list-style:none;
+    }
+    .source, .locals{
+      padding:.3em 2em;
+      list-style:none;
+    }
+    .source>li{
+      white-space:pre;
+    }
+    .source>li:nth-child(4){
+      color:#c00
+    }
+    .source>li:before{
+      content:counter(n) ".";
+      counter-increment:n;
+      display:inline-block;
+    }
     </style>
   </head>
   <body>
@@ -15,7 +43,7 @@
     <h2>Traceback</h2>
     <ol>[exc:traceback|raw]</ol>
     <h3>[exc:type]</h3>
-    <p>[exc:value]</p><br />
+    <p>[exc:value]</p>
     <h2>Query arguments (GET)</h2>
     <ul>[query_args|raw]</ul>
     <h2>POST data</h2>

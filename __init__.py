@@ -216,30 +216,48 @@ class PageMaker(object):
       Yields:
         str: Template-parsed HTML with frame information.
       """
+      def SourceLines(filename, line_num, context=3):
+        """Yields the offending source line, and `context` lines of context.
+
+        Arguments:
+          @ filename: str
+            The filename of the
+          @ line_num: int
+            The line number for the offending line.
+          % context: int ~~ 3
+            Number of lines context, before and after the offending line.
+
+        Yields:
+          str: Templated list-item for a source code line.
+        """
+        for line_num in xrange(line_num - context, line_num + context + 1):
+          yield self.parser.ParseString(
+              '<li style="counter-reset: n [line]">[code]</li>',
+              line=line_num - 1, code=linecache.getline(filename, line_num))
       while stack:
         frame = stack.tb_frame
-        yield self.parser.Parse('list_tb.xhtml', frame={
+        yield self.parser.Parse('stack_frame.xhtml', frame={
             'file': frame.f_code.co_filename,
-            'line': frame.f_lineno,
             'scope': frame.f_code.co_name,
             'locals': ''.join(
-                self.parser.Parse('list_var.xhtml', var=(name, repr(value)))
+                self.parser.Parse('var_list.xhtml', var=(name, repr(value)))
                 for name, value in sorted(frame.f_locals.items())),
-            'source': linecache.getline(frame.f_code.co_filename,
-                                        frame.f_lineno).strip()})
+            'source': ''.join(SourceLines(frame.f_code.co_filename,
+                                          frame.f_lineno))})
         stack = stack.tb_next
     import linecache
-    self.parser.template_dir = os.path.dirname(os.path.abspath(__file__))
-    environ = [self.parser.Parse('list_var.xhtml', var=var)
+    self.parser.template_dir = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), 'error_templates'))
+    environ = [self.parser.Parse('var_list.xhtml', var=var)
                for var in sorted(self.req.ExtendedEnvironment().items())]
-    post_data = [self.parser.Parse('list_var.xhtml', var=(var, self.post[var]))
+    post_data = [self.parser.Parse('var_list.xhtml', var=(var, self.post[var]))
                  for var in sorted(self.post)]
-    query_args = [self.parser.Parse('list_var.html', var=(var, self.get[var]))
+    query_args = [self.parser.Parse('var_list.html', var=(var, self.get[var]))
                   for var in sorted(self.get)]
     nulldata = '<li><em>NULL</em></li>'
     return Page(
         self.parser.Parse(
-            '500.xhtml',
+            'http_500.xhtml',
             environ=''.join(environ),
             query_args=''.join(query_args) or nulldata,
             post_data=''.join(post_data) or nulldata,
