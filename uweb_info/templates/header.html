@@ -3,18 +3,27 @@
   <head>
     <title>&micro;Web Request Information</title>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-    <link rel="shortcut icon" href="http://underdark.nl/media/favicon.ico" type="image/x-icon" />
+    <link type="image/x-icon" rel="shortcut icon" href="http://underdark.nl/media/favicon.ico" />
     <link type="text/css" rel="stylesheet" media="screen" href="http://underdark.nl/styles/default.css" />
     <link type="text/css" rel="stylesheet" media="print" href="http://underdark.nl/styles/print.css" />
+    <style type="text/css">
+    #http404 .http404,
+    #http500 .http500{
+      color:#a2c837;
+      background:#2b383e;
+      -moz-border-radius:.3em;
+      -webkit-border-radius:.3em;
+      border-radius:.3em;
+    </style>
   </head>
-  <body>
+  <body id="[page_id]">
     <div id="header">
       <h1>&micro;Web Request Information</h1>
     </div>
     <ul id="menu">
       <li><a class="logo" href="/">&micro;Web Request Information</a></li>
-      <li><a href="/broken">404 page</a></li>
-      <li><a href="/catchfire">500 page</a></li>
+      <li><a class="http404" href="/broken">404 page</a></li>
+      <li><a class="http500" href="/haltandcatchfire">500 page</a></li>
       <li><a href="/text">Plaintext page</a></li>
       <li><a href="/redirect/http://underdark.nl">Underdark redirect</a></li>
       <li>

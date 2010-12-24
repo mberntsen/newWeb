@@ -13,7 +13,7 @@ PAGE_CLASS = pages.PageMaker
 ROUTES = (
     ('/static/(.*)', 'Static'),
     ('/(broken.*)', 'RequestInvalidcommand'),
-    ('/catchfire', 'RequestInternalFail'),
+    ('/haltandcatchfire', 'RequestInternalFail'),
     ('/text', 'RequestText'),
     ('/redirect/(.*)', 'RequestRedirect'),
     ('/(.*)', 'RequestIndex'))
@@ -52,7 +52,7 @@ def handler(request):
               request. In most cases, the return value is of little interest,
               as the `request` argument will be used to generate a response.
   """
-  return uweb.Handler(request, PAGE_CLASS, ROUTES)
+  return uweb.Handler(request, PAGE_CLASS, ROUTES, debug=True)
 
 
 uweb.ServerSetup(handler)

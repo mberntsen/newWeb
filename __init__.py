@@ -198,15 +198,73 @@ class PageMaker(object):
     except (pysession.SessionError, ValueError):
       return False
 
-  def InternalServerError(self):
-    import traceback
-    template = ('<!DOCTYPE html><html><head><title>Well, that\'s embarassing'
-                '</title></head><body><h1>Internal Server Error (HTTP 500)</h1>'
-                '<p>Wow, no idea what you did there, but the server sure choked'
-                ' on it</p><pre>[traceback]</pre></body></html>')
+  def _InternalServerErrorDebug(self):
+    """Returns a HTTP 500 response with detailed failure analysis."""
+    def ParseStackFrames(stack=sys.exc_traceback):
+      """Generates list items for traceback information.
+
+      Each traceback item contains the file- and function name, the line numer
+      and the source that belongs with it. For each stack frame, the local
+      variables are also added to it, allowing proper analysis to happen.
+
+      This most likely doesn't need overriding / redefining in a subclass.
+
+      Arguments:
+        % stack: traceback.stack ~~ sys.exc_traceback
+          The stack frames to return analysis on.
+
+      Yields:
+        str: Template-parsed HTML with frame information.
+      """
+      while stack:
+        frame = stack.tb_frame
+        yield self.parser.Parse('list_tb.xhtml', frame={
+            'file': frame.f_code.co_filename,
+            'line': frame.f_lineno,
+            'scope': frame.f_code.co_name,
+            'locals': ''.join(
+                self.parser.Parse('list_var.xhtml', var=(name, repr(value)))
+                for name, value in sorted(frame.f_locals.items())),
+            'source': linecache.getline(frame.f_code.co_filename,
+                                        frame.f_lineno).strip()})
+        stack = stack.tb_next
+    import linecache
+    self.parser.template_dir = os.path.dirname(os.path.abspath(__file__))
+    environ = [self.parser.Parse('list_var.xhtml', var=var)
+               for var in sorted(self.req.ExtendedEnvironment().items())]
+    post_data = [self.parser.Parse('list_var.xhtml', var=(var, self.post[var]))
+                 for var in sorted(self.post)]
+    query_args = [self.parser.Parse('list_var.html', var=(var, self.get[var]))
+                  for var in sorted(self.get)]
+    nulldata = '<li><em>NULL</em></li>'
     return Page(
-        self.parser.ParseString(template, traceback=traceback.format_exc(),
-        httpcode=500))
+        self.parser.Parse(
+            '500.xhtml',
+            environ=''.join(environ),
+            query_args=''.join(query_args) or nulldata,
+            post_data=''.join(post_data) or nulldata,
+            exc={'type': sys.exc_type, 'value': sys.exc_value,
+                 'traceback': ''.join(ParseStackFrames())}),
+        httpcode=200)
+
+  @staticmethod
+  def _InternalServerErrorProduction():
+    """Returns a text/plain notification about an internal server error.
+
+    Clients should override this in their own pagemaker subclasses.
+    """
+    return Page('INTERNAL SERVER ERROR (HTTP 500)',
+                content_type='text/plain', httpcode=500)
+
+  def InternalServerError(self):
+    """Processes an Internal Server Error.
+
+    If the environment variable DEBUG is True, the _InternalServerErrorDebug
+    method is returned, otherwise, _InternalServerErrorProduction is returned.
+    """
+    if self.req.env['DEBUG']:
+      return self._InternalServerErrorDebug()
+    return self._InternalServerErrorProduction()
 
   @staticmethod
   def Reload():
@@ -297,7 +355,7 @@ class Page(object):
     return self.content
 
 
-def Handler(req, pageclass, routes, config_file='config.cfg'):
+def Handler(req, pageclass, routes, config_file='config.cfg', debug=False):
   """Handles a web request through processing the routes list.
 
   The url in the received `req` object is taken and matches against the
@@ -329,6 +387,8 @@ def Handler(req, pageclass, routes, config_file='config.cfg'):
     % config_file: str ~~ 'config.cfg'
       Filename to read handler configuration from. This typically contains
       sections for databases and the like.
+    % debug: boolean ~~ False
+      The DEBUG request-environment variable is set to this boolean value.
 
   Returns:
     apache.OK: signal for Apache to send the page to the client. Ignored by
@@ -338,6 +398,7 @@ def Handler(req, pageclass, routes, config_file='config.cfg'):
     apache.SERVER_RETURN: Details on these exceptions included above.
   """
   req = request.Request(req)
+  req.env['DEBUG'] = bool(debug)
   pages = pageclass(req, config_file=config_file)
   try:
     req_method, req_arguments = Router(routes, req.env['PATH_INFO'])

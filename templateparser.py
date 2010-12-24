@@ -77,9 +77,12 @@ class Parser(dict):
         template_path = os.path.join(self.template_dir, template)
         self[template] = file(template_path).read()
       except IOError:
-        raise TemplateReadError('Cannot open: %r' % template)
+        raise TemplateReadError('Cannot open: %r' % template_path)
     return super(Parser, self).__getitem__(template)
 
+  def __nonzero__(self):
+    """A templateparser is boolean True if it exists, unlike a dictionary."""
+    return True
 
   def __setitem__(self, key, value):
     """Writes the template parts to the given key."""

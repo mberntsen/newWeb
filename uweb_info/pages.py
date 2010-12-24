@@ -16,8 +16,8 @@ class PageMaker(uweb.BasePageMaker):
 
   Each page as a separate method.
   """
-  def CommonBlocks(self):
-    return {'header': self.parser.Parse('header.html'),
+  def CommonBlocks(self, page_id):
+    return {'header': self.parser.Parse('header.html', page_id=page_id),
             'footer': self.parser.Parse(
                 'footer.html',
                 year=time.strftime('%Y'),
@@ -30,7 +30,7 @@ class PageMaker(uweb.BasePageMaker):
     gethtml = []
     for getvar in sorted(self.get):
       gethtml.append(self.parser.Parse(
-          'varlisting.html', (getvar, self.get[getvar])))
+          'varlisting.html', var=(getvar, self.get[getvar])))
 
     posthtml = []
     for postvar in sorted(self.post):
@@ -65,7 +65,7 @@ class PageMaker(uweb.BasePageMaker):
                               headers=''.join(headershtml),
                               env=''.join(envhtml),
                               ext_env=''.join(extenvhtml),
-                              **self.CommonBlocks())
+                              **self.CommonBlocks('main'))
 
   def RequestInternalFail(self):
     """Triggers a HTTP 500 Internal Server Error in uWeb.
@@ -113,8 +113,15 @@ class PageMaker(uweb.BasePageMaker):
     """
     return uweb.Page('', headers={'Location': location}, httpcode=302)
 
-  def RequestInvalidcommand(self, command):
-    """Returns an error message"""
-    logging.LogWarning('Bad page %r requested', command)
+  def RequestInvalidcommand(self, path):
+    """The request could not be fulfilled, this returns a 404."""
+    logging.LogWarning('Bad page %r requested', path)
     return uweb.Page(self.parser.Parse(
-        '404.html', error=command, **self.CommonBlocks()), httpcode=404)
+        '404.html', path=path, **self.CommonBlocks('http404')), httpcode=404)
+
+  def _InternalServerErrorProduction(self):
+    """Returns a HTTP 500 page, since the request failed elsewhere."""
+    path = self.req.env['PATH_INFO']
+    logging.LogError('Execution of %r triggered an exception', path)
+    return uweb.Page(self.parser.Parse(
+        '500.html', path=path, **self.CommonBlocks('http500')), httpcode=500)
