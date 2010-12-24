@@ -205,7 +205,8 @@ class Parser(dict):
     """
     return Parser._Parse(Parser._SplitTags(template), replacements)
 
-  def RegisterFunction(self, name, function):
+  @staticmethod
+  def RegisterFunction(name, function):
     """Registers a templating `function`, allowing use in templates by `name`.
 
     Arguments:
