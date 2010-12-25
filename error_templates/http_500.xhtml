@@ -9,10 +9,27 @@
     }
     h2{
       margin:2em 0 .5em;
+      line-height:.7em;
+    }
+    p{
+      margin:0.5em;
     }
     ol, ul{
       margin:0;
-      padding:0 0 0 2em;}
+      padding:0 0 0 2em;
+    }
+    .source, .locals, .traceback{
+      padding:.3em 0 .3em 2em;
+      list-style:none;
+      counter-reset:item;
+    }
+    .traceback>li:before{
+      font:bold italic 2em serif;
+      content:counter(item);
+      counter-increment:item;
+      float:left;
+      margin:0 0 0 -.7em;
+    }
     .frame{
       background:#ddddc8;
       border:2px solid #999;
@@ -20,18 +37,15 @@
       padding:1em 0 .5em 1em;
       list-style:none;
     }
-    .source, .locals{
-      padding:.3em 2em;
-      list-style:none;
-    }
     .source>li{
       white-space:pre;
     }
     .source>li:nth-child(4){
-      color:#c00
+      color:#c00;
+      font-weight:bold;
     }
     .source>li:before{
-      content:counter(n) ".";
+      content:"[" counter(n) "]";
       counter-increment:n;
       display:inline-block;
     }
@@ -40,10 +54,11 @@
   <body>
     <h1>Internal Server Error (HTTP 500)</h1>
     <p>Wow, no idea what you did there, but the server sure choked on it</p>
-    <h2>Traceback</h2>
-    <ol>[exc:traceback|raw]</ol>
-    <h3>[exc:type]</h3>
+    <h2>[exc:type]</h2>
     <p>[exc:value]</p>
+    <h2>Traceback</h2>
+    <p>Most recent call first:</p>
+    <ol class="traceback">[exc:traceback|raw]</ol>
     <h2>Query arguments (GET)</h2>
     <ul>[query_args|raw]</ul>
     <h2>POST data</h2>

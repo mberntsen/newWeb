@@ -262,7 +262,7 @@ class PageMaker(object):
             query_args=''.join(query_args) or nulldata,
             post_data=''.join(post_data) or nulldata,
             exc={'type': sys.exc_type, 'value': sys.exc_value,
-                 'traceback': ''.join(ParseStackFrames())}),
+                 'traceback': ''.join(reversed(list(ParseStackFrames())))}),
         httpcode=200)
 
   @staticmethod
