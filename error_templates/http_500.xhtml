@@ -5,20 +5,17 @@
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     <style type="text/css">
     html{
-      font:1em/1.2 monospace
+      font:1em/1.2em monospace;
     }
     h2{
-      margin:2em 0 .5em;
+      margin:1.5em 0 .5em;
       line-height:.7em;
     }
     p{
       margin:0.5em;
     }
-    ol, ul{
-      margin:0;
-      padding:0 0 0 2em;
-    }
-    .source, .locals, .traceback{
+    .traceback{
+      margin:0 0 -2em;
       padding:.3em 0 .3em 2em;
       list-style:none;
       counter-reset:item;
@@ -31,23 +28,57 @@
       margin:0 0 0 -.7em;
     }
     .frame{
-      background:#ddddc8;
-      border:2px solid #999;
+      background:#eed;
+      border:1px solid #ccc;
       margin:0 0 2em 1em;
-      padding:1em 0 .5em 1em;
+      padding:.5em .8em;
       list-style:none;
     }
-    .source>li{
-      white-space:pre;
+    .frame table{
+      margin:.8em 0 .4em;
     }
-    .source>li:nth-child(4){
+    .source tbody td{
+      white-space:pre;
+      padding: 0 .6em;
+    }
+    .source tbody td:first-child{
+      border-right:1px solid #888;
+    }
+    .source tr:nth-child(4){
       color:#c00;
       font-weight:bold;
     }
-    .source>li:before{
-      content:"[" counter(n) "]";
-      counter-increment:n;
-      display:inline-block;
+    .source td+td:before{
+      content:none;
+    }
+    table{
+      background:#eed;
+      border-collapse:collapse;
+      border:1px solid #888;
+      margin:1em;
+    }
+    table thead td{
+      background:#888;
+      color:#fff;
+      padding:.1em 1.5em;
+    }
+    table td:first-child{
+      font-weight:bold;
+    }
+    table td+td:before{
+      content:"= ";
+    }
+    table td{
+      padding:0 0 0 .6em;
+    }
+    table td+td{
+      width:100%;
+    }
+    table tr:nth-child(2n){
+      background:#ddc;
+    }
+    table tr:hover{
+      background:#bbf;
     }
     </style>
   </head>
@@ -56,14 +87,24 @@
     <p>Wow, no idea what you did there, but the server sure choked on it</p>
     <h2>[exc:type]</h2>
     <p>[exc:value]</p>
-    <h2>Traceback</h2>
-    <p>Most recent call first:</p>
+    <h2>Traceback<small> (most recent call first)</small></h2>
     <ol class="traceback">[exc:traceback|raw]</ol>
-    <h2>Query arguments (GET)</h2>
-    <ul>[query_args|raw]</ul>
-    <h2>POST data</h2>
-    <ul>[post_data|raw]</ul>
-    <h2>Full environment</h2>
-    <ul>[environ|raw]</ul>
+    <h2>Environment information</h2>
+    <table>
+      <thead><tr><td colspan="2">Cookies</td></tr></thead>
+      <tbody>[cookies|raw]</tbody>
+    </table>
+    <table>
+      <thead><tr><td colspan="2">Query arguments (GET)</td></tr></thead>
+      <tbody>[query_args|raw]</tbody>
+    </table>
+    <table>
+      <thead><tr><td colspan="2">POST data</td></tr></thead>
+      <tbody>[post_data|raw]</tbody>
+    </table>
+    <table>
+      <thead><tr><td colspan="2">Full environment</td></tr></thead>
+      <tbody>[environ|raw]</tbody>
+    </table>
   </body>
 </html>

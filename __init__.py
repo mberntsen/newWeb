@@ -231,16 +231,15 @@ class PageMaker(object):
           str: Templated list-item for a source code line.
         """
         for line_num in xrange(line_num - context, line_num + context + 1):
-          yield self.parser.ParseString(
-              '<li style="counter-reset: n [line]">[code]</li>',
-              line=line_num - 1, code=linecache.getline(filename, line_num))
+          yield self.parser.Parse('var_row.xhtml', var=(
+              line_num - 1, linecache.getline(filename, line_num)))
       while stack:
         frame = stack.tb_frame
         yield self.parser.Parse('stack_frame.xhtml', frame={
             'file': frame.f_code.co_filename,
             'scope': frame.f_code.co_name,
             'locals': ''.join(
-                self.parser.Parse('var_list.xhtml', var=(name, repr(value)))
+                self.parser.Parse('var_row.xhtml', var=(name, repr(value)))
                 for name, value in sorted(frame.f_locals.items())),
             'source': ''.join(SourceLines(frame.f_code.co_filename,
                                           frame.f_lineno))})
@@ -248,20 +247,24 @@ class PageMaker(object):
     import linecache
     self.parser.template_dir = os.path.abspath(
         os.path.join(os.path.dirname(__file__), 'error_templates'))
-    environ = [self.parser.Parse('var_list.xhtml', var=var)
+    cookies = [self.parser.Parse(
+                   'var_row.xhtml', var=(name, self.cookies[name].value))
+               for name in sorted(self.cookies)]
+    environ = [self.parser.Parse('var_row.xhtml', var=var)
                for var in sorted(self.req.ExtendedEnvironment().items())]
-    post_data = [self.parser.Parse('var_list.xhtml', var=(var, self.post[var]))
+    post_data = [self.parser.Parse('var_row.xhtml', var=(var, self.post[var]))
                  for var in sorted(self.post)]
-    query_args = [self.parser.Parse('var_list.html', var=(var, self.get[var]))
+    query_args = [self.parser.Parse('var_row.xhtml', var=(var, self.get[var]))
                   for var in sorted(self.get)]
-    nulldata = '<li><em>NULL</em></li>'
+    nulldata = '<tr><td colspan="2"><em>NULL</em></td></tr>'
     return Page(
         self.parser.Parse(
             'http_500.xhtml',
-            environ=''.join(environ),
+            cookies=''.join(cookies) or nulldata,
+            environ=''.join(environ) or nulldata,
             query_args=''.join(query_args) or nulldata,
             post_data=''.join(post_data) or nulldata,
-            exc={'type': sys.exc_type, 'value': sys.exc_value,
+            exc={'type': sys.exc_type.__name__, 'value': sys.exc_value,
                  'traceback': ''.join(reversed(list(ParseStackFrames())))}),
         httpcode=200)
 
