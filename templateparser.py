@@ -146,6 +146,9 @@ class Parser(dict):
 
     N.B. All <unicode> tags will be converted to utf8 byte strings.
 
+    If a tag fails parsing at any point, due to bad tag-names, nonexisting keys
+    or attributes, or a bad function name, the tag is returned verbatim.
+
     Arguments:
       @ tags: iter of str
         Strings that describe tags, indices and functions on them.
@@ -163,16 +166,19 @@ class Parser(dict):
         replacement = replacements[needle]
         if index:
           replacement = Parser._CollectFromIndex(replacement, index)
-        if isinstance(replacement, unicode):
-          replacement = replacement.encode('utf8')
         if funcs:
           for func in funcs:
             replacement = TEMPLATE_FUNCTIONS[func](replacement)
-          yield replacement
         elif type(replacement) == SafeString:
           yield replacement
         else:
-          yield TEMPLATE_FUNCTIONS['default'](replacement)
+          replacement = TEMPLATE_FUNCTIONS['default'](replacement)
+
+        # We will encode our returns down to utf8 byte strings.
+        if type(replacement) == unicode:
+          yield replacement.encode('utf8')
+        else:
+          yield replacement
       except (AttributeError, IndexError, KeyError):
         # AttributeError and IndexError originate from `CollectFromIndex`
         # KeyError is raised only at the beginning of this try block.

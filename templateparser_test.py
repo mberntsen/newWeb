@@ -175,15 +175,8 @@ class TemplateParserFunctions(unittest.TestCase):
     output = 'A replacement processed by two functions: 8 characters.'
     self.assertEqual(output, self.parser.ParseString(template, spam='ham&eggs'))
 
-
-class TemplateParserBugs(unittest.TestCase):
-  """Collection of bugs encountered in TemplateParser, mb-encoding et al."""
-  def setUp(self):
-    """Sets up a parser instance, as it never changes."""
-    self.parser = templateparser.Parser()
-
   def testFunctionSeparation(self):
-    """Functions are only offered those template fragments that refer to them"""
+    """Template functions are only called for fragments that require them"""
     fragments_received = []
     def TemplateFunction(string):
       fragments_received.append(string)
@@ -196,13 +189,39 @@ class TemplateParserBugs(unittest.TestCase):
         template, num='one', expletive='horribly', noun='broken'))
     self.assertEqual(1, len(fragments_received))
 
+
+class TemplateUnicodeBehavior(unittest.TestCase):
+  """TemplateParser handles Unicode gracefully."""
+  def setUp(self):
+    """Sets up a parser instance, as it never changes."""
+    self.parser = templateparser.Parser()
+
   def testUnicodeInput(self):
     """TemplateParser can handle unicode objects on input, converts to utf8"""
-    self.parser.RegisterFunction('mb', TemplateFunction)
-    template = 'Underdark Web framework, also known as [name|mb].'
+    template = 'Underdark Web framework, also known as [name].'
     output = u'Underdark Web framework, also known as \xb5Web.'.encode('utf8')
     name = u'\xb5Web'
     self.assertEqual(output, self.parser.ParseString(template, name=name))
+
+  def testCreoleTemplateParsing(self):
+    """The Creole module's return of <unicode> doesn't break the parser"""
+    from underdark.libs import creole
+    self.parser.RegisterFunction('creole', creole.CreoleToHtml)
+    template = 'Creole [expr|creole]!'
+    output = 'Creole <p><strong>rocks</strong> \xc2\xb5Web</p>\n!'
+    self.assertEqual(output, self.parser.ParseString(
+        template, expr=u'**rocks** \xb5Web'))
+
+  def testTemplateFunctionReturnUnicode(self):
+    """Template functions may return unicode objects, they are later encoded"""
+    function_result = u'No more \N{BLACK HEART SUIT}'
+    def TemplateFunction(_unused):
+      return function_result
+
+    self.parser.RegisterFunction('nolove', TemplateFunction)
+    template = '[love|nolove]'
+    output = function_result.encode('utf8')
+    self.assertEqual(output, self.parser.ParseString(template, love='love'))
 
 
 if __name__ == '__main__':
