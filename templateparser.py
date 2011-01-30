@@ -144,6 +144,8 @@ class Parser(dict):
   def _TagReplace(tags, replacements):
     """Replaces tags from a given `tags` iterable, using `replacements`.
 
+    N.B. All <unicode> tags will be converted to utf8 byte strings.
+
     Arguments:
       @ tags: iter of str
         Strings that describe tags, indices and functions on them.
@@ -161,6 +163,8 @@ class Parser(dict):
         replacement = replacements[needle]
         if index:
           replacement = Parser._CollectFromIndex(replacement, index)
+        if isinstance(replacement, unicode):
+          replacement = replacement.encode('utf8')
         if funcs:
           for func in funcs:
             replacement = TEMPLATE_FUNCTIONS[func](replacement)

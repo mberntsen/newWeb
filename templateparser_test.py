@@ -176,5 +176,34 @@ class TemplateParserFunctions(unittest.TestCase):
     self.assertEqual(output, self.parser.ParseString(template, spam='ham&eggs'))
 
 
+class TemplateParserBugs(unittest.TestCase):
+  """Collection of bugs encountered in TemplateParser, mb-encoding et al."""
+  def setUp(self):
+    """Sets up a parser instance, as it never changes."""
+    self.parser = templateparser.Parser()
+
+  def testFunctionSeparation(self):
+    """Functions are only offered those template fragments that refer to them"""
+    fragments_received = []
+    def TemplateFunction(string):
+      fragments_received.append(string)
+      return string
+
+    self.parser.RegisterFunction('x', TemplateFunction)
+    template = 'X only has [num|x] call, else it\'s [expletive] [noun|raw].'
+    output = 'X only has one call, else it\'s horribly broken.'
+    self.assertEqual(output, self.parser.ParseString(
+        template, num='one', expletive='horribly', noun='broken'))
+    self.assertEqual(1, len(fragments_received))
+
+  def testUnicodeInput(self):
+    """TemplateParser can handle unicode objects on input, converts to utf8"""
+    self.parser.RegisterFunction('mb', TemplateFunction)
+    template = 'Underdark Web framework, also known as [name|mb].'
+    output = u'Underdark Web framework, also known as \xb5Web.'.encode('utf8')
+    name = u'\xb5Web'
+    self.assertEqual(output, self.parser.ParseString(template, name=name))
+
+
 if __name__ == '__main__':
   unittest.main(testRunner=unittest.TextTestRunner(verbosity=2))
