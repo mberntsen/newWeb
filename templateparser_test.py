@@ -22,7 +22,9 @@ class TemplateParserTags(unittest.TestCase):
   def testPlainTemplate(self):
     """Templates without tags get returned whole"""
     template = 'Template without any tags'
-    self.assertEqual(template, self.parser.ParseString(template))
+    parsed_template = self.parser.ParseString(template)
+    self.assertEqual(template, parsed_template)
+    self.assertTrue(isinstance(parsed_template, templateparser.SafeString))
 
   def testSingleTagTemplate(self):
     """Templates with basic tags get returned proper"""
@@ -159,6 +161,14 @@ class TemplateParserFunctions(unittest.TestCase):
         template_default, none='"nothing"'))
     self.assertEqual(output, self.parser.ParseString(
         template_escape, none='"nothing"'))
+
+  def testNoDefaultForSafeString(self):
+    first_template = 'Hello doctor [name]'
+    second_template = '<assistant> [quote].'
+    result = '<assistant> Hello doctor &quot;Who&quot;.'
+    output_first = self.parser.ParseString(first_template, name='"Who"')
+    output_second = self.parser.ParseString(second_template, quote=output_first)
+    self.assertEqual(result, output_second)
 
   def testCustomFunction(self):
     """Custom functions added to the parser work as expected"""

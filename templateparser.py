@@ -171,6 +171,7 @@ class Parser(dict):
             replacement = TEMPLATE_FUNCTIONS[func](replacement)
         elif type(replacement) == SafeString:
           yield replacement
+          continue
         else:
           replacement = TEMPLATE_FUNCTIONS['default'](replacement)
 
