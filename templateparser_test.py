@@ -163,6 +163,7 @@ class TemplateParserFunctions(unittest.TestCase):
         template_escape, none='"nothing"'))
 
   def testNoDefaultForSafeString(self):
+    """SafeString objects are not fed through the default templating function"""
     first_template = 'Hello doctor [name]'
     second_template = '<assistant> [quote].'
     result = '<assistant> Hello doctor &quot;Who&quot;.'
@@ -188,11 +189,12 @@ class TemplateParserFunctions(unittest.TestCase):
   def testFunctionSeparation(self):
     """Template functions are only called for fragments that require them"""
     fragments_received = []
-    def TemplateFunction(string):
-      fragments_received.append(string)
-      return string
+    def CountAndReturn(fragment):
+      """Returns the given fragment after adding it to a counter list."""
+      fragments_received.append(fragment)
+      return fragment
 
-    self.parser.RegisterFunction('x', TemplateFunction)
+    self.parser.RegisterFunction('x', CountAndReturn)
     template = 'X only has [num|x] call, else it\'s [expletive] [noun|raw].'
     output = 'X only has one call, else it\'s horribly broken.'
     self.assertEqual(output, self.parser.ParseString(
@@ -225,10 +227,11 @@ class TemplateUnicodeBehavior(unittest.TestCase):
   def testTemplateFunctionReturnUnicode(self):
     """Template functions may return unicode objects, they are later encoded"""
     function_result = u'No more \N{BLACK HEART SUIT}'
-    def TemplateFunction(_unused):
+    def StaticReturn(_fragment):
+      """Returns a static string, for any input fragment."""
       return function_result
 
-    self.parser.RegisterFunction('nolove', TemplateFunction)
+    self.parser.RegisterFunction('nolove', StaticReturn)
     template = '[love|nolove]'
     output = function_result.encode('utf8')
     self.assertEqual(output, self.parser.ParseString(template, love='love'))
