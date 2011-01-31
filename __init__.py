@@ -95,7 +95,7 @@ class PageMaker(object):
   # which is not desirable).
   @property
   def connection(self):
-    if not self._connection:
+    if self._connection is None:
       if 'mysql' in self.options:
         from underdark.libs.sqltalk import mysql
         mysqlopts = self.options['mysql']
@@ -130,7 +130,7 @@ class PageMaker(object):
                   DeprecationWarning, stacklevel=2)
     logging.LogWarning('Cursor property is disappearing, please use the '
                        'connection property and its context manager instead')
-    if not self._cursor:
+    if self._cursor is None:
       if 'mysql' in self.options:
         self._cursor = self.connection.Cursor()
       elif 'sqlite' in self.options:
@@ -148,7 +148,7 @@ class PageMaker(object):
     assigned in there, this path will be used.
     Otherwise, the `TEMPLATE_DIR` will be used to load templates from.
     """
-    if not self._parser:
+    if self._parser is None:
       self._parser = templateparser.Parser(
           self.options.get('templates', {}).get('path', self.TEMPLATE_DIR))
     return self._parser
@@ -156,7 +156,7 @@ class PageMaker(object):
   @property
   def userid(self):
     """Provides the ID of the logged in user, if a valid session is available"""
-    if not self._userid:
+    if self._userid is None:
       self._userid = self._GetSessionUserId()
     return self._userid
 
