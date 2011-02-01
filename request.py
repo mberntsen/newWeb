@@ -8,6 +8,7 @@ __version__ = '0.3'
 import cgi
 import Cookie
 import os
+import re
 import socket
 import urllib
 
