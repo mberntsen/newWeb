@@ -13,7 +13,6 @@ import urllib
 
 # Custom modules
 #from underdark.libs import logging
-from underdark.libs import purl
 
 
 class Request(object):
@@ -34,10 +33,9 @@ class Request(object):
     self.vars = {'cookie': ExtractCookies(self.env.get('HTTP_COOKIE')),
                  'get': cgi.parse_qs(self.env['QUERY_STRING'])}
     if self.env['REQUEST_METHOD'] == 'POST':
-      self.vars['post'] = purl.ArrayParsingFieldStorage(post_data_fp,
-                                                        environ=self.env)
+      self.vars['post'] = IndexedFieldStorage(post_data_fp, environ=self.env)
     else:
-      self.vars['post'] = purl.ArrayParsingFieldStorage()
+      self.vars['post'] = IndexedFieldStorage()
 
   def AddCookie(self, key, value, **attrs):
     cookie = Cookie.SimpleCookie({key: value})
@@ -81,6 +79,37 @@ class Request(object):
         self._request.wfile.write(data.encode('utf8'))
       else:
         self._request.wfile.write(data)
+
+
+class IndexedFieldStorage(cgi.FieldStorage):
+  """Adaption of cgi.FieldStorage with a few specific changes.
+
+  Notable differences with cgi.FieldStorage:
+    1) `environ.QUERY_STRING` does not add to the returned FieldStorage
+       This way we maintain a strict separation between POST and GET variables.
+    2) Field names in the form 'foo[bar]=baz' will generate a dictionary:
+         foo = {'bar': 'baz'}
+       Multiple statements of the form 'foo[%s]' will expand this dictionary.
+       Multiple occurrances of 'foo[bar]' will result in unspecified behavior.
+  """
+  FIELD_AS_ARRAY = re.compile(r'(.*)\[(.*)\]')
+  def read_urlencoded(self):
+    self.qs_on_post = ''  # We do NOT parse QUERY_STRING in our FIELD_STORAGE.
+    previous_len = len(self.list) if self.list else 0
+    cgi.FieldStorage.read_urlencoded(self) # OLD class, damnit!
+    new_form_fields = self.list[previous_len:]
+    del self.list[previous_len:]
+
+    new_fields = {}
+    for field in new_form_fields:
+      if self.FIELD_AS_ARRAY.match(field.name):
+        field_group, field_key = self.FIELD_AS_ARRAY.match(field.name).groups()
+        new_fields.setdefault(
+            field_group, cgi.MiniFieldStorage(field_group, {}))
+        new_fields[field_group].value[field_key] = field.value
+      else:
+        self.list.append(field)
+    self.list.extend(new_fields.values())
 
 
 def EnvironBaseHttp(request):
