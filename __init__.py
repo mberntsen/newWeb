@@ -56,20 +56,24 @@ class PageMaker(object):
   def __init__(self, req, config_file=None):
     """sets up the template parser and database connections
 
-    Takes:
-      sessiondata: dict:
-        remote_addr: str, ip addres of client
-        cookies:     str, cookies from header
+    Arguments:
+      @ req: request.Request
+        The originating request, including environment, GET, POST and cookies.
+      % config_file: str ~~ None
+        Configfile for the pagemaker, with database connection information
+        and other settings. These will be stored on the instance dict `options`.
     """
     self.__SetupPaths()
     self._parser = None
-    self.options = udders.ParseConfig(os.path.join(self.LOCAL_DIR, config_file))
     self.req = req
-
-    # GET/POST/Cookie vars
     self.cookies = req.vars['cookie']
     self.get = req.vars['get']
     self.post = req.vars['post']
+    if config_file:
+      self.options = udders.ParseConfig(
+          os.path.join(self.LOCAL_DIR, config_file))
+    else:
+      self.options = {}
 
   @classmethod
   def __SetupPaths(cls):
@@ -413,7 +417,7 @@ class Response(object):
     return self.content
 
 
-def Handler(req, pageclass, routes, config_file='config.cfg', debug=False):
+def Handler(req, pageclass, routes, config_file=None, debug=False):
   """Handles a web request through processing the routes list.
 
   The url in the received `req` object is taken and matches against the
