@@ -62,11 +62,7 @@ class PageMaker(object):
         cookies:     str, cookies from header
     """
     self.__SetupPaths()
-    self._connection = None
-    self._cursor = None
     self._parser = None
-    self._userid = None
-    self.session_handler = None
     self.options = udders.ParseConfig(os.path.join(self.LOCAL_DIR, config_file))
     self.req = req
 
@@ -88,58 +84,6 @@ class PageMaker(object):
     cls.PUBLIC_DIR = os.path.join(cls_dir, cls.PUBLIC_DIR)
     cls.TEMPLATE_DIR = os.path.join(cls_dir, cls.TEMPLATE_DIR)
 
-  #TODO(Elmer): Put the connection property in separate Mixin classes
-  # This allows the developer to simple inherit from the desired mixin,
-  # and receive the appropriate connection, without making this needlessly
-  # complex, and error prone. (A bad config block can now break the application,
-  # which is not desirable).
-  @property
-  def connection(self):
-    if self._connection is None:
-      if 'mysql' in self.options:
-        from underdark.libs.sqltalk import mysql
-        mysqlopts = self.options['mysql']
-        self._connection = mysql.Connect(
-            host=mysqlopts.get('host', 'localhost'),
-            user=mysqlopts.get('user'),
-            passwd=mysqlopts.get('password'),
-            db=mysqlopts.get('database'),
-            charset=mysqlopts.get('charset', 'utf8'))
-      elif 'sqlite' in self.options:
-        from underdark.libs.sqltalk import sqlite
-        self._connection = sqlite.Connect(self.options['sqlite']['database'])
-      elif 'mongodb' in self.options:
-        import pymongo
-        try:
-          self._connection = pymongo.connection.Connection(
-              host=self.options['mongodb'].get('host', 'localhost'),
-              port=self.options['mongodb'].get('port', None))
-        except pymongo.errors.AutoReconnect:
-          raise DatabaseError('MongoDb is unavailable')
-        except pymongo.errors.ConnectionFailure:
-          raise DatabaseError('MongoDb is unavailable')
-      else:
-        raise TypeError('E_NODATABASE')
-    return self._connection
-
-  @property
-  def cursor(self):
-    """Provides a cursor to the database as specified in the options dict"""
-    warnings.warn('Cursor property is disappearing, please use the connection '
-                  'property and its context manager instead',
-                  DeprecationWarning, stacklevel=2)
-    logging.LogWarning('Cursor property is disappearing, please use the '
-                       'connection property and its context manager instead')
-    if self._cursor is None:
-      if 'mysql' in self.options:
-        self._cursor = self.connection.Cursor()
-      elif 'sqlite' in self.options:
-        self._cursor = self.connection.Cursor()
-      elif 'mongodb' in self.options:
-        self._cursor = getattr(
-            self.connection, self.options['mongodb']['database'])
-    return self._cursor
-
   @property
   def parser(self):
     """Provides a templateparser.Parser instance.
@@ -148,55 +92,10 @@ class PageMaker(object):
     assigned in there, this path will be used.
     Otherwise, the `TEMPLATE_DIR` will be used to load templates from.
     """
-    if self._parser is None:
+    if self._parser is not None:
       self._parser = templateparser.Parser(
           self.options.get('templates', {}).get('path', self.TEMPLATE_DIR))
     return self._parser
-
-  @property
-  def userid(self):
-    """Provides the ID of the logged in user, if a valid session is available"""
-    if self._userid is None:
-      self._userid = self._GetSessionUserId()
-    return self._userid
-
-  def _GetSessionHandler(self):
-    """Creates a session handler used to check sessions"""
-    return pysession.Session(
-        connection=self.connection,
-        usertable='users',
-        sessiontable='sessions',
-        domain='true',
-        remoteip=self.req['remote_addr'],
-        columns={'user': 'emailaddress',
-                 'password': 'password',
-                 'useractive': 'status'},
-        activestates='valid')
-
-  def _GetSessionUserId(self):
-    """Tries to validate a session by its cookiestring and IP address
-
-    sets:
-      self.options['login']: to True if logged in
-      self.session['id']:    session id
-      self.session['key']:   session password
-
-    returns:
-      True if logged in
-      False if session is invalid
-    """
-    if 'session' not in self.cookies:
-      return False
-    raw_session = self.cookies.get['session'].value
-    session_id, _sep, session_key = raw_session.partition(':')
-    if not (session_id and session_key):
-      return False
-    try:
-      session_handler = self._GetSessionHandler()
-      session_handler.ResumeSession(session_id, session_key)
-      return session_handler.userid
-    except (pysession.SessionError, ValueError):
-      return False
 
   def _InternalServerErrorDebug(self):
     """Returns a HTTP 500 response with detailed failure analysis."""
@@ -328,9 +227,148 @@ class PageMaker(object):
       return Page(content=message, httpcode=404, content_type='text/plain')
 
 
-#TODO(Elmer): Deprecate BasePageMaker in favor of PageMaker.
-class BasePageMaker(PageMaker):
-  """A trivial subclass of PageMaker, maintaining backwards compatibility."""
+class PageMakerDbMixin(object):
+  """Sets up the PageMaker for a database Mixin class."""
+ def __init__(self, *args, **kwds):
+    super(PageMakerDbMixin, self).__init__(*args, **kwds)
+    self._connection = None
+    self._cursor = None
+
+
+class PageMakerMysqlMixin(PageMakerDbMixin):
+  """Adds MySQL support to PageMaker."""
+  @property
+  def connection(self):
+    if self._connection is None:
+      from underdark.libs.sqltalk import mysql
+      mysqlopts = self.options['mysql']
+      self._connection = mysql.Connect(
+          host=mysqlopts.get('host', 'localhost'),
+          user=mysqlopts.get('user'),
+          passwd=mysqlopts.get('password'),
+          db=mysqlopts.get('database'),
+          charset=mysqlopts.get('charset', 'utf8'))
+    return self._connection
+
+  @property
+  def cursor(self):
+    """Provides a cursor to the database as specified in the options dict"""
+    warnings.warn('Cursor property is disappearing, please use the connection '
+                  'property and its context manager instead',
+                  DeprecationWarning, stacklevel=2)
+    logging.LogWarning('Cursor property is disappearing, please use the '
+                       'connection property and its context manager instead')
+    if self._cursor is None:
+      self._cursor = self.connection.Cursor()
+    return self._cursor
+
+
+class PageMakerMongodbMixin(PageMakerDbMixin):
+  """Adds MongoDB support to PageMaker."""
+  @property
+  def connection(self):
+    if self._connection is None:
+      import pymongo
+      try:
+        self._connection = pymongo.connection.Connection(
+            host=self.options['mongodb'].get('host', 'localhost'),
+            port=self.options['mongodb'].get('port', None))
+      except pymongo.errors.AutoReconnect:
+        raise DatabaseError('MongoDb is unavailable')
+      except pymongo.errors.ConnectionFailure:
+        raise DatabaseError('MongoDb is unavailable')
+    return self._connection
+
+  @property
+  def cursor(self):
+    """Provides a cursor to the database as specified in the options dict"""
+    warnings.warn('Cursor property is disappearing, please use the connection '
+                  'property and its context manager instead',
+                  DeprecationWarning, stacklevel=2)
+    logging.LogWarning('Cursor property is disappearing, please use the '
+                       'connection property and its context manager instead')
+    if self._cursor is None:
+      self._cursor = getattr(
+          self.connection, self.options['mongodb']['database'])
+    return self._cursor
+
+
+class PageMakerSqliteMixIn(PageMakerDbMixin):
+  """Adds SQLite support to PageMaker."""
+  @property
+  def connection(self):
+    if self._connection is None:
+      from underdark.libs.sqltalk import sqlite
+      self._connection = sqlite.Connect(self.options['sqlite']['database'])
+    return self._connection
+
+  @property
+  def cursor(self):
+    """Provides a cursor to the database as specified in the options dict"""
+    warnings.warn('Cursor property is disappearing, please use the connection '
+                  'property and its context manager instead',
+                  DeprecationWarning, stacklevel=2)
+    logging.LogWarning('Cursor property is disappearing, please use the '
+                       'connection property and its context manager instead')
+    if self._cursor is None:
+      self._cursor = self.connection.Cursor()
+    return self._cursor
+
+
+class PageMakerSessionMixin(object):
+  """Adds pysession support to PageMaker."""
+  def __init__(self, *args, **kwds):
+    super(PageMakerSessionMixin, self).__init__(*args, **kwds)
+    self._userid = None
+
+  @property
+  def userid(self):
+    """Provides the ID of the logged in user, if a valid session is available"""
+    if self._userid is None:
+      self._userid = self._GetSessionUserId()
+    return self._userid
+
+  def _GetSessionHandler(self):
+    """Creates a session handler used to check sessions"""
+    return pysession.Session(
+        connection=self.connection,
+        usertable='users',
+        sessiontable='sessions',
+        domain='true',
+        remoteip=self.req['remote_addr'],
+        columns={'user': 'emailaddress',
+                 'password': 'password',
+                 'useractive': 'status'},
+        activestates='valid')
+
+  def _GetSessionUserId(self):
+    """Tries to validate a session by its cookiestring and IP address
+
+    sets:
+      self.options['login']: to True if logged in
+      self.session['id']:    session id
+      self.session['key']:   session password
+
+    returns:
+      True if logged in
+      False if session is invalid
+    """
+    if 'session' not in self.cookies:
+      return False
+    raw_session = self.cookies.get['session'].value
+    session_id, _sep, session_key = raw_session.partition(':')
+    if not (session_id and session_key):
+      return False
+    try:
+      session_handler = self._GetSessionHandler()
+      session_handler.ResumeSession(session_id, session_key)
+      return session_handler.userid
+    except (pysession.SessionError, ValueError):
+      return False
+
+
+class BasePageMaker(PageMaker, PageMakerMysqlMixin, PageMakerSessionMixin):
+  """The basic PageMaker package, providing MySQL and Pysession support."""
 
 
 #TODO(Elmer): Rename this 'Response', to better cover the purpose.
