@@ -92,7 +92,7 @@ class PageMaker(object):
     assigned in there, this path will be used.
     Otherwise, the `TEMPLATE_DIR` will be used to load templates from.
     """
-    if self._parser is not None:
+    if self._parser is None:
       self._parser = templateparser.Parser(
           self.options.get('templates', {}).get('path', self.TEMPLATE_DIR))
     return self._parser
