@@ -131,7 +131,7 @@ class PageMaker(object):
         """
         for line_num in xrange(line_num - context, line_num + context + 1):
           yield self.parser.Parse('var_row.xhtml', var=(
-              line_num - 1, linecache.getline(filename, line_num)))
+              line_num, linecache.getline(filename, line_num)))
       while stack:
         frame = stack.tb_frame
         yield self.parser.Parse('stack_frame.xhtml', frame={
