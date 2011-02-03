@@ -229,7 +229,7 @@ class PageMaker(object):
 
 class PageMakerDbMixin(object):
   """Sets up the PageMaker for a database Mixin class."""
- def __init__(self, *args, **kwds):
+  def __init__(self, *args, **kwds):
     super(PageMakerDbMixin, self).__init__(*args, **kwds)
     self._connection = None
     self._cursor = None
