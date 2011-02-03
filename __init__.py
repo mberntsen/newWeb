@@ -156,7 +156,7 @@ class PageMaker(object):
     query_args = [self.parser.Parse('var_row.xhtml', var=(var, self.get[var]))
                   for var in sorted(self.get)]
     nulldata = '<tr><td colspan="2"><em>NULL</em></td></tr>'
-    return Page(
+    return Response(
         self.parser.Parse(
             'http_500.xhtml',
             cookies=''.join(cookies) or nulldata,
@@ -173,8 +173,8 @@ class PageMaker(object):
 
     Clients should override this in their own pagemaker subclasses.
     """
-    return Page('INTERNAL SERVER ERROR (HTTP 500)',
-                content_type='text/plain', httpcode=500)
+    return Response('INTERNAL SERVER ERROR (HTTP 500)',
+                    content_type='text/plain', httpcode=500)
 
   def InternalServerError(self):
     """Processes an Internal Server Error.
@@ -219,12 +219,12 @@ class PageMaker(object):
           # and a custom dict, if that fails, add Magic Mime detection
           #XXX(Elmer): mimetypes.guess_type is already strictly extension based.
           content_type = 'text/plain'
-        return Page(content=staticfile.read(),
-                    content_type=content_type)
+        return Response(content=staticfile.read(),
+                        content_type=content_type)
     except IOError:
       message = 'This is not the path you\'re looking for. No such file %r' % (
           self.req.env['PATH_INFO'])
-      return Page(content=message, httpcode=404, content_type='text/plain')
+      return Response(content=message, httpcode=404, content_type='text/plain')
 
 
 class PageMakerDbMixin(object):
@@ -371,8 +371,7 @@ class BasePageMaker(PageMaker, PageMakerMysqlMixin, PageMakerSessionMixin):
   """The basic PageMaker package, providing MySQL and Pysession support."""
 
 
-#TODO(Elmer): Rename this 'Response', to better cover the purpose.
-class Page(object):
+class Response(object):
   """Defines a full HTTP response.
 
   The full response consists of a required content part, and then optional
@@ -381,7 +380,7 @@ class Page(object):
   # Default content-type for Page objects
   CONTENT_TYPE = 'text/html'
 
-  def __init__(self, content, content_type=CONTENT_TYPE,
+  def __init__(self, content='', content_type=CONTENT_TYPE,
                cookies=(), headers=None,  httpcode=200):
     """Initializes a Page object.
 
@@ -469,8 +468,8 @@ def Handler(req, pageclass, routes, config_file='config.cfg', debug=False):
   except (Exception, NoRouteError):
     content = pages.InternalServerError()
 
-  if not isinstance(content, Page):
-    content = Page(content)
+  if not isinstance(content, Response):
+    content = Response(content=content)
   req.SetHttpStatus(content.httpcode)
   req.SetContentType(content.content_type)
   for header_pair in content.headers.iteritems():

@@ -97,7 +97,7 @@ class PageMaker(uweb.BasePageMaker):
         Linebreaks and leading whitespace are honored.
         <strong>HTML tags do nothing, as demonstrated above<strong>.
         """
-    return uweb.Page(content=text, content_type='text/plain')
+    return uweb.Response(content=text, content_type='text/plain')
 
   @staticmethod
   def RequestRedirect(location):
@@ -111,17 +111,21 @@ class PageMaker(uweb.BasePageMaker):
       @ location: str
         The full URL the client should be redirected to, including schema.
     """
-    return uweb.Page('', headers={'Location': location}, httpcode=302)
+    return uweb.Response(headers={'Location': location}, httpcode=302)
 
   def RequestInvalidcommand(self, path):
     """The request could not be fulfilled, this returns a 404."""
     logging.LogWarning('Bad page %r requested', path)
-    return uweb.Page(self.parser.Parse(
-        '404.html', path=path, **self.CommonBlocks('http404')), httpcode=404)
+    return uweb.Response(
+        httpcode=404,
+        content=self.parser.Parse(
+            '404.html', path=path, **self.CommonBlocks('http404')))
 
   def _InternalServerErrorProduction(self):
     """Returns a HTTP 500 page, since the request failed elsewhere."""
     path = self.req.env['PATH_INFO']
     logging.LogError('Execution of %r triggered an exception', path)
-    return uweb.Page(self.parser.Parse(
-        '500.html', path=path, **self.CommonBlocks('http500')), httpcode=500)
+    return uweb.Response(
+        httpcode=500,
+        content=self.parser.Parse(
+            '500.html', path=path, **self.CommonBlocks('http500')))
