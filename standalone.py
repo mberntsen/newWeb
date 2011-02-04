@@ -19,8 +19,7 @@ class ServerRunningError(Exception):
 
 class StandaloneServer(object):
   def __init__(self, handler, server=None):
-    if server == None:
-      server = {}
+    server = server or {}
     host = server.get('host', '0.0.0.0')
     port = int(server.get('port', '8082'))
     try:
