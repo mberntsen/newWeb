@@ -371,7 +371,7 @@ class PageMakerSessionMixin(object):
       return False
 
 
-class BasePageMaker(PageMaker, PageMakerMysqlMixin, PageMakerSessionMixin):
+class BasePageMaker(PageMakerMysqlMixin, PageMakerSessionMixin, PageMaker):
   """The basic PageMaker package, providing MySQL and Pysession support."""
 
 
