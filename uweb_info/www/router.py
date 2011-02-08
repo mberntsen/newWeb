@@ -52,7 +52,7 @@ def handler(request):
               request. In most cases, the return value is of little interest,
               as the `request` argument will be used to generate a response.
   """
-  return uweb.Handler(request, PAGE_CLASS, ROUTES, debug=True)
+  return uweb.Handler(request, PAGE_CLASS, ROUTES)
 
 
 uweb.ServerSetup(handler)

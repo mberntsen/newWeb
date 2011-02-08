@@ -3,10 +3,12 @@
       <div>
         <h2>We're sorry, our server broke. (HTTP 500)</h2>
         <p>
-          Something went terribly wrong with your request (&quot;[path]&quot;).<br />
-          Hopefully this is because you requested the HTTP 500 test page (&quot;/haltandcatchfire&quot;).
+          Something went terribly wrong with your request (&quot;[path]&quot;).
         </p>
-        <p>If you got this error for any other page, that's a bug and we'd like to know about this.</p>
+        <p>
+          You probably got to this page by requesting  &quot;/haltandcatchfire&quot;. This is the non-debugging result page for an Internal Server Error. This was raised because the requested <code>PageMaker</code> method generated an error (though it also happens when no route is defined for a request). If you were running your pagemaker subclassed from <code>uweb.DebuggingPageMaker</code> (as opposed to the <code>uweb.PageMaker</code> you're using now), you'd be presented a page that would assist you greatly in debugging.
+        </p>
+        <p>Oh and yeah, ff you got this response for any request other than <a href="/haltandcatchfire">/haltandcatchfire</a>, that's a bug and we'd like to know about this.</p>
       </div>
     </div>
 [footer]

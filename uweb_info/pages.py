@@ -11,7 +11,7 @@ import time
 from underdark.libs import logging
 from underdark.libs import uweb
 
-class PageMaker(uweb.BasePageMaker):
+class PageMaker(uweb.PageMaker):
   """Holds all the html generators for the webapp
 
   Each page as a separate method.
@@ -121,11 +121,14 @@ class PageMaker(uweb.BasePageMaker):
         content=self.parser.Parse(
             '404.html', path=path, **self.CommonBlocks('http404')))
 
-  def _InternalServerErrorProduction(self):
+  def InternalServerError(self):
     """Returns a HTTP 500 page, since the request failed elsewhere."""
-    path = self.req.env['PATH_INFO']
-    logging.LogError('Execution of %r triggered an exception', path)
-    return uweb.Response(
-        httpcode=500,
-        content=self.parser.Parse(
-            '500.html', path=path, **self.CommonBlocks('http500')))
+    if isinstance(self, uweb.DebuggingPageMaker):
+      return super(PageMaker, self).InternalServerError()
+    else:
+      path = self.req.env['PATH_INFO']
+      logging.LogError('Execution of %r triggered an exception', path)
+      return uweb.Response(
+          httpcode=500,
+          content=self.parser.Parse(
+              '500.html', path=path, **self.CommonBlocks('http500')))
