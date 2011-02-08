@@ -112,11 +112,3 @@ HTTP_STATUS_MAP = {
     503: 'Service Unavailable',
     504: 'Gateway Time-out',
     505: 'HTTP Version not supported'}
-
-
-class CookieError(Exception):
-    pass
-
-
-class SERVER_RETURN(Exception):
-    pass

@@ -10,7 +10,6 @@ import sys
 
 # Custom modules
 from underdark.libs import logging
-import apache_mock as apache
 
 
 class ServerRunningError(Exception):
@@ -56,11 +55,7 @@ class StandaloneHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         self.close_connection = 1
       else:
         logging.LogCritical('This is REALLY unexpected, beyond the previous.')
-
-    try:
-      self.server.handler(self)
-    except apache.SERVER_RETURN:
-      pass
+    self.server.handler(self)
 
   #TODO(Elmer): Move logging to the Request object.
   def log_error(self, logmsg, *args):

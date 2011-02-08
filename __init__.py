@@ -57,12 +57,12 @@ def Handler(req, pageclass, routes, config_file=None):
 
   The processing in this function knows two main interruptions:
     1) Exception `NoRouteError`:
-       This raises apache.SERVER_RETURN with an apache.INTERNAL_SERVER_ERROR
-       attached. No route exists to tell the Handler what to do, this situation
-       should usually be prevented by a catchall route.
+       This triggers the PageMaker method InternalServerError, which generates
+       an appropriate response for the requesting client.
     2) Exception `ReloadModules`
        This halts any running execution of web-requests and reloads the
-       `pageclass`. The returned page will be the return of the relad() action.
+       `pageclass`. The response will be a text/plain page with the result of
+       the reload statement
 
   Takes:
     @ req: obj
@@ -76,11 +76,8 @@ def Handler(req, pageclass, routes, config_file=None):
       sections for databases and the like.
 
   Returns:
-    apache.OK: signal for Apache to send the page to the client. Ignored by
-               the standalone version of uWeb.
-
-  Raises:
-    apache.SERVER_RETURN: Details on these exceptions included above.
+    apache.DONE: signal for Apache to send the page to the client. Ignored by
+                 the standalone version of uWeb.
   """
   req = request.Request(req)
   pages = pageclass(req, config_file=config_file)
