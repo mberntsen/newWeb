@@ -42,7 +42,7 @@ class DebuggingPageMaker(PageMakerDebuggerMixin, PageMaker):
   """The same basic PageMaker, with added debugging on HTTP 500."""
 
 
-def Handler(req, pageclass, routes, config_file=None, debug=False):
+def Handler(req, pageclass, routes, config_file=None):
   """Handles a web request through processing the routes list.
 
   The url in the received `req` object is taken and matches against the
@@ -74,8 +74,6 @@ def Handler(req, pageclass, routes, config_file=None, debug=False):
     % config_file: str ~~ 'config.cfg'
       Filename to read handler configuration from. This typically contains
       sections for databases and the like.
-    % debug: boolean ~~ False
-      The DEBUG request-environment variable is set to this boolean value.
 
   Returns:
     apache.OK: signal for Apache to send the page to the client. Ignored by
@@ -85,10 +83,6 @@ def Handler(req, pageclass, routes, config_file=None, debug=False):
     apache.SERVER_RETURN: Details on these exceptions included above.
   """
   req = request.Request(req)
-  if debug:
-    warnings.warn('The `debug` argument is soon disappearing. Look into proper '
-                  'subclassing of `PageMakerDebuggerMixin` to provide '
-                  ' debugging support', DeprecationWarning, stacklevel=2)
   pages = pageclass(req, config_file=config_file)
   try:
     req_method, req_arguments = Router(routes, req.env['PATH_INFO'])
