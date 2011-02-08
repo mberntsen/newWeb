@@ -6,7 +6,9 @@
           Something went terribly wrong with your request (&quot;[path]&quot;).
         </p>
         <p>
-          You probably got to this page by requesting  &quot;/haltandcatchfire&quot;. This is the non-debugging result page for an Internal Server Error. This was raised because the requested <code>PageMaker</code> method generated an error (though it also happens when no route is defined for a request). If you were running your pagemaker subclassed from <code>uweb.DebuggingPageMaker</code> (as opposed to the <code>uweb.PageMaker</code> you're using now), you'd be presented a page that would assist you greatly in debugging.
+          You probably got to this page by requesting  &quot;/haltandcatchfire&quot;. This is the <em>production</em> result page for an Internal Server Error. This was raised because the requested <code>PageMaker</code> method generated an error (though it also happens when no route is defined for a request).
+        </p>
+        <p>The <code>InternalServerError</code> method from <code>uweb.DebuggingPageMaker</code> has been overridden here to bring you this somewhat user-friendly page. For the raw debugging page, this method has a check for the presence of <em>debug</em> in the query string. Give it a try: <a href="?debug">debug HTTP 500</a>.
         </p>
         <p>Oh and yeah, ff you got this response for any request other than <a href="/haltandcatchfire">/haltandcatchfire</a>, that's a bug and we'd like to know about this.</p>
       </div>

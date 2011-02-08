@@ -86,11 +86,12 @@ class BasePageMaker(object):
           self.options.get('templates', {}).get('path', self.TEMPLATE_DIR))
     return self._parser
 
-  @staticmethod
-  def InternalServerError():
+  def InternalServerError(self):
     """Returns a plain text notification about an internal server error."""
-    return Response(content='INTERNAL SERVER ERROR (HTTP 500)',
-                    content_type='text/plain', httpcode=500)
+    return Response(
+        content='INTERNAL SERVER ERROR (HTTP 500) DURING PROCESSING OF %r' % (
+            self.req.env['PATH_INFO']),
+        content_type='text/plain', httpcode=500)
 
   @staticmethod
   def Reload():

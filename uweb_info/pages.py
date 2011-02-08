@@ -11,19 +11,20 @@ import time
 from underdark.libs import logging
 from underdark.libs import uweb
 
-class PageMaker(uweb.PageMaker):
+class PageMaker(uweb.DebuggingPageMaker):
   """Holds all the html generators for the webapp
 
   Each page as a separate method.
   """
   def CommonBlocks(self, page_id):
+    """Returns the common header and footer blocks for this project."""
     return {'header': self.parser.Parse('header.html', page_id=page_id),
             'footer': self.parser.Parse(
                 'footer.html',
                 year=time.strftime('%Y'),
                 version=uweb.__version__)}
 
-  def RequestIndex(self, path=None):
+  def RequestIndex(self, _path):
     """Returns the index.html template"""
     logging.LogInfo('Index page requested')
 
@@ -67,7 +68,8 @@ class PageMaker(uweb.PageMaker):
                               ext_env=''.join(extenvhtml),
                               **self.CommonBlocks('main'))
 
-  def RequestInternalFail(self):
+  @staticmethod
+  def RequestInternalFail():
     """Triggers a HTTP 500 Internal Server Error in uWeb.
 
     This is a demonstration of the (limited) debugging facilities in uWeb.
@@ -75,21 +77,23 @@ class PageMaker(uweb.PageMaker):
     The resulting stack trace and a short introductory message is returned to
     the browser, tagged with a HTTP response code 500.
     """
-    def _Processor(instruction):
-      instruction('foo')
+    def _Processor(function):
+      """Uses the given `function` to process the string literal 'foo' with."""
+      function('foo')
 
-    def _Numerize(number_as_string):
-      return int(number_as_string)
+    def _MakeInteger(numeric_string):
+      """Returns the integer value of a numeric string using int()."""
+      return int(numeric_string)
 
-    return _Processor(_Numerize)
+    return _Processor(_MakeInteger)
 
-  def RequestText(self):
+  @staticmethod
+  def RequestText():
     """Returns a page with data in text/plain.
 
     To return a different content type, the returned object must be a Page,
     where the `content_type` argument can be set to any desired mimetype.
     """
-    # if a different content_type should be returned, create a Page object
     logging.LogInfo('Text page requested')
     text = """
         <h1>This is a text-only page.</h1>
@@ -103,15 +107,35 @@ class PageMaker(uweb.PageMaker):
   def RequestRedirect(location):
     """Generated a temporary redirect to the given URL.
 
-    Returns a Page object with a custom HTTP Code (302 in our case), which
-    trigger uWeb to send a HTTP_MOVED_TEMPORARILY. The custom Location: header
+    Returns a Page object with a custom HTTP Code (307 in our case), which
+    trigger uWeb to send a HTTP_TEMPORARY_REDIRECT. The custom Location: header
     then directs the client to the given URL.
+
+    From the specification:
+      [http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html]
+
+      The requested resource resides temporarily under a different URI. Since
+      the redirection MAY be altered on occasion, the client SHOULD continue to
+      use the Request-URI for future requests. This response is only cacheable
+      if indicated by a Cache-Control or Expires header field.
+
+      The temporary URI SHOULD be given by the Location field in the response.
+      Unless the request method was HEAD, the entity of the response SHOULD
+      contain a short hypertext note with a hyperlink to the new URI(s) , since
+      many pre-HTTP/1.1 user agents do not understand the 307 status. Therefore,
+      the note SHOULD contain the information necessary for a user to repeat the
+      original request on the new URI.
+
+      If the 307 status code is received in response to a request other than GET
+      or HEAD, the user agent MUST NOT automatically redirect the request unless
+      it can be confirmed by the user, since this might change the conditions
+      under which the request was issued.
 
     Arguments:
       @ location: str
         The full URL the client should be redirected to, including schema.
     """
-    return uweb.Response(headers={'Location': location}, httpcode=302)
+    return uweb.Response(headers={'Location': location}, httpcode=307)
 
   def RequestInvalidcommand(self, path):
     """The request could not be fulfilled, this returns a 404."""
@@ -123,9 +147,13 @@ class PageMaker(uweb.PageMaker):
 
   def InternalServerError(self):
     """Returns a HTTP 500 page, since the request failed elsewhere."""
-    if isinstance(self, uweb.DebuggingPageMaker):
+    if 'debug' in self.req.env['QUERY_STRING']:
+      # Returns the default HTTP 500 handler result. For this class, since we
+      # subclassed DebuggingPageMaker, it has all sorts of debug info.
       return super(PageMaker, self).InternalServerError()
     else:
+      # Return our custom styled HTTP 500 handler instead, this is what you'll
+      # want to serve during production; the debugging one gives too much info.
       path = self.req.env['PATH_INFO']
       logging.LogError('Execution of %r triggered an exception', path)
       return uweb.Response(
