@@ -1,0 +1,404 @@
+#!/usr/bin/python
+"""Underdark web interface, or uWeb interface"""
+from __future__ import with_statement
+
+__author__ = 'Elmer de Looff <elmer@underdark.nl>'
+__version__ = '0.3'
+
+# Standard modules
+import mimetypes
+import os
+import sys
+import warnings
+
+# Custom modules
+from underdark.libs import logging
+from underdark.libs import pysession
+from underdark.libs import udders
+from underdark.libs.uweb import templateparser
+
+__all__ = (
+    'DatabaseError', 'ReloadModules', 'BasePageMaker', 'PageMakerDebuggerMixin',
+    'PageMakerDatabaseMixin', 'PageMakerMongodbMixin', 'PageMakerMysqlMixin',
+    'PageMakerSqliteMixin', 'PageMakerSessionMixin', 'Response')
+
+
+class DatabaseError(Exception):
+  """The database server has gone away"""
+
+
+class ReloadModules(Exception):
+  """Communicates the handler that it should reload the pageclass"""
+
+
+class BasePageMaker(object):
+  """Provides the base pagemaker methods for all the html generators."""
+  # Base paths for templates and public data. These are used in the PageMaker
+  # classmethods that set up paths specific for that pagemaker.
+  PUBLIC_DIR = 'www'
+  TEMPLATE_DIR = 'templates'
+
+  def __init__(self, req, config_file=None):
+    """sets up the template parser and database connections
+
+    Arguments:
+      @ req: request.Request
+        The originating request, including environment, GET, POST and cookies.
+      % config_file: str ~~ None
+        Configfile for the pagemaker, with database connection information
+        and other settings. These will be stored on the instance dict `options`.
+    """
+    self.__SetupPaths()
+    self._parser = None
+    self.req = req
+    self.cookies = req.vars['cookie']
+    self.get = req.vars['get']
+    self.post = req.vars['post']
+    if config_file:
+      self.options = udders.ParseConfig(
+          os.path.join(self.LOCAL_DIR, config_file))
+    else:
+      self.options = {}
+
+  @classmethod
+  def __SetupPaths(cls):
+    """This sets up the correct paths for the PageMaker subclasses.
+
+    From the passed in `cls`, it retrieves the filename. Of that path, the
+    directory is used as the working directory. Then, the module constants
+    PUBLIC_DIR and TEMPLATE_DIR are used to define class constants from.
+    """
+    cls_dir = os.path.dirname(sys.modules[cls.__module__].__file__)
+    cls.LOCAL_DIR = cls_dir
+    cls.PUBLIC_DIR = os.path.join(cls_dir, cls.PUBLIC_DIR)
+    cls.TEMPLATE_DIR = os.path.join(cls_dir, cls.TEMPLATE_DIR)
+
+  @property
+  def parser(self):
+    """Provides a templateparser.Parser instance.
+
+    If the config file specificied a [templates] section and a `path` is
+    assigned in there, this path will be used.
+    Otherwise, the `TEMPLATE_DIR` will be used to load templates from.
+    """
+    if self._parser is None:
+      self._parser = templateparser.Parser(
+          self.options.get('templates', {}).get('path', self.TEMPLATE_DIR))
+    return self._parser
+
+  @staticmethod
+  def InternalServerError():
+    """Returns a plain text notification about an internal server error."""
+    return Response(content='INTERNAL SERVER ERROR (HTTP 500)',
+                    content_type='text/plain', httpcode=500)
+
+  @staticmethod
+  def Reload():
+    """Raises `ReloadModules`, telling the Handler() to reload its pageclass."""
+    raise ReloadModules('Reloading ... ')
+
+  def Static(self, rel_path):
+    """Provides a handler for static content.
+
+    The requested `path` is truncated against a root (removing any uplevels),
+    and then added to the working dir + PUBLIC_DIR. If the request file exists,
+    then the requested file is retrieved, its mimetype guessed, and returned
+    to the client performing the request.
+
+    Should the requested file not exist, a 404 page is returned instead.
+
+    Arguments:
+      @ rel_path: str
+        The filename relative to the working directory of the webserver.
+
+    Returns:
+      Page: contains the content and mimetype of the requested file, or a 404
+            page if the file was not available on the local path.
+    """
+    rel_path = os.path.abspath(os.path.join(os.path.sep, rel_path))[1:]
+    abs_path = os.path.join(self.PUBLIC_DIR, rel_path)
+    try:
+      with file(abs_path) as staticfile:
+        content_type, _encoding = mimetypes.guess_type(abs_path)
+        if not content_type:
+          #TODO(Jan): add mime-type guessing based on the path extension,
+          # and a custom dict, if that fails, add Magic Mime detection
+          #XXX(Elmer): mimetypes.guess_type is already strictly extension based.
+          content_type = 'text/plain'
+        return Response(content=staticfile.read(),
+                        content_type=content_type)
+    except IOError:
+      message = 'This is not the path you\'re looking for. No such file %r' % (
+          self.req.env['PATH_INFO'])
+      return Response(content=message,
+                      content_type='text/plain',
+                      httpcode=404)
+
+
+class PageMakerDebuggerMixin(object):
+  """Replaces the default handler for Internal Server Errors.
+
+  This one prints a host of debugging and request information, though it still
+  lacks interactive functions.
+  """
+  def _ParseStackFrames(self, stack):
+    """Generates list items for traceback information.
+
+    Each traceback item contains the file- and function name, the line numer
+    and the source that belongs with it. For each stack frame, the local
+    variables are also added to it, allowing proper analysis to happen.
+
+    This most likely doesn't need overriding / redefining in a subclass.
+
+    Arguments:
+      @ stack: traceback.stack
+        The stack frames to return analysis on.
+
+    Yields:
+      str: Template-parsed HTML with frame information.
+    """
+    while stack:
+      frame = stack.tb_frame
+      yield self.parser.Parse('stack_frame.xhtml', frame={
+          'file': frame.f_code.co_filename,
+          'scope': frame.f_code.co_name,
+          'locals': ''.join(
+              self.parser.Parse('var_row.xhtml', var=(name, repr(value)))
+              for name, value in sorted(frame.f_locals.items())),
+          'source': ''.join(
+              self._SourceLines(frame.f_code.co_filename, frame.f_lineno))})
+      stack = stack.tb_next
+
+  def _SourceLines(self, filename, line_num, context=3):
+    """Yields the offending source line, and `context` lines of context.
+
+    Arguments:
+      @ filename: str
+        The filename of the
+      @ line_num: int
+        The line number for the offending line.
+      % context: int ~~ 3
+        Number of lines context, before and after the offending line.
+
+    Yields:
+      str: Templated list-item for a source code line.
+    """
+    import linecache
+    for line_num in xrange(line_num - context, line_num + context + 1):
+      yield self.parser.Parse('var_row.xhtml', var=(
+          line_num, linecache.getline(filename, line_num)))
+
+  def InternalServerError(self):
+    """Returns a HTTP 500 response with detailed failure analysis."""
+    self.parser.template_dir = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), 'error_templates'))
+    cookies = [
+        self.parser.Parse('var_row.xhtml', var=(name, self.cookies[name].value))
+        for name in sorted(self.cookies)]
+    environ = [
+        self.parser.Parse('var_row.xhtml', var=var)
+        for var in sorted(self.req.ExtendedEnvironment().items())]
+    post_data = [
+        self.parser.Parse('var_row.xhtml', var=(var, self.post[var]))
+        for var in sorted(self.post)]
+    query_args = [
+        self.parser.Parse('var_row.xhtml', var=(var, self.get[var]))
+        for var in sorted(self.get)]
+    nulldata = '<tr><td colspan="2"><em>NULL</em></td></tr>'
+    stack_trace = reversed(list(self._ParseStackFrames(sys.exc_traceback)))
+    return Response(
+        httpcode=200,
+        content=self.parser.Parse(
+            'http_500.xhtml',
+            cookies=''.join(cookies) or nulldata,
+            environ=''.join(environ) or nulldata,
+            query_args=''.join(query_args) or nulldata,
+            post_data=''.join(post_data) or nulldata,
+            exc={'type': sys.exc_type.__name__,
+                 'value': sys.exc_value,
+                 'traceback': ''.join(stack_trace)}))
+
+
+class PageMakerDatabaseMixin(object):
+  """Sets up the PageMaker for a database Mixin class."""
+  def __init__(self, *args, **kwds):
+    super(PageMakerDatabaseMixin, self).__init__(*args, **kwds)
+    self._connection = None
+    self._cursor = None
+
+
+class PageMakerMongodbMixin(PageMakerDatabaseMixin):
+  """Adds MongoDB support to PageMaker."""
+  @property
+  def connection(self):
+    """Returns a MongoDB database connection."""
+    if self._connection is None:
+      import pymongo
+      try:
+        self._connection = pymongo.connection.Connection(
+            host=self.options['mongodb'].get('host', 'localhost'),
+            port=self.options['mongodb'].get('port', None))
+      except pymongo.errors.AutoReconnect:
+        raise DatabaseError('MongoDb is unavailable')
+      except pymongo.errors.ConnectionFailure:
+        raise DatabaseError('MongoDb is unavailable')
+    return self._connection
+
+  @property
+  def cursor(self):
+    """Provides a cursor to the database as specified in the options dict"""
+    warnings.warn('Cursor property is disappearing, please use the connection '
+                  'property and its context manager instead',
+                  DeprecationWarning, stacklevel=2)
+    logging.LogWarning('Cursor property is disappearing, please use the '
+                       'connection property and its context manager instead')
+    if self._cursor is None:
+      self._cursor = getattr(
+          self.connection, self.options['mongodb']['database'])
+    return self._cursor
+
+
+class PageMakerMysqlMixin(PageMakerDatabaseMixin):
+  """Adds MySQL support to PageMaker."""
+  @property
+  def connection(self):
+    """Returns a MySQL database connection."""
+    if self._connection is None:
+      from underdark.libs.sqltalk import mysql
+      mysqlopts = self.options['mysql']
+      self._connection = mysql.Connect(
+          host=mysqlopts.get('host', 'localhost'),
+          user=mysqlopts.get('user'),
+          passwd=mysqlopts.get('password'),
+          db=mysqlopts.get('database'),
+          charset=mysqlopts.get('charset', 'utf8'))
+    return self._connection
+
+  @property
+  def cursor(self):
+    """Provides a cursor to the database as specified in the options dict"""
+    warnings.warn('Cursor property is disappearing, please use the connection '
+                  'property and its context manager instead',
+                  DeprecationWarning, stacklevel=2)
+    logging.LogWarning('Cursor property is disappearing, please use the '
+                       'connection property and its context manager instead')
+    if self._cursor is None:
+      self._cursor = self.connection.Cursor()
+    return self._cursor
+
+
+class PageMakerSqliteMixin(PageMakerDatabaseMixin):
+  """Adds SQLite support to PageMaker."""
+  @property
+  def connection(self):
+    """Returns an SQLite database connection."""
+    if self._connection is None:
+      from underdark.libs.sqltalk import sqlite
+      self._connection = sqlite.Connect(self.options['sqlite']['database'])
+    return self._connection
+
+  @property
+  def cursor(self):
+    """Provides a cursor to the database as specified in the options dict"""
+    warnings.warn('Cursor property is disappearing, please use the connection '
+                  'property and its context manager instead',
+                  DeprecationWarning, stacklevel=2)
+    logging.LogWarning('Cursor property is disappearing, please use the '
+                       'connection property and its context manager instead')
+    if self._cursor is None:
+      self._cursor = self.connection.Cursor()
+    return self._cursor
+
+
+class PageMakerSessionMixin(object):
+  """Adds pysession support to PageMaker."""
+  def __init__(self, *args, **kwds):
+    super(PageMakerSessionMixin, self).__init__(*args, **kwds)
+    self._userid = None
+
+  @property
+  def userid(self):
+    """Provides the ID of the logged in user, if a valid session is available"""
+    if self._userid is None:
+      self._userid = self._GetSessionUserId()
+    return self._userid
+
+  def _GetSessionHandler(self):
+    """Creates a session handler used to check sessions"""
+    return pysession.Session(
+        connection=self.connection,
+        usertable='users',
+        sessiontable='sessions',
+        domain='true',
+        remoteip=self.req['remote_addr'],
+        columns={'user': 'emailaddress',
+                 'password': 'password',
+                 'useractive': 'status'},
+        activestates='valid')
+
+  def _GetSessionUserId(self):
+    """Tries to validate a session by its cookiestring and IP address
+
+    sets:
+      self.options['login']: to True if logged in
+      self.session['id']:    session id
+      self.session['key']:   session password
+
+    returns:
+      True if logged in
+      False if session is invalid
+    """
+    if 'session' not in self.cookies:
+      return False
+    raw_session = self.cookies.get['session'].value
+    session_id, _sep, session_key = raw_session.partition(':')
+    if not (session_id and session_key):
+      return False
+    try:
+      session_handler = self._GetSessionHandler()
+      session_handler.ResumeSession(session_id, session_key)
+      return session_handler.userid
+    except (pysession.SessionError, ValueError):
+      return False
+
+
+class Response(object):
+  """Defines a full HTTP response.
+
+  The full response consists of a required content part, and then optional
+  http response code, cookies, additional headers, and a content-type.
+  """
+  # Default content-type for Page objects
+  CONTENT_TYPE = 'text/html'
+
+  def __init__(self, content='', content_type=CONTENT_TYPE,
+               cookies=(), headers=None,  httpcode=200):
+    """Initializes a Page object.
+
+    Arguments:
+      @ content: str
+        The content to return to the client. This can be either plain text, html
+        or the contents of a file (images for example).
+      % content_type: str ~~ CONTENT_TYPE ('text/html' by default)
+        The content type of the response. This should NOT be set in headers.
+      % cookies: dict ~~ None
+        Cookies are expected to be dictionaries, made up of the following keys:
+        * Keys they MUST contain: `key`, `value`
+        * Keys they MAY contain:  `expires`, `path`, `comment`, `domain`,
+                                  `max-age`, `secure`, `version`, `httponly`
+      % headers: dictionary ~~ None
+        A dictionary mappging the header name to its value.
+      % httpcode: int ~~ 200
+        The HTTP response code to attach to the response.
+    """
+    self.content = content
+    self.cookies = cookies
+    self.httpcode = httpcode
+    self.headers = headers or {}
+    self.content_type = content_type
+
+  def __repr__(self):
+    return '<%s instance at %#x>' % (self.__class__.__name__, id(self))
+
+  def __str__(self):
+    return self.content
