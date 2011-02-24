@@ -1,16 +1,15 @@
 #!/usr/bin/python
+"""module to support OpenId login in uweb"""
+
+__author__ = 'Jan Klopper <jan@underdark.nl>'
+__version__ = '0.1'
 
 # standard imports
 from underdark.libs.uweb import request as uwebrequest
 
 # Custom imports
-import openid
-from openid.store import memstore
-from openid.store import filestore
 from openid.consumer import consumer
-from openid.oidutil import appendArgs
 from openid.cryptutil import randomString
-from openid.fetchers import setDefaultFetcher, Urllib2Fetcher
 from openid.extensions import pape, sreg
 
 # Used with an OpenID provider affiliate program.
@@ -37,6 +36,30 @@ class VerificationCanceled(Error):
   """The verification for the user was canceled"""
 
 
+def RequestRegistrationData(request, required=['nickname'],
+                            optional=['fullname', 'email']):
+  """Adds the requered fields to the request that is to be send to the
+  OpenId provider
+
+  Takes:
+    request: the OpenId request object
+    required: list, required fields to be suplied by the provider
+    optional: list, optional fields to be suplied by the provider
+  """
+  sreg_request = sreg.SRegRequest(required=required, optional=optional)
+  request.addExtension(sreg_request)
+
+def RequestPAPEDetails(request):
+  """
+  Add the flags that request a phishing resistant response from the OpenId
+  provider to the request that is to be send to the OpenId provider
+
+  Takes:
+    request: the OpenId request object
+  """
+  pape_request = pape.Request([pape.AUTH_PHISHING_RESISTANT])
+  request.addExtension(pape_request)
+
 class OpenId(object):
   """Provides OpenId verification and processing of return values"""
   def __init__(self, request, cookiename='uwebopenid'):
@@ -47,7 +70,7 @@ class OpenId(object):
       cookiename: str, optionally a cookiename holding the session
     """
     self.request = request
-    self.session = None
+    self.session = {'id':None}
     self.cookiename = cookiename
 
   def getConsumer(self, stateless=False):
@@ -61,24 +84,23 @@ class OpenId(object):
 
   def getSession(self):
     """Return the existing session or a new session"""
-    if self.session is not None:
+    if self.session['id'] is not None:
       return self.session
 
     # Get value of cookie header that was sent
     if self.cookiename in self.request.cookies:
-      sid = self.cookies.get(cookiename).value
+      self.session['id'] = self.request.cookies.get(self.cookiename).value
     else:
-      sid = randomString(16, '0123456789abcdef')
+      self.session['id'] = randomString(16, '0123456789abcdef')
 
-    self.session = {'id':sid}
     return self.session
 
   def setSessionCookie(self):
     """Sets the session cookie on the uweb request"""
-    self.request.AddCookie(self.cookiename, self.session.id)
+    self.request.AddCookie(self.cookiename, self.session['id'])
 
-  def Verify(self, openIdUrl, trustroot, returnurl, registrationData=False,
-             phishingResistant=False, stateless=False, immediate=False):
+  def Verify(self, openid_url, trustroot, returnurl, registration_data=False,
+             phishing_resistant=False, stateless=False, immediate=False):
     """
     Takes the openIdUrl from the user and sets up the request to send the user
     to the correct page that will validate our trustroot to receive the data.
@@ -101,21 +123,22 @@ class OpenId(object):
     """
     oidconsumer = self.getConsumer(stateless = stateless)
     try:
-      request = oidconsumer.begin(openIdUrl)
-    except consumer.DiscoveryFailure, exc:
-      raise InvalidOpenIdUrl(openIdUrl)
+      request = oidconsumer.begin(openid_url)
+    except consumer.DiscoveryFailure:
+      raise InvalidOpenIdUrl(openid_url)
     else:
       if request:
-        if registrationData:
-          self.requestRegistrationData(request)
+        if registration_data:
+          RequestRegistrationData(request)
 
-        if phishingResistant:
-          self.requestPAPEDetails(request)
+        if phishing_resistant:
+          RequestPAPEDetails(request)
 
         if request.shouldSendRedirect():
           redirect_url = request.redirectURL(
               trustroot, returnurl, immediate=immediate)
-          return uwebrequest(httpcode=302).AddHeader('Location', redirect_url)
+          return uwebrequest.Response(headers={'Location': redirect_url},
+                                      httpcode=302)
         else:
           return request.htmlMarkup(
               trustroot, returnurl,
@@ -123,30 +146,6 @@ class OpenId(object):
               immediate=immediate)
       else:
         raise InvalidOpenIdService()
-
-  def requestRegistrationData(self, request, required=['nickname'],
-                              optional=['fullname', 'email']):
-    """Adds the requered fields to the request that is to be send to the
-    OpenId provider
-
-    Takes:
-      request: the OpenId request object
-      required: list, required fields to be suplied by the provider
-      optional: list, optional fields to be suplied by the provider
-    """
-    sreg_request = sreg.SRegRequest(required=required, optional=optional)
-    request.addExtension(sreg_request)
-
-  def requestPAPEDetails(self, request):
-    """
-    Add the flags that request a phishing resistant response from the OpenId
-    provider to the request that is to be send to the OpenId provider
-
-    Takes:
-      request: the OpenId request object
-    """
-    pape_request = pape.Request([pape.AUTH_PHISHING_RESISTANT])
-    request.addExtension(pape_request)
 
   def doProcess(self):
     """Handle the redirect from the OpenID server.
@@ -212,6 +211,7 @@ class OpenId(object):
         # This means auth didn't succeed, but you're welcome to try
         # non-immediate mode.
         message = 'Setup needed'
+      raise VerificationFailed(message)
     else:
       # Either we don't understand the code or there is no
       # openid_url included with the error. Give a generic
