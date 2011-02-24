@@ -15,7 +15,7 @@ from openid.extensions import pape, sreg
 
 # Used with an OpenID provider affiliate program.
 OPENID_PROVIDER_NAME = 'uweb OpenID'
-OPENID_PROVIDER_URL ='https://www.myopenid.com/affiliate_signup?affiliate_id=39'
+OPENID_PROVIDER_URL = 'https://www.myopenid.com/affiliate_signup?affiliate_id=39'
 
 class Error(Exception):
   """A uweb OpenID error has occured"""
@@ -38,12 +38,21 @@ class VerificationCanceled(Error):
 
 
 class OpenId(object):
+  """Provides OpenId verification and processing of return values"""
   def __init__(self, request, cookiename='uwebopenid'):
+    """Sets up the openId class
+
+    Takes:
+      request: obj, the uweb request object
+      cookiename: str, optionally a cookiename holding the session
+    """
     self.request = request
     self.session = None
     self.cookiename = cookiename
 
   def getConsumer(self, stateless=False):
+    """Creates a openId consumer class and returns it"""
+    #TODO figure out what kind of 'store' openId needs
     if stateless:
       store = None
     else:
@@ -61,32 +70,33 @@ class OpenId(object):
     else:
       sid = randomString(16, '0123456789abcdef')
 
-    session = {'id':sid}
-    self.session = session
-    return session
+    self.session = {'id':sid}
+    return self.session
 
   def setSessionCookie(self):
-    self.request.AddCookie(self.cookiename, sid)
+    """Sets the session cookie on the uweb request"""
+    self.request.AddCookie(self.cookiename, self.session.id)
 
-  def Verify(self, openIdUrl, trustroot, returnurl, registrationData=False, phishingResistant=False, stateless=False, immediate=False):
+  def Verify(self, openIdUrl, trustroot, returnurl, registrationData=False,
+             phishingResistant=False, stateless=False, immediate=False):
     """
-    Takes the openIdUrl from the user and sets up the request to send the user 
+    Takes the openIdUrl from the user and sets up the request to send the user
     to the correct page that will validate our trustroot to receive the data.
-    
+
     Takes:
       OpenIdUrl: str, the user supplied openId url
       trstroot: str, the url of our webservice, will be displayed to the user as
                      the consuming url
-      returnUrl: str, the url that will handle the Process step for the user 
+      returnUrl: str, the url that will handle the Process step for the user
                       being returned to us by the openId supplier
-      registrationData: bool, do we want to request registration data for the 
+      registrationData: bool, do we want to request registration data for the
                               user from the supplier
-      phishingResistant: bool, do we want to use a phishing resistant openId 
+      phishingResistant: bool, do we want to use a phishing resistant openId
                                auth policy
       stateless: bool, setup the authentication in stateless mode
       immediate: bool, use immediate mode.
-      
-    Returns either an uweb Page object redirectnig the user to the OpenId 
+
+    Returns either an uweb Page object redirectnig the user to the OpenId
     provider or page with some variabeles
     """
     oidconsumer = self.getConsumer(stateless = stateless)
@@ -98,14 +108,14 @@ class OpenId(object):
       if request:
         if registrationData:
           self.requestRegistrationData(request)
-          
+
         if phishingResistant:
           self.requestPAPEDetails(request)
-        
+
         if request.shouldSendRedirect():
           redirect_url = request.redirectURL(
               trustroot, returnurl, immediate=immediate)
-          return uweb.uwebrequest(httpcode=302).AddHeader('Location', redirect_url)
+          return uwebrequest(httpcode=302).AddHeader('Location', redirect_url)
         else:
           return request.htmlMarkup(
               trustroot, returnurl,
@@ -114,17 +124,46 @@ class OpenId(object):
       else:
         raise InvalidOpenIdService()
 
-  def requestRegistrationData(self, request):
-    sreg_request = sreg.SRegRequest(
-        required=['nickname'], optional=['fullname', 'email'])
+  def requestRegistrationData(self, request, required=['nickname'],
+                              optional=['fullname', 'email']):
+    """Adds the requered fields to the request that is to be send to the
+    OpenId provider
+
+    Takes:
+      request: the OpenId request object
+      required: list, required fields to be suplied by the provider
+      optional: list, optional fields to be suplied by the provider
+    """
+    sreg_request = sreg.SRegRequest(required=required, optional=optional)
     request.addExtension(sreg_request)
 
   def requestPAPEDetails(self, request):
+    """
+    Add the flags that request a phishing resistant response from the OpenId
+    provider to the request that is to be send to the OpenId provider
+
+    Takes:
+      request: the OpenId request object
+    """
     pape_request = pape.Request([pape.AUTH_PHISHING_RESISTANT])
     request.addExtension(pape_request)
 
   def doProcess(self):
-    """Handle the redirect from the OpenID server."""
+    """Handle the redirect from the OpenID server.
+
+    Consumes the query part of the url by reading the get property on the uweb
+    request object
+
+    Returns:
+      tuple: userId
+             requested fields
+             phishing resistant info
+             canonical user ID
+
+    Raises:
+      VerificationCanceled if the user canceled the verification
+      VerificationFailed if the verification failed
+    """
     oidconsumer = self.getConsumer()
 
     # Ask the library to check the response that the server sent
@@ -150,7 +189,7 @@ class OpenId(object):
       # Success means that the transaction completed without
       # error. If info is None, it means that the user cancelled
       # the verification.
-    
+
       # This is a successful verification attempt. If this
       # was a real application, we would do our login,
       # comment posting, etc. here.
