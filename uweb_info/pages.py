@@ -10,6 +10,7 @@ import time
 # Custom modules
 from underdark.libs import logging
 from underdark.libs import uweb
+from underdark.libs.uweb import uwebopenid
 
 class PageMaker(uweb.DebuggingPageMaker):
   """Holds all the html generators for the webapp
@@ -160,3 +161,38 @@ class PageMaker(uweb.DebuggingPageMaker):
           httpcode=500,
           content=self.parser.Parse(
               '500.html', path=path, **self.CommonBlocks('http500')))
+
+  def RequestOpenIdVerify(self):
+    """Tries to use the openId module and verify the supplied openId url"""
+
+    OpenIdconsumer = uwebopenid.OpenId(self)
+    #self.req.ExtendedEnvironment()
+    #trustroot = 'http://%s:%d/' % (self.req.env['SERVER_NAME'], self.req.env['SERVER_PORT'])
+    trustroot = 'http://localhost:8082'
+    returnurl = 'http://localhost:8082/OpenIdProcess'
+    openIdUrl = self.post.getfirst('openid_identifier')
+
+    registrationData = 'use_sreg' in self.post
+    phishingResistant = 'use_pape' in self.post
+    stateless = 'use_stateless' in self.post        
+    immediate = 'immediate' in self.post
+    
+    try:
+      return OpenIdconsumer.Verify(openIdUrl, trustroot, returnurl, 
+                                   registrationData=registrationData, 
+                                   phishingResistant=phishingResistant, 
+                                   stateless=stateless, immediate=immediate)
+
+    except uwebopenid.InvalidOpenIdUrl, url:
+      return 'sorry mate, thats no a valid openId url: %s' %url
+    except uwebopenid.InvalidOpenIdService:
+      return 'The openId service did not respond like a valid openId server would have'
+      
+  def RequestOpenIdValidate(self):
+    try:
+      user = uwebopenid.OpenId(self).doProcess()
+    except uwebopenid.VerificationFailed, error:
+      return error
+    except uwebopenid.VerificationCanceled, error:
+      return error
+    return 'welcome %s, %r, %r, %s' % user

@@ -39,5 +39,18 @@
         <h2>Extended environment variables:</h2>
         <ul>[ext_env|raw]</ul>
       </div>
+      
+      <div>
+        <h2>OpenId login</h2>
+        <form method="POST" accept-charset="UTF-8" action="/openId?debug">
+          Identifier:
+          <input type="text" name="openid_identifier" value="" />
+          <input type="submit" value="Verify" /><br />
+          <input type="checkbox" name="immediate" id="immediate" /><label for="immediate">Use immediate mode</label>
+          <input type="checkbox" name="use_sreg" id="use_sreg" /><label for="use_sreg">Request registration data</label>
+          <input type="checkbox" name="use_pape" id="use_pape" /><label for="use_pape">Request phishing-resistent auth policy (PAPE)</label>
+          <input type="checkbox" name="use_stateless" id="use_stateless" /><label for="use_stateless">Use stateless mode</label>
+        </form>
+      </div>
     </div>
 [footer]

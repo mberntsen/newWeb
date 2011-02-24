@@ -16,6 +16,8 @@ ROUTES = (
     ('/haltandcatchfire', 'RequestInternalFail'),
     ('/text', 'RequestText'),
     ('/redirect/(.*)', 'RequestRedirect'),
+    ('/openId.*', 'RequestOpenIdVerify'),
+    ('/OpenIdProcess.*', 'RequestOpenIdValidate'),
     ('/(.*)', 'RequestIndex'))
 
 
