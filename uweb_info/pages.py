@@ -165,30 +165,37 @@ class PageMaker(uweb.DebuggingPageMaker):
   def RequestOpenIdVerify(self):
     """Tries to use the openId module and verify the supplied openId url"""
 
-    OpenIdconsumer = uwebopenid.OpenId(self)
+    openid_consumer = uwebopenid.OpenId(self)
+    
     #self.req.ExtendedEnvironment()
     #trustroot = 'http://%s:%d/' % (self.req.env['SERVER_NAME'], self.req.env['SERVER_PORT'])
+    
+    # set the realm that we want to ask to user to verify to
     trustroot = 'http://localhost:8082'
+    # set the return url that handles the validation
     returnurl = 'http://localhost:8082/OpenIdProcess'
-    openIdUrl = self.post.getfirst('openid_identifier')
+    
+    openid_url = self.post.getfirst('openid_identifier')
 
-    registrationData = 'use_sreg' in self.post
-    phishingResistant = 'use_pape' in self.post
+    registration_data = 'use_sreg' in self.post
+    phishing_resistant = 'use_pape' in self.post
     stateless = 'use_stateless' in self.post        
     immediate = 'immediate' in self.post
     
     try:
-      return OpenIdconsumer.Verify(openIdUrl, trustroot, returnurl, 
-                                   registrationData=registrationData, 
-                                   phishingResistant=phishingResistant, 
-                                   stateless=stateless, immediate=immediate)
+      return openid_consumer.Verify(openid_url, trustroot, returnurl, 
+                                    registration_data=registration_data, 
+                                    phishing_resistant=phishing_resistant, 
+                                    stateless=stateless, immediate=immediate)
 
     except uwebopenid.InvalidOpenIdUrl, url:
-      return 'sorry mate, thats no a valid openId url: %s' %url
+      return 'sorry mate, thats no a valid openId url: %s' % url
     except uwebopenid.InvalidOpenIdService:
-      return 'The openId service did not respond like a valid openId server would have'
+      return """The openId service did not respond like a valid 
+          openId server would have"""
       
   def RequestOpenIdValidate(self):
+    """Handles the return url that openId uses to send the user to"""
     try:
       user = uwebopenid.OpenId(self).doProcess()
     except uwebopenid.VerificationFailed, error:
