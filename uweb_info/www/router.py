@@ -12,13 +12,13 @@ PACKAGE = 'uweb_info'
 PAGE_CLASS = pages.PageMaker
 ROUTES = (
     ('/static/(.*)', 'Static'),
-    ('/(broken.*)', 'RequestInvalidcommand'),
-    ('/haltandcatchfire', 'RequestInternalFail'),
-    ('/text', 'RequestText'),
-    ('/redirect/(.*)', 'RequestRedirect'),
-    ('/openId.*', 'RequestOpenIdVerify'),
-    ('/OpenIdProcess.*', 'RequestOpenIdValidate'),
-    ('/(.*)', 'RequestIndex'))
+    ('/(broken.*)', 'FourOhFour'),
+    ('/haltandcatchfire', 'MakeFail'),
+    ('/text', 'Text'),
+    ('/redirect/(.*)', 'Redirect'),
+    ('/OpenIDLogin', '_OpenIdInitiate'),
+    ('/OpenIDValidate', '_OpenIdValidate'),
+    ('/(.*)', 'Index'))
 
 
 # This function needs to be called `handler` for use with the default mod_python

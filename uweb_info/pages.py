@@ -25,7 +25,7 @@ class PageMaker(uweb.DebuggingPageMaker):
                 year=time.strftime('%Y'),
                 version=uweb.__version__)}
 
-  def RequestIndex(self, _path):
+  def Index(self, _path):
     """Returns the index.html template"""
     logging.LogInfo('Index page requested')
 
@@ -42,7 +42,7 @@ class PageMaker(uweb.DebuggingPageMaker):
     cookieshtml = []
     for cookie in sorted(self.cookies):
       cookieshtml.append(self.parser.Parse(
-          'varlisting.html', var=(cookie, self.cookies[cookie])))
+          'varlisting.html', var=(cookie, self.cookies[cookie].value)))
 
     headershtml = []
     for header in sorted(self.req.headers.items()):
@@ -70,7 +70,7 @@ class PageMaker(uweb.DebuggingPageMaker):
                               **self.CommonBlocks('main'))
 
   @staticmethod
-  def RequestInternalFail():
+  def MakeFail():
     """Triggers a HTTP 500 Internal Server Error in uWeb.
 
     This is a demonstration of the (limited) debugging facilities in uWeb.
@@ -89,7 +89,7 @@ class PageMaker(uweb.DebuggingPageMaker):
     return _Processor(_MakeInteger)
 
   @staticmethod
-  def RequestText():
+  def Text():
     """Returns a page with data in text/plain.
 
     To return a different content type, the returned object must be a Page,
@@ -105,7 +105,7 @@ class PageMaker(uweb.DebuggingPageMaker):
     return uweb.Response(content=text, content_type='text/plain')
 
   @staticmethod
-  def RequestRedirect(location):
+  def Redirect(location):
     """Generated a temporary redirect to the given URL.
 
     Returns a Page object with a custom HTTP Code (307 in our case), which
@@ -138,7 +138,7 @@ class PageMaker(uweb.DebuggingPageMaker):
     """
     return uweb.Response(headers={'Location': location}, httpcode=307)
 
-  def RequestInvalidcommand(self, path):
+  def FourOhFour(self, path):
     """The request could not be fulfilled, this returns a 404."""
     logging.LogWarning('Bad page %r requested', path)
     return uweb.Response(
@@ -148,7 +148,8 @@ class PageMaker(uweb.DebuggingPageMaker):
 
   def InternalServerError(self):
     """Returns a HTTP 500 page, since the request failed elsewhere."""
-    if 'debug' in self.req.env['QUERY_STRING']:
+    if ('debug' in self.req.env['QUERY_STRING'].lower() or
+        'openid' in self.req.env['PATH_INFO'].lower()):
       # Returns the default HTTP 500 handler result. For this class, since we
       # subclassed DebuggingPageMaker, it has all sorts of debug info.
       return super(PageMaker, self).InternalServerError()
@@ -162,44 +163,71 @@ class PageMaker(uweb.DebuggingPageMaker):
           content=self.parser.Parse(
               '500.html', path=path, **self.CommonBlocks('http500')))
 
-  def RequestOpenIdVerify(self):
-    """Tries to use the openId module and verify the supplied openId url"""
+  def _OpenIdInitiate(self):
+    """Verifies the supplied OpenID URL and resolves a login through it."""
+    consumer = uwebopenid.OpenId(self.req)
 
-    openid_consumer = uwebopenid.OpenId(self)
-    
-    #self.req.ExtendedEnvironment()
-    #trustroot = 'http://%s:%d/' % (self.req.env['SERVER_NAME'], self.req.env['SERVER_PORT'])
-    
     # set the realm that we want to ask to user to verify to
-    trustroot = 'http://localhost:8082'
+    trustroot = 'http://%s' % self.req.env['HTTP_HOST']
     # set the return url that handles the validation
-    returnurl = 'http://localhost:8082/OpenIdProcess'
-    
-    openid_url = self.post.getfirst('openid_identifier')
-
-    registration_data = 'use_sreg' in self.post
-    phishing_resistant = 'use_pape' in self.post
-    stateless = 'use_stateless' in self.post        
-    immediate = 'immediate' in self.post
-    
+    returnurl = trustroot + '/OpenIDValidate'
+    openid_url = self.post.getfirst('openid_provider')
     try:
-      return openid_consumer.Verify(openid_url, trustroot, returnurl, 
-                                    registration_data=registration_data, 
-                                    phishing_resistant=phishing_resistant, 
-                                    stateless=stateless, immediate=immediate)
+      return consumer.Verify(openid_url, trustroot, returnurl)
+    except uwebopenid.InvalidOpenIdUrl, error:
+      return self.OpenIdProviderBadLink(error)
+    except uwebopenid.InvalidOpenIdService, error:
+      return self.OpenIdProviderError(error)
 
-    except uwebopenid.InvalidOpenIdUrl, url:
-      return 'sorry mate, thats no a valid openId url: %s' % url
-    except uwebopenid.InvalidOpenIdService:
-      return """The openId service did not respond like a valid 
-          openId server would have"""
-      
-  def RequestOpenIdValidate(self):
+  def _OpenIdValidate(self):
     """Handles the return url that openId uses to send the user to"""
     try:
-      user = uwebopenid.OpenId(self).doProcess()
+      user = uwebopenid.OpenId(self.req).doProcess()
     except uwebopenid.VerificationFailed, error:
-      return error
+      return self.OpenIdAuthFailure(error)
     except uwebopenid.VerificationCanceled, error:
-      return error
-    return 'welcome %s, %r, %r, %s' % user
+      return self.OpenIdAuthCancel(error)
+    return self.OpenIdAuthSuccess('welcome %s, %r, %r, %s' % user)
+
+
+  def OpenIdProviderBadLink(self, err_obj):
+    return self.parser.Parse(
+        'freetext.html',
+        title='Bad OpenID Provider URL',
+        message=err_obj,
+        **self.CommonBlocks('uweb'))
+
+  def OpenIdProviderError(self, err_obj):
+    message = 'The OpenID provider did not respond as expected: %r' % err_obj
+    return self.parser.Parse(
+        'freetext.html',
+        title='Bad OpenID Provider',
+        message=message,
+        **self.CommonBlocks('uweb'))
+
+  def OpenIdAuthCancel(self, err_obj):
+    return self.parser.Parse(
+        'freetext.html',
+        title='OpenID Authentication canceled by user',
+        message=err_obj,
+        **self.CommonBlocks('uweb'))
+
+  def OpenIdAuthFailure(self, err_obj):
+    return self.parser.Parse(
+        'freetext.html',
+        title='OpenID Authentication failed',
+        message=err_obj,
+        **self.CommonBlocks('uweb'))
+
+  def OpenIdAuthSuccess(self, message):
+    import base64
+    import os
+    message = 'You are now known as ' + message
+    self.req.AddCookie('FirstMinuteLogin', 'True', max_age=60)
+    self.req.AddCookie(
+        'OpenIDSession', base64.urlsafe_b64encode(os.urandom(30)), max_age=3600)
+    return self.parser.Parse(
+        'freetext.html',
+        title='OpenID Authentication successful',
+        message=message,
+        **self.CommonBlocks('uweb'))

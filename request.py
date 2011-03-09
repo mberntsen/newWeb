@@ -2,7 +2,7 @@
 """Underdark micro-Web framework, uWeb, Request module."""
 
 __author__ = 'Elmer de Looff <elmer@underdark.nl>'
-__version__ = '0.3'
+__version__ = '0.4'
 
 # Standard modules
 import cgi
@@ -23,6 +23,8 @@ class Request(object):
       self._modpython = False
       self.env = EnvironBaseHttp(request)
       self.headers = request.headers
+      self._out_headers = []
+      self._out_status = 200
       post_data_fp = request.rfile
     else:
       self._modpython = True
@@ -40,6 +42,8 @@ class Request(object):
 
   def AddCookie(self, key, value, **attrs):
     cookie = Cookie.SimpleCookie({key: value})
+    if 'max_age' in attrs:
+      attrs['max-age'] = attrs.pop('max_age')
     cookie[key].update(attrs)
     self.AddHeader('Set-Cookie', cookie[key].OutputString())
 
@@ -47,7 +51,7 @@ class Request(object):
     if self._modpython:
       self._request.headers_out.add(name, value)
     else:
-      self._request.send_header(name, value)
+      self._out_headers.append((name, value))
 
   def ExtendedEnvironment(self):
     if self._modpython:
@@ -66,15 +70,19 @@ class Request(object):
     if self._modpython:
       self._request.status = http_status_code
     else:
-      self._request.send_response(http_status_code)
+      self._out_status = http_status_code
 
   def Write(self, data):
     """Writes the HTTP reply to the requesting party.
 
-    N.B. For the BaseHTTP variant, this also ends headers."""
+    N.B. For the BaseHTTP variant, this is where status and headers are written.
+    """
     if self._modpython:
       self._request.write(data)
     else:
+      self._request.send_response(self._out_status)
+      for name, value in self._out_headers:
+        self._request.send_header(name, value)
       self._request.end_headers()
       if isinstance(data, unicode):
         self._request.wfile.write(data.encode('utf8'))

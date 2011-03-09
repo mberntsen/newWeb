@@ -1,56 +1,48 @@
 [header]
     <div id="content">
       <div>
-        <p>
-          Both standalone and mod_python should be returning the same content here:
-        </p>
-        <strong>Method: <em>[method]</em></strong>
-      </div>
-      <div>
-        <h2>Incoming headers:</h2>
-        <ul>[headers|raw]</ul>
-      </div>
-      <div>
+        <h2>Request method</h2>
+        <strong><em>[method]</em></strong>
+        <br /><br />
         <h2>Query arguments (GET):</h2>
-        <ul>[getvars|raw]</ul>
+        <ul class="varlist">[getvars|raw]</ul>
+        <br />
+        <h2>POST data:</h2>
+        <ul class="varlist">[postvars|raw]</ul>
+        <br />
+        <h2>Cookies:</h2>
+        <ul class="varlist">[cookies|raw]</ul>
       </div>
       <div>
-        <h2>POST data:</h2>
-        <ul>[postvars|raw]</ul><br />
+        <h2>Test POST data</h2>
         <form action="#" method="post">
           <ul class="nodot">
             <li>
-                <label for="example_post">Test POST data:</label>
+                <label for="example_post">ExamplePost:</label>
                 <input type="text" id="example_post" name="ExamplePost" />
                 <input type="submit" value="Submit" />
             </li>
           </ul>
         </form>
+        <br />
+        <h2>OpenId login</h2>
+        <form method="POST" accept-charset="UTF-8" action="/OpenIDLogin">
+          <label for="openid_provider">Provider URL:</label>
+          <input type="text" id="openid_provider" name="openid_provider" value="" />
+          <input type="submit" value="Log in" /><br />
+        </form>
       </div>
       <div>
-        <h2>Cookies:</h2>
-        <ul>[cookies|raw]</ul>
+        <h2>Client headers:</h2>
+        <ul class="varlist">[headers|raw]</ul>
       </div>
       <div>
         <h2>Environment variables:</h2>
-        <ul>[env|raw]</ul>
+        <ul class="varlist">[env|raw]</ul>
       </div>
       <div>
         <h2>Extended environment variables:</h2>
-        <ul>[ext_env|raw]</ul>
-      </div>
-      
-      <div>
-        <h2>OpenId login</h2>
-        <form method="POST" accept-charset="UTF-8" action="/openId?debug">
-          Identifier:
-          <input type="text" name="openid_identifier" value="" />
-          <input type="submit" value="Verify" /><br />
-          <input type="checkbox" name="immediate" id="immediate" /><label for="immediate">Use immediate mode</label>
-          <input type="checkbox" name="use_sreg" id="use_sreg" /><label for="use_sreg">Request registration data</label>
-          <input type="checkbox" name="use_pape" id="use_pape" /><label for="use_pape">Request phishing-resistent auth policy (PAPE)</label>
-          <input type="checkbox" name="use_stateless" id="use_stateless" /><label for="use_stateless">Use stateless mode</label>
-        </form>
+        <ul class="varlist">[ext_env|raw]</ul>
       </div>
     </div>
 [footer]
