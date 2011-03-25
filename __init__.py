@@ -30,7 +30,14 @@ from underdark.libs.uweb import request
 HTML_ENTITY_SEARCH = re.compile('&#?\w+;')
 
 
-class NoRouteError(Exception):
+class Error(Exception):
+  """Superclass used for inheritance and external excepion handling."""
+
+
+class ImmediateResponse(Exception):
+  """Used to trigger an immediate repsonse, foregoing the regular returns."""
+
+class NoRouteError(Error):
   """The server does not know how to route this request"""
 
 
@@ -83,22 +90,24 @@ def Handler(req, pageclass, routes, config_file=None):
   pages = pageclass(req, config_file=config_file)
   try:
     req_method, req_arguments = Router(routes, req.env['PATH_INFO'])
-    content = getattr(pages, req_method)(*req_arguments)
+    response = getattr(pages, req_method)(*req_arguments)
   except ReloadModules, message:
     reload_message = reload(sys.modules[pageclass.__module__])
-    content = Response(content='%s\n%s' % (message, reload_message))
+    response = Response(content='%s\n%s' % (message, reload_message))
+  except ImmediateResponse, response:
+    response = response
   except (Exception, NoRouteError):
-    content = pages.InternalServerError()
+    response = pages.InternalServerError()
 
-  if not isinstance(content, Response):
-    content = Response(content=content)
-  req.SetHttpStatus(content.httpcode)
-  req.SetContentType(content.content_type)
-  for header_pair in content.headers.iteritems():
+  if not isinstance(response, Response):
+    response = Response(content=response)
+  req.SetHttpStatus(response.httpcode)
+  req.SetContentType(response.content_type)
+  for header_pair in response.headers.iteritems():
     req.AddHeader(*header_pair)
-  for cookie in content.cookies:
+  for cookie in response.cookies:
     req.AddCookie(**cookie)
-  req.Write(content.content)
+  req.Write(response.content)
   return apache.DONE
 
 
