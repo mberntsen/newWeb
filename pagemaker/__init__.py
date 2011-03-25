@@ -1,5 +1,5 @@
 #!/usr/bin/python
-"""Underdark web interface, or uWeb interface"""
+"""Underdark uWeb PageMaker class and its various Mixins."""
 from __future__ import with_statement
 
 __author__ = 'Elmer de Looff <elmer@underdark.nl>'
