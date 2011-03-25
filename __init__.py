@@ -95,7 +95,7 @@ def Handler(req, pageclass, routes, config_file=None):
     reload_message = reload(sys.modules[pageclass.__module__])
     response = Response(content='%s\n%s' % (message, reload_message))
   except ImmediateResponse, response:
-    response = response
+    response = response[0]
   except (Exception, NoRouteError):
     response = pages.InternalServerError()
 
