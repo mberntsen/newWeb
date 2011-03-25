@@ -5,6 +5,8 @@ __author__ = 'Elmer de Looff <elmer@underdark.nl>'
 __version__ = '0.3'
 
 # Standard modules
+import base64
+import os
 import time
 
 # Custom modules
@@ -182,12 +184,12 @@ class PageMaker(uweb.DebuggingPageMaker):
   def _OpenIdValidate(self):
     """Handles the return url that openId uses to send the user to"""
     try:
-      user = uwebopenid.OpenId(self.req).doProcess()
+      auth_dict = uwebopenid.OpenId(self.req).doProcess()
     except uwebopenid.VerificationFailed, error:
       return self.OpenIdAuthFailure(error)
     except uwebopenid.VerificationCanceled, error:
       return self.OpenIdAuthCancel(error)
-    return self.OpenIdAuthSuccess('welcome %s, %r, %r, %s' % user)
+    return self.OpenIdAuthSuccess(auth_dict)
 
 
   def OpenIdProviderBadLink(self, err_obj):
@@ -219,13 +221,12 @@ class PageMaker(uweb.DebuggingPageMaker):
         message=err_obj,
         **self.CommonBlocks('uweb'))
 
-  def OpenIdAuthSuccess(self, message):
-    import base64
-    import os
-    message = 'You are now known as ' + message
+  def OpenIdAuthSuccess(self, auth_dict):
+    message = 'Some authentication info:\n\n%s' % (
+        '\n'.join('* %s = %r' % pair for pair in sorted(auth_dict.items())))
+    session_id = base64.urlsafe_b64encode(os.urandom(30))
     self.req.AddCookie('FirstMinuteLogin', 'True', max_age=60)
-    self.req.AddCookie(
-        'OpenIDSession', base64.urlsafe_b64encode(os.urandom(30)), max_age=3600)
+    self.req.AddCookie('OpenIDSession', session_id, max_age=3600)
     return self.parser.Parse(
         'freetext.html',
         title='OpenID Authentication successful',

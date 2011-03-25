@@ -166,8 +166,10 @@ class OpenId(object):
       # rather than their more human-friendly identifiers.  That
       # way their account with you is not compromised if their
       # i-name registration expires and is bought by someone else.
-      return (display_identifier, sreg_resp, pape_resp,
-              (info.endpoint.canonicalID or display_identifier))
+      return {'ident': display_identifier,
+              'sreg': sreg_resp,
+              'pape': pape_resp,
+              'canonicalID': info.endpoint.canonicalID}
 
     elif info.status == consumer.CANCEL:
       # cancelled
