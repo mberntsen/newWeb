@@ -1,5 +1,5 @@
 #!/usr/bin/python
-"""module to support OpenId login in uweb"""
+"""module to support OpenID login in uWeb"""
 
 __author__ = 'Jan Klopper <jan@underdark.nl>'
 __version__ = '0.3'

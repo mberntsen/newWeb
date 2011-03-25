@@ -12,9 +12,9 @@ import time
 # Custom modules
 from underdark.libs import logging
 from underdark.libs import uweb
-from underdark.libs.uweb import uwebopenid
+from underdark.libs.uweb.pagemaker import login
 
-class PageMaker(uweb.DebuggingPageMaker):
+class PageMaker(uweb.DebuggingPageMaker, login.OpenIdMixin):
   """Holds all the html generators for the webapp
 
   Each page as a separate method.
@@ -164,33 +164,6 @@ class PageMaker(uweb.DebuggingPageMaker):
           httpcode=500,
           content=self.parser.Parse(
               '500.html', path=path, **self.CommonBlocks('http500')))
-
-  def _OpenIdInitiate(self):
-    """Verifies the supplied OpenID URL and resolves a login through it."""
-    consumer = uwebopenid.OpenId(self.req)
-
-    # set the realm that we want to ask to user to verify to
-    trustroot = 'http://%s' % self.req.env['HTTP_HOST']
-    # set the return url that handles the validation
-    returnurl = trustroot + '/OpenIDValidate'
-    openid_url = self.post.getfirst('openid_provider')
-    try:
-      return consumer.Verify(openid_url, trustroot, returnurl)
-    except uwebopenid.InvalidOpenIdUrl, error:
-      return self.OpenIdProviderBadLink(error)
-    except uwebopenid.InvalidOpenIdService, error:
-      return self.OpenIdProviderError(error)
-
-  def _OpenIdValidate(self):
-    """Handles the return url that openId uses to send the user to"""
-    try:
-      auth_dict = uwebopenid.OpenId(self.req).doProcess()
-    except uwebopenid.VerificationFailed, error:
-      return self.OpenIdAuthFailure(error)
-    except uwebopenid.VerificationCanceled, error:
-      return self.OpenIdAuthCancel(error)
-    return self.OpenIdAuthSuccess(auth_dict)
-
 
   def OpenIdProviderBadLink(self, err_obj):
     return self.parser.Parse(
