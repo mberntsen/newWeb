@@ -34,7 +34,7 @@ class Request(object):
 
     # `self.vars` setup, will contain keys 'cookie', 'get' and 'post'
     self.vars = {'cookie': ExtractCookies(self.env.get('HTTP_COOKIE')),
-                 'get': cgi.parse_qs(self.env['QUERY_STRING'])}
+                 'get': QueryArgsDict(cgi.parse_qs(self.env['QUERY_STRING']))}
     if self.env['REQUEST_METHOD'] == 'POST':
       self.vars['post'] = IndexedFieldStorage(post_data_fp, environ=self.env)
     else:
@@ -119,6 +119,25 @@ class IndexedFieldStorage(cgi.FieldStorage):
       else:
         self.list.append(field)
     self.list.extend(new_fields.values())
+
+
+class QueryArgsDict(dict):
+  def getfirst(self, key, default=None):
+    """Returns the first value for the requested key, or a fallback value."""
+    try:
+      return self[key][0]
+    except KeyError:
+      return default
+
+  def getlist(self, key):
+    """Returns a list with all values that were given for the requested key.
+
+    N.B. If the given key does not exist, an empty list is returned.
+    """
+    try:
+      return self[key]
+    except KeyError:
+      return []
 
 
 def EnvironBaseHttp(request):
