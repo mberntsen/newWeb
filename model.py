@@ -3,7 +3,7 @@
 from __future__ import with_statement
 
 __author__ = 'Elmer de Looff <elmer@underdark.nl>'
-__version__ = '0.1'
+__version__ = '0.2'
 
 
 class Model(object):
@@ -16,13 +16,13 @@ class Model(object):
     self._fields = []
     with self.connection as cursor:
       for row in cursor.Execute('EXPLAIN %s' % self.TABLE):
-        self._fields.append(dict(row.items))
+        self._fields.append(row)
 
   def _SelectNaiveRecords(self, **sqltalk_options):
     with self.connection as cursor:
       records = cursor.Select(table=self.TABLE, **sqltalk_options)
     for record in records:
-      yield self.RECORD_CLASS(record.items)
+      yield self.RECORD_CLASS(record)
 
   def GetById(self, record_id):
     conditions = '%s = %s' % (self.ID_FIELD,
