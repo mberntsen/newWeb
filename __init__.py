@@ -178,7 +178,7 @@ def HtmlUnescape(html):
   return HTML_ENTITY_SEARCH.sub(_FixEntities, html)
 
 
-def ServerSetup(router):
+def ServerSetup(router, apache_logging=True):
   """Sets up a the runtime environment of the webserver.
 
   If the router (the caller of this function) runs in STANDALONE mode, the
@@ -201,11 +201,11 @@ def ServerSetup(router):
   Arguments:
     @ router: function
       The main router of the webserver.
-    % package: str ~~ 'mod_python_project'
-      The application's common name. This is used in the creation of the
-      directory that will hold the application's log files.
-      For Apache, this name is required, for BaseHTTP, it's optional, and the
-      default is the directory name two levels up from the router.
+    % apache_logging: bool ~~ True
+      Whether or not to log when running from inside Apache. Enabling logging
+      on apache has the disadvantage of opening and closing the logging database
+      for each and every request that Apache handles.
+      This may affect performance significantly.
   """
   if STANDALONE:
     # The following is based on the assumption that the package path contains a
@@ -223,9 +223,7 @@ def ServerSetup(router):
 
     app.Service(stack_depth=3, app=main, config=config_location,
                 working_dir=package_dir, package=package_name)
-  else:
-    #os.chdir(working_dir)
-    # For mod_python, the current working directory is set to the package dir.
+  elif apache_logging:
     package = router.func_globals.get('PACKAGE', 'mod_python_project')
     log_dir = app.FirstWritablePath(app.MakePaths(app.LOGGING_PATHS, package))
     app.SetUpLogging(os.path.join(log_dir, 'apache.sqlite'))
