@@ -25,6 +25,27 @@
           </ul>
         </form>
         <br />
+        <h2>Create a custom cookie</h2>
+        <p>
+          These cookies will be posted to this very same page. They will then be added to the outgoing headers. They will *not* show up on the resulting page, though they will on every other request after that, until their max-age expires.
+        <form action="#" method="post">
+          <ul class="nodot horizontal">
+            <li>
+                <label for="cookie_name">Cookie name:</label>
+                <input type="text" id="cookie_name" name="uweb_cookie_name" />
+            </li>
+            <li>
+                <label for="cookie_value">Cookie value:</label>
+                <input type="text" id="cookie_value" name="uweb_cookie_value" />
+            </li>
+            <li>
+                <label for="cookie_max_age">Cookie max-age:</label>
+                <input type="text" id="cookie_max_age" name="uweb_cookie_max_age" />
+                <input type="submit" value="Submit" />
+            </li>
+          </ul>
+        </form>
+        <br />
         <h2>OpenId login</h2>
         <form method="POST" accept-charset="UTF-8" action="/OpenIDLogin">
           <label for="openid_provider">Provider URL:</label>

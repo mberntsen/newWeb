@@ -27,9 +27,18 @@ class PageMaker(uweb.DebuggingPageMaker, login.OpenIdMixin):
                 year=time.strftime('%Y'),
                 version=uweb.__version__)}
 
+  def CustomCookie(self):
+    """Adds a user-generated cookie to the outgoing headers if requested."""
+    self.req.AddCookie(self.post.getfirst('uweb_cookie_name'),
+                       self.post.getfirst('uweb_cookie_value', 'default'),
+                       max_age=self.post.getfirst('uweb_cookie_max_age', 600))
+
   def Index(self, _path):
     """Returns the index.html template"""
     logging.LogInfo('Index page requested')
+
+    if 'uweb_cookie_name' in self.post:
+      self.CustomCookie()
 
     gethtml = []
     for getvar in sorted(self.get):
