@@ -17,15 +17,27 @@ class OpenIdMixin(object):
   necessities for verifying that whoever logs in is still the same person as the
   one that was previously registered.
   """
-  def _OpenIdInitiate(self):
-    """Verifies the supplied OpenID URL and resolves a login through it."""
-    consumer = uwebopenid.OpenId(self.req)
+  PROVIDERS = {'google':'https://www.google.com/accounts/o8/id',
+               'yahoo':'http://yahoo.com/',
+               'myopenid':'http://myopenid.com/'}
 
+  
+  def _OpenIdInitiate(self, provider=None):
+    """Verifies the supplied OpenID URL and resolves a login through it."""
+    if provider:
+      try:
+        openid_url = self.PROVIDERS[provider]
+      except KeyError:
+        return self.OpenIdProviderError('Invalid OpenID provider')       
+    else:
+      openid_url = self.post.getfirst('openid_provider')
+    
+    consumer = uwebopenid.OpenId(self.req)
     # set the realm that we want to ask to user to verify to
     trustroot = 'http://%s' % self.req.env['HTTP_HOST']
     # set the return url that handles the validation
     returnurl = trustroot + '/OpenIDValidate'
-    openid_url = self.post.getfirst('openid_provider')
+
     try:
       return consumer.Verify(openid_url, trustroot, returnurl)
     except uwebopenid.InvalidOpenIdUrl, error:
