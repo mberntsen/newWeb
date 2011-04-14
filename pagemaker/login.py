@@ -8,6 +8,10 @@ __version__ = '0.3'
 # Custom modules
 from underdark.libs.uweb import uwebopenid
 
+OPENID_PROVIDERS = {'google': 'https://www.google.com/accounts/o8/id',
+                    'yahoo': 'http://yahoo.com/',
+                    'myopenid': 'http://myopenid.com/'}
+
 
 class OpenIdMixin(object):
   """A class that provides rudimentary OpenID authentication.
@@ -17,21 +21,16 @@ class OpenIdMixin(object):
   necessities for verifying that whoever logs in is still the same person as the
   one that was previously registered.
   """
-  PROVIDERS = {'google':'https://www.google.com/accounts/o8/id',
-               'yahoo':'http://yahoo.com/',
-               'myopenid':'http://myopenid.com/'}
-
-  
   def _OpenIdInitiate(self, provider=None):
     """Verifies the supplied OpenID URL and resolves a login through it."""
     if provider:
       try:
-        openid_url = self.PROVIDERS[provider]
+        openid_url = OPENID_PROVIDERS[provider.lower()]
       except KeyError:
-        return self.OpenIdProviderError('Invalid OpenID provider')       
+        return self.OpenIdProviderError('Invalid OpenID provider %r' % provider)
     else:
       openid_url = self.post.getfirst('openid_provider')
-    
+
     consumer = uwebopenid.OpenId(self.req)
     # set the realm that we want to ask to user to verify to
     trustroot = 'http://%s' % self.req.env['HTTP_HOST']
