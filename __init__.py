@@ -15,11 +15,12 @@ import warnings
 # Import apache, or a mock for standalone purposes
 try:
   from mod_python import apache
-  STANDALONE = False
 except ImportError:
-  import apache_mock as apache
+  # The following global exists to signal the apache module is NOT loaded.
+  # pylint: disable=C0103
+  apache = False
+  # pylint: enable=C0103
   import standalone
-  STANDALONE = True
 
 # Custom modules
 from underdark.libs import app
@@ -108,7 +109,8 @@ def Handler(req, pageclass, routes, config_file=None):
   for cookie in response.cookies:
     req.AddCookie(**cookie)
   req.Write(response.content)
-  return apache.DONE
+  if apache:
+    return apache.DONE
 
 
 def Router(routes, url):
@@ -181,12 +183,13 @@ def HtmlUnescape(html):
 def ServerSetup(router, apache_logging=True):
   """Sets up a the runtime environment of the webserver.
 
-  If the router (the caller of this function) runs in STANDALONE mode, the
-  runtime environment will be a service as defined by the app framework.
+  If the router (the caller of this function) runs in `standalone` mode (defined
+  by absence of the `apache` module), the runtime environment will be a service
+  as defined by the app framework.
   This reads a config file to use for configuring the webserver itself, sets up
   output redirection and logging to sqlite database.
 
-  In the STANDALONE mode, the assumption is made that the passed in `router` is
+  In `standalone` mode, the assumption is made that the passed in `router` is
   a file that lives in a directory one path below what is considered the
   `package`. This package name will be used to create a directory for log files.
 
@@ -194,8 +197,9 @@ def ServerSetup(router, apache_logging=True):
   and used to configure the webserver. The config portion used is [server],
   and the supported settings are 'host' and 'port'.
 
-  When not runnin in STANDALONE mode, this function sets up logging to sqlite,
-  in a directory that's defined by the router's module constant PACKAGE.
+  When running in `apache` mode (that is, there is an apache module), this
+  function sets up logging to sqlite, in a directory that's defined by the
+  router's module constant PACKAGE.
   If this constant is not present, it will default to 'mod_python_project'.
 
   Arguments:
@@ -207,7 +211,7 @@ def ServerSetup(router, apache_logging=True):
       for each and every request that Apache handles.
       This may affect performance significantly.
   """
-  if STANDALONE:
+  if not apache:
     # The following is based on the assumption that the package path contains a
     # directory (typically `www`) which contains the router module.
     # Third from the right is the package directory's name, which we need.
