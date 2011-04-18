@@ -3,7 +3,7 @@
 from __future__ import with_statement
 
 __author__ = 'Elmer de Looff <elmer@underdark.nl>'
-__version__ = '0.3'
+__version__ = '0.4'
 
 # Standard modules
 import mimetypes
@@ -392,7 +392,10 @@ class Response(object):
       % httpcode: int ~~ 200
         The HTTP response code to attach to the response.
     """
-    self.content = content
+    if isinstance(content, unicode):
+      self.content = content.encode('utf8')
+    else:
+      self.content = str(content)
     self.cookies = cookies
     self.httpcode = httpcode
     self.headers = headers or {}

@@ -2,7 +2,7 @@
 """Underdark micro-Web framework, uWeb, Request module."""
 
 __author__ = 'Elmer de Looff <elmer@underdark.nl>'
-__version__ = '0.4'
+__version__ = '0.5'
 
 # Standard modules
 import cgi
@@ -84,10 +84,7 @@ class Request(object):
       for name, value in self._out_headers:
         self._request.send_header(name, value)
       self._request.end_headers()
-      if isinstance(data, unicode):
-        self._request.wfile.write(data.encode('utf8'))
-      else:
-        self._request.wfile.write(data)
+      self._request.wfile.write(data)
 
 
 class IndexedFieldStorage(cgi.FieldStorage):

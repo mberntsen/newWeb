@@ -3,7 +3,7 @@
 from __future__ import with_statement
 
 __author__ = 'Jan Klopper <jan@underdark.nl>'
-__version__ = '0.5'
+__version__ = '0.6'
 
 # Standard modules
 import htmlentitydefs
@@ -12,10 +12,14 @@ import re
 import sys
 import warnings
 
-# Import apache, or a mock for standalone purposes
 try:
+  # Import the apache module from inside mod_python. This allows us to trigger
+  # a DONE so that Apache knows when and how to respond to the client.
   from mod_python import apache
 except ImportError:
+  # We are *NOT* running from inside Apache. Import the standalone routines so
+  # that we can set up a local webserver
+
   # The following global exists to signal the apache module is NOT loaded.
   # pylint: disable=C0103
   apache = False
