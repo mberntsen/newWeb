@@ -31,6 +31,7 @@ class PageMaker(uweb.DebuggingPageMaker, login.OpenIdMixin):
     """Adds a user-generated cookie to the outgoing headers if requested."""
     self.req.AddCookie(self.post.getfirst('uweb_cookie_name'),
                        self.post.getfirst('uweb_cookie_value', 'default'),
+                       path=self.post.getfirst('uweb_cookie_path'),
                        max_age=self.post.getfirst('uweb_cookie_max_age', 600))
 
   def Index(self, _path):
