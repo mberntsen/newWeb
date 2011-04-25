@@ -2,11 +2,11 @@
 """Underdark micro-Web framework, uWeb, Request module."""
 
 __author__ = 'Elmer de Looff <elmer@underdark.nl>'
-__version__ = '0.5'
+__version__ = '0.6'
 
 # Standard modules
 import cgi
-import Cookie
+import Cookie as cookie
 import os
 import re
 import socket
@@ -14,6 +14,34 @@ import urllib
 
 # Custom modules
 #from underdark.libs import logging
+
+
+class Cookie(cookie.SimpleCookie):
+  """Cookie class that uses the most specific value for a cookie name.
+
+  According to RFC2965 (http://tools.ietf.org/html/rfc2965):
+      If multiple cookies satisfy the criteria above, they are ordered in
+      the Cookie header such that those with more specific Path attributes
+      precede those with less specific.  Ordering with respect to other
+      attributes (e.g., Domain) is unspecified.
+
+  This class adds this behaviour to cookie parsing. That is, a key:value pair
+  WILL NOT overwrite an already existing (and thus more specific) pair.
+
+  N.B.: this class assumes the given cookie to follow the standards outlined in
+  the RFC. At the moment (2011Q1) this assumption proves to be correct for both
+  Chromium (and likely Webkit in general) and Firefox. Other browsers have not
+  been testsed, and might possibly deviate from the suggested standard.
+  As such, it's recommended not to re-use the cookie name with different values
+  for different paths.
+  """
+  # Unfortunately this works by redefining a private method.
+  def _BaseCookie__set(self, key, real_value, coded_value):
+    """Inserts a morsel into the Cookie, strictly on the first occurrance."""
+    if key not in self:
+      morsel = cookie.Morsel()
+      morsel.set(key, real_value, coded_value)
+      dict.__setitem__(self, key, morsel)
 
 
 class Request(object):
@@ -33,7 +61,7 @@ class Request(object):
       post_data_fp = request
 
     # `self.vars` setup, will contain keys 'cookie', 'get' and 'post'
-    self.vars = {'cookie': ExtractCookies(self.env.get('HTTP_COOKIE')),
+    self.vars = {'cookie': Cookie(self.env.get('HTTP_COOKIE')),
                  'get': QueryArgsDict(cgi.parse_qs(self.env['QUERY_STRING']))}
     if self.env['REQUEST_METHOD'] == 'POST':
       self.vars['post'] = IndexedFieldStorage(post_data_fp, environ=self.env)
@@ -41,11 +69,40 @@ class Request(object):
       self.vars['post'] = IndexedFieldStorage()
 
   def AddCookie(self, key, value, **attrs):
-    cookie = Cookie.SimpleCookie({key: value})
+    """Adds a new cookie header to the repsonse.
+
+    Arguments:
+      @ key: str
+        The name of the cookie.
+      @ value: str
+        The actual value to store in the cookie.
+      % expires: str ~~ None
+        The date + time when the cookie should expire. The format should be:
+        "Wdy, DD-Mon-YYYY HH:MM:SS GMT" and the time specified in UTC.
+        The default means the cookie never expires.
+        N.B. Specifying both this and `max_age` leads to undefined behavior.
+      % path: str ~~ '/'
+        The path for which this cookie is valid. This default ('/') is different
+        from the rule stated on Wikipedia: "If not specified, they default to
+        the domain and path of the object that was requested".
+      % domain: str ~~ None
+        The domain for which the cookie is valid. The default is that of the
+        requested domain.
+      % max_age: int
+        The number of seconds this cookie should be used for. After this period,
+        the cookie should be deleted by the client.
+        N.B. Specifying both this and `expires` leads to undefined behavior.
+      % secure: any
+        When specified, the cookie is only used on https connections.
+      % httponly
+        When specified, the cookie is only used for http(s) requests, and is not
+        accessible through Javascript (DOM).
+    """
+    new_cookie = Cookie({key: value})
     if 'max_age' in attrs:
       attrs['max-age'] = attrs.pop('max_age')
-    cookie[key].update(attrs)
-    self.AddHeader('Set-Cookie', cookie[key].OutputString())
+    new_cookie[key].update(attrs)
+    self.AddHeader('Set-Cookie', new_cookie[key].OutputString())
 
   def AddHeader(self, name, value):
     if self._modpython:
@@ -259,10 +316,3 @@ def HeadersIntoEnviron(environ, headers, skip_pre_existing_http=True):
     else:
       environ['HTTP_' + name] = value
   return environ
-
-
-def ExtractCookies(raw_cookie):
-  """Returns a SimpleCookie based on the raw cookie string received."""
-  if isinstance(raw_cookie, list):
-    raw_cookie = ';'.join(raw_cookie)
-  return Cookie.SimpleCookie(raw_cookie)

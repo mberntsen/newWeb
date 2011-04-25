@@ -3,7 +3,7 @@
 from __future__ import with_statement
 
 __author__ = 'Jan Klopper <jan@underdark.nl>'
-__version__ = '0.6'
+__version__ = '0.7'
 
 # Standard modules
 import htmlentitydefs
