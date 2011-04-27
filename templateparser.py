@@ -227,6 +227,7 @@ class Parser(dict):
     """
     TEMPLATE_FUNCTIONS[name] = function
 
+  TemplateReadError = TemplateReadError
 
 class SafeString(str):
   """A template string, which has had all its processing done already."""
