@@ -73,8 +73,5 @@ class StandaloneHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
 def RunStandAlone(handler, **config):
   server = StandaloneServer(handler, server=config.get('server'))
-  print 'running locally on %s:%d' % server.httpd.server_address
-  try:
-    server.Start()
-  except KeyboardInterrupt:
-    print 'shutting down'
+  print 'Running uWeb on %s:%d' % server.httpd.server_address
+  server.Start()
