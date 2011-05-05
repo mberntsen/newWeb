@@ -156,11 +156,11 @@ class Parser(dict):
     """
     for tag in tags:
       parts = tag.split('|')
-      needle, _sep, index = parts[0].partition(':')
+      needle_and_indices = parts[0].split(':')
       funcs = parts[1:]
       try:
-        replacement = replacements[needle]
-        if index:
+        replacement = replacements[needle_and_indices[0]]
+        for index in needle_and_indices[1:]:
           replacement = Parser._CollectFromIndex(replacement, index)
         if funcs:
           for func in funcs:

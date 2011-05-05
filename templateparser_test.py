@@ -130,6 +130,13 @@ class TemplateParserIndexedTags(unittest.TestCase):
     self.assertEqual(output, self.parser.ParseString(
         template, titles=['Mr'], names=Object(), date={}))
 
+  def testTemplateMultipleIndexing(self):
+    """Template tags can contain nested indexes"""
+    template = 'Welcome to the [foo:bar:zoink].'
+    output = 'Welcome to the World.'
+    self.assertEqual(output, self.parser.ParseString(
+        template, foo={'bar': {'zoink': 'World'}}))
+
 #  def testPerformance(self):
 #    """Basic performance test for 2 template replacements"""
 #    for i in range(100):
