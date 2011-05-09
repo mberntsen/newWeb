@@ -3,7 +3,7 @@
 from __future__ import with_statement
 
 __author__ = 'Elmer de Looff <elmer@underdark.nl>'
-__version__ = '0.4'
+__version__ = '0.5'
 
 # Standard modules
 import mimetypes
@@ -272,7 +272,8 @@ class PageMakerMysqlMixin(PageMakerDatabaseMixin):
           user=mysqlopts.get('user'),
           passwd=mysqlopts.get('password'),
           db=mysqlopts.get('database'),
-          charset=mysqlopts.get('charset', 'utf8'))
+          charset=mysqlopts.get('charset', 'utf8'),
+          debug=PageMakerDebuggerMixin in self.__class__.__mro__)
     return self._connection
 
   @property
