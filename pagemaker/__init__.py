@@ -6,6 +6,7 @@ __author__ = 'Elmer de Looff <elmer@underdark.nl>'
 __version__ = '0.5'
 
 # Standard modules
+import datetime
 import mimetypes
 import os
 import sys
@@ -16,6 +17,8 @@ from underdark.libs import logging
 from underdark.libs import pysession
 from underdark.libs import udders
 from underdark.libs.uweb import templateparser
+
+RFC_1123_DATE = '%a, %d %b %Y %T GMT'
 
 __all__ = (
     'DatabaseError', 'ReloadModules', 'BasePageMaker', 'PageMakerDebuggerMixin',
@@ -37,6 +40,9 @@ class BasePageMaker(object):
   # classmethods that set up paths specific for that pagemaker.
   PUBLIC_DIR = 'www'
   TEMPLATE_DIR = 'templates'
+
+  # Default Static() handler cache durations, per MIMEtype, in days
+  CACHE_DURATION = MimeTypeDict({'text': 7, 'image': 30, 'application': 7})
 
   def __init__(self, req, config_file=None):
     """sets up the template parser and database connections
@@ -122,12 +128,12 @@ class BasePageMaker(object):
       with file(abs_path) as staticfile:
         content_type, _encoding = mimetypes.guess_type(abs_path)
         if not content_type:
-          #TODO(Jan): add mime-type guessing based on the path extension,
-          # and a custom dict, if that fails, add Magic Mime detection
-          #XXX(Elmer): mimetypes.guess_type is already strictly extension based.
           content_type = 'text/plain'
+        cache_days = self.CACHE_DURATION.get(content_type, 0)
+        expires = datetime.datetime.utcnow() + datetime.timedelta(cache_days)
         return Response(content=staticfile.read(),
-                        content_type=content_type)
+                        content_type=content_type,
+                        headers={'Expires': expires.strftime(RFC_1123_DATE)})
     except IOError:
       message = 'This is not the path you\'re looking for. No such file %r' % (
           self.req.env['PATH_INFO'])
@@ -362,6 +368,77 @@ class PageMakerSessionMixin(object):
       return session_handler.userid
     except (pysession.SessionError, ValueError):
       return False
+
+
+class MimeTypeDict(dict):
+  """Dictionary that defines special behavior for mimetypes.
+
+  Mimetypes (of typical form "type/subtype") are stored as (type, subtype) keys.
+  This allows grouping of types to happen, and fallbacks to occur.
+
+  The following is a typical complete MIMEType example:
+    >>> mime_type_dict['text/html'] = 'HTML content'
+
+  One could also define a default for the whole type, as follows:
+    >>> mime_type_dict['text/*'] = 'Default'
+
+  Looking up a type/subtype that doesn't exist, but for which a bare type does,
+  will result in the value for the bare type to be returned:
+    >>> mime_type_dict['text/nonexistant']
+    'Default'
+  """
+  def __init__(self, data=(), **kwds):
+    super(MimeTypeDict, self).__init__()
+    if data:
+      self.update(data)
+    if kwds:
+      self.update(**kwds)
+
+  @staticmethod
+  def MimeSplit(mime):
+    """Split up a MIMEtype in a type and subtype, return as tuple.
+
+    When the subtype if undefined or '*', only the type is returned, as 1-tuple.
+    """
+    mime_type, _sep, mime_subtype = mime.lower().partition('/')
+    if not mime_subtype or mime_subtype == '*':
+      return mime_type,  # 1-tuple
+    return mime_type, mime_subtype
+
+  def __setitem__(self, mime, value):
+    super(MimeTypeDict, self).__setitem__(self.MimeSplit(mime), value)
+
+  def __getitem__(self, mime):
+    parsed_mime = self.MimeSplit(mime)
+    try:
+      return super(MimeTypeDict, self).__getitem__(parsed_mime)
+    except KeyError:
+      try:
+        return super(MimeTypeDict, self).__getitem__(parsed_mime[:1])
+      except KeyError:
+        raise KeyError('KeyError: %r' % mime)
+
+  def get(self, mime, default=None):
+    try:
+      return self[mime]
+    except KeyError:
+      return default
+
+  def update(self, data=None, **kwargs):
+    """Update the dictionary with new values from another dictionary.
+
+    Also takes values from an iterable object of pairwise data.
+    """
+    if data:
+      try:
+        for key, value in data.iteritems():
+          self[key] = value
+      except AttributeError:
+        # Argument data is not a proper dict, treat it as an iterable of tuples.
+        for key, value in data:
+          self[key] = value
+    if kwargs:
+      self.update(kwargs)
 
 
 class Response(object):
