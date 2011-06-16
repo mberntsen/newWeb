@@ -34,6 +34,77 @@ class ReloadModules(Exception):
   """Communicates the handler that it should reload the pageclass"""
 
 
+class MimeTypeDict(dict):
+  """Dictionary that defines special behavior for mimetypes.
+
+  Mimetypes (of typical form "type/subtype") are stored as (type, subtype) keys.
+  This allows grouping of types to happen, and fallbacks to occur.
+
+  The following is a typical complete MIMEType example:
+    >>> mime_type_dict['text/html'] = 'HTML content'
+
+  One could also define a default for the whole type, as follows:
+    >>> mime_type_dict['text/*'] = 'Default'
+
+  Looking up a type/subtype that doesn't exist, but for which a bare type does,
+  will result in the value for the bare type to be returned:
+    >>> mime_type_dict['text/nonexistant']
+    'Default'
+  """
+  def __init__(self, data=(), **kwds):
+    super(MimeTypeDict, self).__init__()
+    if data:
+      self.update(data)
+    if kwds:
+      self.update(**kwds)
+
+  @staticmethod
+  def MimeSplit(mime):
+    """Split up a MIMEtype in a type and subtype, return as tuple.
+
+    When the subtype if undefined or '*', only the type is returned, as 1-tuple.
+    """
+    mime_type, _sep, mime_subtype = mime.lower().partition('/')
+    if not mime_subtype or mime_subtype == '*':
+      return mime_type,  # 1-tuple
+    return mime_type, mime_subtype
+
+  def __setitem__(self, mime, value):
+    super(MimeTypeDict, self).__setitem__(self.MimeSplit(mime), value)
+
+  def __getitem__(self, mime):
+    parsed_mime = self.MimeSplit(mime)
+    try:
+      return super(MimeTypeDict, self).__getitem__(parsed_mime)
+    except KeyError:
+      try:
+        return super(MimeTypeDict, self).__getitem__(parsed_mime[:1])
+      except KeyError:
+        raise KeyError('KeyError: %r' % mime)
+
+  def get(self, mime, default=None):
+    try:
+      return self[mime]
+    except KeyError:
+      return default
+
+  def update(self, data=None, **kwargs):
+    """Update the dictionary with new values from another dictionary.
+
+    Also takes values from an iterable object of pairwise data.
+    """
+    if data:
+      try:
+        for key, value in data.iteritems():
+          self[key] = value
+      except AttributeError:
+        # Argument data is not a proper dict, treat it as an iterable of tuples.
+        for key, value in data:
+          self[key] = value
+    if kwargs:
+      self.update(kwargs)
+
+
 class BasePageMaker(object):
   """Provides the base pagemaker methods for all the html generators."""
   # Base paths for templates and public data. These are used in the PageMaker
@@ -368,77 +439,6 @@ class PageMakerSessionMixin(object):
       return session_handler.userid
     except (pysession.SessionError, ValueError):
       return False
-
-
-class MimeTypeDict(dict):
-  """Dictionary that defines special behavior for mimetypes.
-
-  Mimetypes (of typical form "type/subtype") are stored as (type, subtype) keys.
-  This allows grouping of types to happen, and fallbacks to occur.
-
-  The following is a typical complete MIMEType example:
-    >>> mime_type_dict['text/html'] = 'HTML content'
-
-  One could also define a default for the whole type, as follows:
-    >>> mime_type_dict['text/*'] = 'Default'
-
-  Looking up a type/subtype that doesn't exist, but for which a bare type does,
-  will result in the value for the bare type to be returned:
-    >>> mime_type_dict['text/nonexistant']
-    'Default'
-  """
-  def __init__(self, data=(), **kwds):
-    super(MimeTypeDict, self).__init__()
-    if data:
-      self.update(data)
-    if kwds:
-      self.update(**kwds)
-
-  @staticmethod
-  def MimeSplit(mime):
-    """Split up a MIMEtype in a type and subtype, return as tuple.
-
-    When the subtype if undefined or '*', only the type is returned, as 1-tuple.
-    """
-    mime_type, _sep, mime_subtype = mime.lower().partition('/')
-    if not mime_subtype or mime_subtype == '*':
-      return mime_type,  # 1-tuple
-    return mime_type, mime_subtype
-
-  def __setitem__(self, mime, value):
-    super(MimeTypeDict, self).__setitem__(self.MimeSplit(mime), value)
-
-  def __getitem__(self, mime):
-    parsed_mime = self.MimeSplit(mime)
-    try:
-      return super(MimeTypeDict, self).__getitem__(parsed_mime)
-    except KeyError:
-      try:
-        return super(MimeTypeDict, self).__getitem__(parsed_mime[:1])
-      except KeyError:
-        raise KeyError('KeyError: %r' % mime)
-
-  def get(self, mime, default=None):
-    try:
-      return self[mime]
-    except KeyError:
-      return default
-
-  def update(self, data=None, **kwargs):
-    """Update the dictionary with new values from another dictionary.
-
-    Also takes values from an iterable object of pairwise data.
-    """
-    if data:
-      try:
-        for key, value in data.iteritems():
-          self[key] = value
-      except AttributeError:
-        # Argument data is not a proper dict, treat it as an iterable of tuples.
-        for key, value in data:
-          self[key] = value
-    if kwargs:
-      self.update(kwargs)
 
 
 class Response(object):
