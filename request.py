@@ -120,9 +120,9 @@ class Request(object):
   def SetContentType(self, content_type):
     """Sets outgoing header 'content-type' to the given value."""
     if self._modpython:
-      self._request.content_type = content_type
+      self._request.content_type = '%s; charset=utf-8' % content_type
     else:
-      self.AddHeader('content-type', content_type)
+      self.AddHeader('content-type', '%s; charset=utf-8' % content_type)
 
   def SetHttpStatus(self, http_status_code):
     if self._modpython:
