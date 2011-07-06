@@ -11,6 +11,7 @@ import os
 import re
 import socket
 import urllib
+import urlparse
 
 # Custom modules
 #from underdark.libs import logging
@@ -154,25 +155,23 @@ class IndexedFieldStorage(cgi.FieldStorage):
          foo = {'bar': 'baz'}
        Multiple statements of the form 'foo[%s]' will expand this dictionary.
        Multiple occurrances of 'foo[bar]' will result in unspecified behavior.
+    3) Automatically attempts to parse all input as UTF8. This is the proposed
+       standard as of 2005: http://tools.ietf.org/html/rfc3986.
   """
   FIELD_AS_ARRAY = re.compile(r'(.*)\[(.*)\]')
   def read_urlencoded(self):
-    self.qs_on_post = ''  # We do NOT parse QUERY_STRING in our FIELD_STORAGE.
-    previous_len = len(self.list) if self.list else 0
-    cgi.FieldStorage.read_urlencoded(self) # OLD class, damnit!
-    new_form_fields = self.list[previous_len:]
-    del self.list[previous_len:]
-
-    new_fields = {}
-    for field in new_form_fields:
-      if self.FIELD_AS_ARRAY.match(field.name):
-        field_group, field_key = self.FIELD_AS_ARRAY.match(field.name).groups()
-        new_fields.setdefault(
-            field_group, cgi.MiniFieldStorage(field_group, {}))
-        new_fields[field_group].value[field_key] = field.value
+    fields = {}
+    for field, value in urlparse.parse_qsl(self.fp.read(self.length),
+                                           self.keep_blank_values,
+                                           self.strict_parsing):
+      if self.FIELD_AS_ARRAY.match(field):
+        field_group, field_key = self.FIELD_AS_ARRAY.match(field).groups()
+        fields.setdefault(field_group, cgi.MiniFieldStorage(field_group, {}))
+        fields[field_group].value[field_key] = value.decode('utf8')
       else:
-        self.list.append(field)
-    self.list.extend(new_fields.values())
+        fields[field] = cgi.MiniFieldStorage(field, value.decode('utf8'))
+    self.list = fields.values()
+    self.skip_lines()
 
 
 class QueryArgsDict(dict):
