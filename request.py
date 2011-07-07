@@ -5,6 +5,7 @@ __author__ = 'Elmer de Looff <elmer@underdark.nl>'
 __version__ = '0.6'
 
 # Standard modules
+import collections
 import cgi
 import Cookie as cookie
 import os
@@ -160,17 +161,18 @@ class IndexedFieldStorage(cgi.FieldStorage):
   """
   FIELD_AS_ARRAY = re.compile(r'(.*)\[(.*)\]')
   def read_urlencoded(self):
-    fields = {}
+    indexed = {}
+    self.list = []
     for field, value in urlparse.parse_qsl(self.fp.read(self.length),
                                            self.keep_blank_values,
                                            self.strict_parsing):
       if self.FIELD_AS_ARRAY.match(field):
         field_group, field_key = self.FIELD_AS_ARRAY.match(field).groups()
-        fields.setdefault(field_group, cgi.MiniFieldStorage(field_group, {}))
-        fields[field_group].value[field_key] = value.decode('utf8')
+        indexed.setdefault(field_group, cgi.MiniFieldStorage(field_group, {}))
+        indexed[field_group].value[field_key] = value.decode('utf8')
       else:
-        fields[field] = cgi.MiniFieldStorage(field, value.decode('utf8'))
-    self.list = fields.values()
+        self.list.append(cgi.MiniFieldStorage(field, value.decode('utf8')))
+    self.list.extend(indexed.values())
     self.skip_lines()
 
 
