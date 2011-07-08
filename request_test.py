@@ -1,17 +1,18 @@
 #!/usr/bin/python2.5
 """Tests for the request module."""
 __author__ = 'Elmer de Looff <elmer@underdark.nl>'
-__version__ = '0.1'
+__version__ = '0.3'
 
 # Method could be a function
-# p-ylint: disable-msg=R0201
+# pylint: disable-msg=R0201
 
 # Too many public methods
-# p-ylint: disable-msg=R0904
+# pylint: disable-msg=R0904
 
 # Standard modules
 import cStringIO
 import unittest
+import urllib
 
 # Unittest target
 import request
@@ -38,12 +39,41 @@ class IndexedFieldStorageTest(unittest.TestCase):
     self.assertEqual(ifs.getlist('key'), ['value'])
 
   def testMissingKey(self):
-    """Getfirst / getlist for missing keys return proper defaults"""
+    """getfirst / getlist for missing keys return proper defaults"""
     ifs = self.CreateFieldStorage('')
     self.assertEqual(ifs.getfirst('missing'), None)
     self.assertEqual(ifs.getfirst('missing', 'signal'), 'signal')
     self.assertEqual(ifs.getlist('missing'), [])
     # getlist has no default argument
+
+  def testMultipleKeyOrder(self):
+    """getlist returns keys in the order they were given to the FieldStorage"""
+    args = ['1', '3', '2']
+    ifs = self.CreateFieldStorage('arg=1&arg=3&arg=2')
+    self.assertEqual(ifs.getlist('arg'), args)
+
+  def testUrlEncoding(self):
+    """IndexedFieldStorage can handle utf-8 encoded forms"""
+    string = u'We \u2665 Unicode'
+    data = urllib.urlencode({'q': string.encode('utf8')})
+    ifs = self.CreateFieldStorage(data)
+    self.assertEqual(ifs.getfirst('q'), string)
+
+  def testDictionaryFunctionality(self):
+    """The indexing of IndexedFieldStorage allows dict-like assignment"""
+    data = 'd[name]=Arthur&d[type]=King'
+    ifs = self.CreateFieldStorage(data)
+    self.assertEqual(ifs.getfirst('d'), {'name': 'Arthur', 'type': 'King'})
+
+  def testDictionaryAndMultipleValues(self):
+    """Dictionaries and regular values can be combined; dict is item no. #1"""
+    data = 'd=third&d[first]=1&d[second]=2&d=fourth'
+    ifs = self.CreateFieldStorage(data)
+    form_data = ifs.getlist('d')
+    self.assertEqual(form_data[0], {'first': '1', 'second': '2'})
+    self.assertEqual(form_data[1], 'third')
+    self.assertEqual(form_data[2], 'fourth')
+
 
 if __name__ == '__main__':
   unittest.main(testRunner=unittest.TextTestRunner(verbosity=2))

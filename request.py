@@ -172,7 +172,7 @@ class IndexedFieldStorage(cgi.FieldStorage):
         indexed[field_group].value[field_key] = value.decode('utf8')
       else:
         self.list.append(cgi.MiniFieldStorage(field, value.decode('utf8')))
-    self.list.extend(indexed.values())
+    self.list = indexed.values() + self.list
     self.skip_lines()
 
 
