@@ -200,7 +200,7 @@ class BasePageMaker(object):
         content_type, _encoding = mimetypes.guess_type(abs_path)
         if not content_type:
           content_type = 'text/plain'
-        cache_days = self.CACHE_DURATION.get(content_type, 0)
+        cache_days = self.CACHE_DURATION.get(content_type)
         expires = datetime.datetime.utcnow() + datetime.timedelta(cache_days)
         return Response(content=staticfile.read(),
                         content_type=content_type,
@@ -214,6 +214,8 @@ class BasePageMaker(object):
 
 
 class PageMakerDebuggerMixin(object):
+  CACHE_DURATION = MimeTypeDict({})
+
   """Replaces the default handler for Internal Server Errors.
 
   This one prints a host of debugging and request information, though it still
