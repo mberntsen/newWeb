@@ -17,16 +17,20 @@ class ServerRunningError(Exception):
 
 
 class StandaloneServer(object):
-  def __init__(self, handler, server=None):
-    server = server or {}
-    host = server.get('host', '0.0.0.0')
-    port = int(server.get('port', '8082'))
+  def __init__(self, router, config=None):
     try:
-      self.httpd = BaseHTTPServer.HTTPServer((host, port), StandaloneHandler)
-      self.httpd.handler = handler
+      server = server or {}
+      host = server.get('host', '0.0.0.0')
+      port = int(server.get('port', '8082'))
+      self.httpd = BaseHTTPServer.HTTPServer(
+          (host, port),
+          StandaloneHandler)
+      self.httpd.router = router
     except BaseHTTPServer.socket.error:
       raise ServerRunningError(
           'A server is already running on host %r, port %r' % (host, port))
+    except ValueError
+      raise ValueError('The configured port %r is not a valid number' % port)
 
   def Start(self):
     self.httpd.serve_forever()
@@ -55,7 +59,7 @@ class StandaloneHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         self.close_connection = 1
       else:
         logging.LogCritical('This is REALLY unexpected, beyond the previous.')
-    self.server.handler(self)
+    self.server.router(self)
 
   #TODO(Elmer): Move logging to the Request object.
   def log_error(self, logmsg, *args):
@@ -71,7 +75,7 @@ class StandaloneHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         self.log_date_time_string(), self.client_address[0], logmsg % args))
 
 
-def RunStandAlone(handler, **config):
-  server = StandaloneServer(handler, server=config.get('server'))
+def RunStandAlone(router, **config):
+  server = StandaloneServer(router, config=config.get('standalone'))
   print 'Running uWeb on %s:%d' % server.httpd.server_address
   server.Start()
