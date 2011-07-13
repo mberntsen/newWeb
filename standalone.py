@@ -29,7 +29,7 @@ class StandaloneServer(object):
     except BaseHTTPServer.socket.error:
       raise ServerRunningError(
           'A server is already running on host %r, port %r' % (host, port))
-    except ValueError
+    except ValueError:
       raise ValueError('The configured port %r is not a valid number' % port)
 
   def Start(self):
