@@ -19,13 +19,12 @@ class ServerRunningError(Exception):
 class StandaloneServer(object):
   def __init__(self, router, config=None):
     try:
-      server = server or {}
-      host = server.get('host', '0.0.0.0')
-      port = int(server.get('port', '8082'))
-      self.httpd = BaseHTTPServer.HTTPServer(
-          (host, port),
-          StandaloneHandler)
+      config = config or {}
+      host = config.get('host', '0.0.0.0')
+      port = int(config.get('port', '8082'))
+      self.httpd = BaseHTTPServer.HTTPServer((host, port), StandaloneHandler)
       self.httpd.router = router
+      print 'server running'
     except BaseHTTPServer.socket.error:
       raise ServerRunningError(
           'A server is already running on host %r, port %r' % (host, port))
