@@ -99,6 +99,8 @@ class OpenId(object):
     provider or page with some variabeles
     """
     oidconsumer = self.getConsumer()
+    if openid_url.strip() == '':
+      raise InvalidOpenIdService()
     try:
       request = oidconsumer.begin(openid_url)
     except consumer.DiscoveryFailure:
