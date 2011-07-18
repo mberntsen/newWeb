@@ -3,7 +3,7 @@
 from __future__ import with_statement
 
 __author__ = 'Elmer de Looff <elmer@underdark.nl>'
-__version__ = '0.3'
+__version__ = '0.5'
 
 
 class Record(dict):
@@ -50,31 +50,60 @@ class Record(dict):
   def _RecordInsert(self, sql_record):
     """Inserts the given `sql_record` into the database.
 
-    The table used to store this record is gathered from the `self.table`
+    The table used to store this record is gathered from the `self.TableName()`
     property.
     Upon success, the record's foreign key is set to the result's insertid
     """
     with self.connection as cursor:
-      record = cursor.Insert(table=self.table, values=sql_record)
+      record = cursor.Insert(table=self.TableName(), values=sql_record)
     self.key = record.insertid
 
   def _RecordUpdate(self, sql_record):
     """Updates the existing database entry with values from `sql_record`.
 
-    The table used to store this record is gathered from the `self.table`
+    The table used to store this record is gathered from the `self.TableName()`
     property. The condition with which the record is updated is the name and
     value of the Record's foreign key (`self._FOREIGN_KEY` and `self.key` resp.)
     """
     with self.connection as cursor:
-      cursor.Update(table=self.table, values=sql_record,
+      cursor.Update(table=self.TableName(), values=sql_record,
                     conditions='%s=%s' % (self._FOREIGN_KEY, self.key))
+
+  @classmethod
+  def FromKey(cls, connection, fkey_id):
+    """Returns the Record object that belongs to the given foreign key value.
+
+    Arguments:
+      @ connection: sqltalk.connection
+        Database connection to use.
+      @ fkey_id: obj
+        The value for the foreign key field
+
+    Raises:
+      NotExistError:
+        There is no Record for that foreign key value.
+
+    Returns:
+      Record: Datbase record abstraction class.
+    """
+    if cls._FOREIGN_KEY is None:
+      raise ValueError(
+          'Cannot load %s without _FOREIGN_KEY defined.' % cls.__name__)
+
+    with connection as cursor:
+      record = cursor.Select(table=cls.TableName(),
+                             conditions='%s=%d' % (cls._FOREIGN_KEY, fkey_id))
+    if not record:
+      raise NotExistError('No %s with foreign key %s=%s' % (
+          self.__class__.__name__, cls._FOREIGN_KEY, fkey_id))
+    return cls(connection, record[0])
 
   #XXX(Elmer): We might want to use a single transaction to Save() (or not save)
   # all this object's children. Doing so would require a second optional
   # argument, cursor, and some delegation to a separate save method which
   # REQUIRES a cursor. (to reduce the copy/paste redundancy of two branches)
   def Save(self, save_foreign=False):
-    """Saves or updated the record, based on `self.table` and `self.key`.
+    """Saves or updated the record, based on `self.TableName()` and `self.key`.
 
     Firstly, it makes a strictly data containing SQL record. This means that any
     record class contained by the record is reduced to that record's foreign key
@@ -117,6 +146,18 @@ class Record(dict):
     else:
       self._RecordInsert(sql_record)
 
+  @classmethod
+  def TableName(cls):
+    """Returns the database table name for the Record class.
+
+    If this is not explicitly defined by the class constant `_TABLE`, the return
+    value will be the class name with the first letter lowercased.
+    """
+    if cls._TABLE:
+      return cls._TABLE
+    name = cls.__name__
+    return name[0].lower() + name[1:]
+
   # Pylint falsely believes this property is overwritten by its setter later on.
   # pylint: disable=E0202
   @property
@@ -137,39 +178,3 @@ class Record(dict):
     """Sets the value of the foreign key constraint."""
     self[self._FOREIGN_KEY] = value
   # pylint: enable=E0102, E0202, E1101
-
-  @property
-  def table(self):
-    """Returns the database table name for the Record class.
-
-    If this is not explicitly defined by the class constant `_TABLE`, the return
-    value will be the class name with the first letter lowercased.
-    """
-    if self._TABLE:
-      return self._TABLE
-    name = self.__class__.__name__
-    return name[0].lower() + name[1:]
-
-
-class Model(object):
-  ID_FIELD = 'ID'  #XXX(Elmer): Could dump this in favor of the prikey field?
-  RECORD_CLASS = Record
-  TABLE = 'subclass_defined'
-
-  def __init__(self, connection):
-    self.connection = connection
-    self._fields = []
-    with self.connection as cursor:
-      for row in cursor.Execute('EXPLAIN %s' % self.TABLE):
-        self._fields.append(row)
-
-  def _SelectNaiveRecords(self, **sqltalk_options):
-    with self.connection as cursor:
-      records = cursor.Select(table=self.TABLE, **sqltalk_options)
-    for record in records:
-      yield self.RECORD_CLASS(record)
-
-  def GetById(self, record_id):
-    conditions = '%s = %s' % (self.ID_FIELD,
-                              self.connection.EscapeValues(record_id))
-    return self._SelectNaiveRecords(conditions=conditions).next()
