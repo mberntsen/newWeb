@@ -70,7 +70,7 @@ class Record(dict):
                     conditions='%s=%s' % (self._FOREIGN_KEY, self.key))
 
   @classmethod
-  def FromKey(cls, connection, fkey_id):
+  def FromKey(cls, connection, fkey_id, load_foreign=True):
     """Returns the Record object that belongs to the given foreign key value.
 
     Arguments:
@@ -78,6 +78,8 @@ class Record(dict):
         Database connection to use.
       @ fkey_id: obj
         The value for the foreign key field
+      % load_foreign: bool ~~ True
+        Flags loading of foreign key objects for the resulting Repository.
 
     Raises:
       NotExistError:
@@ -96,7 +98,7 @@ class Record(dict):
     if not record:
       raise NotExistError('No %s with foreign key %s=%s' % (
           self.__class__.__name__, cls._FOREIGN_KEY, fkey_id))
-    return cls(connection, record[0])
+    return cls(connection, record[0], load_foreign=load_foreign)
 
   #XXX(Elmer): We might want to use a single transaction to Save() (or not save)
   # all this object's children. Doing so would require a second optional
