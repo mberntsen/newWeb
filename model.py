@@ -3,7 +3,23 @@
 from __future__ import with_statement
 
 __author__ = 'Elmer de Looff <elmer@underdark.nl>'
-__version__ = '0.5'
+__version__ = '0.6'
+
+
+class Error(Exception):
+  """Superclass used for inheritance and external exception handling."""
+
+
+class AlreadyExistError(Error):
+  """The resource already exists, and cannot be created twice."""
+
+
+class NotExistError(Error):
+  """The requested or provided resource doesn't exist or isn't accessible."""
+
+
+class PermissionError(Error):
+  """The entity has insufficient rights to access the resource."""
 
 
 class Record(dict):
@@ -97,7 +113,7 @@ class Record(dict):
                              conditions='%s=%d' % (cls._FOREIGN_KEY, fkey_id))
     if not record:
       raise NotExistError('No %s with foreign key %s=%s' % (
-          self.__class__.__name__, cls._FOREIGN_KEY, fkey_id))
+          cls.__name__, cls._FOREIGN_KEY, fkey_id))
     return cls(connection, record[0], load_foreign=load_foreign)
 
   #XXX(Elmer): We might want to use a single transaction to Save() (or not save)
@@ -180,3 +196,8 @@ class Record(dict):
     """Sets the value of the foreign key constraint."""
     self[self._FOREIGN_KEY] = value
   # pylint: enable=E0102, E0202, E1101
+
+  Error = Error
+  AlreadyExistError = AlreadyExistError
+  NotExistError = NotExistError
+  PermissionError = PermissionError
