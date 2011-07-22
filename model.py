@@ -71,7 +71,6 @@ class Record(dict):
     Similarly, if you have a fieldname that matches a table name but does NOT
     reference it, you should override this method.
     """
-    print 'This classname: %s' % self.__class__.__name__
     if not hasattr(Record, '._SUBTYPES'):
       # Adding classes at runtime is pretty rare, but fails this code.
       # Pylint believes Record has no method __subclasses__
