@@ -58,10 +58,31 @@ class Record(dict):
     return self.key
 
   def _LoadForeignRelations(self):
-    """Automatically loads objects references by foreign key.
+    """Automatically loads objects referenced by foreign key.
 
-    This should be implemented by subclasses where required.
+    This is done by checking fieldnames against the table names for each of the
+    subclasses that exist for the Record object. If a match is found, the value
+    for that key will be used to create an instance of the corresponding class
+    using the FromKey classmethod.
+
+    If you have relations on non-matching fieldnames (such as `owner`
+    referencing the `user` table), you should override this method.
+
+    Similarly, if you have a fieldname that matches a table name but does NOT
+    reference it, you should override this method.
     """
+    print 'This classname: %s' % self.__class__.__name__
+    if not hasattr(Record, '._SUBTYPES'):
+      # Adding classes at runtime is pretty rare, but fails this code.
+      # Pylint believes Record has no method __subclasses__
+      # pylint: disable=E1101
+      Record._SUBTYPES = dict(
+          (cls.TableName(), cls) for cls in Record.__subclasses__())
+      # pylint: enable=E1101
+
+    for field, value in self.iteritems():
+      if field in self._SUBTYPES and not isinstance(value, Record):
+        self[field] = self._SUBTYPES[field].FromKey(self.connection, value)
 
   def _RecordInsert(self, sql_record):
     """Inserts the given `sql_record` into the database.
