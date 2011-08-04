@@ -3,7 +3,7 @@
 from __future__ import with_statement
 
 __author__ = 'Elmer de Looff <elmer@underdark.nl>'
-__version__ = '0.6'
+__version__ = '0.7'
 
 
 class Error(Exception):
@@ -50,11 +50,23 @@ class Record(dict):
     data is unreliable because the other object may not have its foreign
     relations loaded.
     """
-    return (self.__class__ == other.__class__
+    return (type(self) == type(other)
             and self.key is not None
             and self.key == other.key)
 
   def __hash__(self):
+    return self.key
+
+  def __int__(self):
+    """Returns the integer key value of the Record.
+
+    For record objects where the foreign key value is not (always) an integer,
+    this function will raise an error in the situations where it is not.
+    """
+    if not isinstance(self.key, (int, long)):
+      # We should not truncate floating point numbers.
+      # Nor turn strings of numbers into an integer.
+      raise ValueError('The foreign key is not an integral number.')
     return self.key
 
   def _LoadForeignRelations(self):
