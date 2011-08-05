@@ -134,7 +134,7 @@ class Record(dict):
         There is no Record for that foreign key value.
 
     Returns:
-      Record: Datbase record abstraction class.
+      Record: Database record abstraction class.
     """
     if cls._FOREIGN_KEY is None:
       raise ValueError(
