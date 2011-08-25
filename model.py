@@ -114,17 +114,40 @@ class Record(dict):
     value of the Record's foreign key (`self._FOREIGN_KEY` and `self.key` resp.)
     """
     with self.connection as cursor:
+      safe_key = self.connection.EscapeValues(self.key)
       cursor.Update(table=self.TableName(), values=sql_record,
-                    conditions='%s=%s' % (self._FOREIGN_KEY, self.key))
+                    conditions='`%s` = %s' % (self._FOREIGN_KEY, safe_key))
 
   @classmethod
-  def FromKey(cls, connection, fkey_id, load_foreign=True):
+  def DeleteKey(cls, connection, fkey_value):
+    """Deletes a database record based on the foreign key value.
+
+    Arguments:
+      @ connection: sqltalk.connection
+        Database connection to use.
+      @ fkey_value: obj
+        The value for the foreign key field
+
+    Raises:
+      ValueError
+        If no _FOREIGN_KEY fieldname static variable is defined.
+    """
+    if cls._FOREIGN_KEY is None:
+      raise ValueError(
+          'Cannot delete a %r without _FOREIGN_KEY defined.' % cls.__name__)
+    with connection as cursor:
+      safe_key = connection.EscapeValues(fkey_value)
+      cursor.Delete(table=cls.TableName(),
+                    conditions='`%s` = %s' % (cls._FOREIGN_KEY, safe_key))
+
+  @classmethod
+  def FromKey(cls, connection, fkey_value, load_foreign=True):
     """Returns the Record object that belongs to the given foreign key value.
 
     Arguments:
       @ connection: sqltalk.connection
         Database connection to use.
-      @ fkey_id: obj
+      @ fkey_value: obj
         The value for the foreign key field
       % load_foreign: bool ~~ True
         Flags loading of foreign key objects for the resulting Repository.
@@ -132,21 +155,33 @@ class Record(dict):
     Raises:
       NotExistError:
         There is no Record for that foreign key value.
+      ValueError
+        If no _FOREIGN_KEY fieldname static variable is defined.
 
     Returns:
       Record: Database record abstraction class.
     """
     if cls._FOREIGN_KEY is None:
       raise ValueError(
-          'Cannot load %s without _FOREIGN_KEY defined.' % cls.__name__)
-
+          'Cannot load a %r without _FOREIGN_KEY defined.' % cls.__name__)
     with connection as cursor:
-      record = cursor.Select(table=cls.TableName(),
-                             conditions='%s=%d' % (cls._FOREIGN_KEY, fkey_id))
+      safe_key = connection.EscapeValues(fkey_value)
+      record = cursor.Select(
+          table=cls.TableName(),
+          conditions='`%s` = %d' % (cls._FOREIGN_KEY, safe_key))
     if not record:
-      raise NotExistError('No %s with foreign key %s=%s' % (
-          cls.__name__, cls._FOREIGN_KEY, fkey_id))
+      raise NotExistError('There is No %r with key %r' % (
+          cls.__name__, fkey_value))
     return cls(connection, record[0], load_foreign=load_foreign)
+
+  def Delete(self):
+    """Deletes a loaded record based on `self.TableName` and `self.key`.
+
+    For deleting an unloaded object, use the classmethod `DeleteKey`.
+    """
+    with self.connection as cursor:
+      cursor.Delete(table=self.TableName(), conditions='`%s` = %s' % (
+          self._FOREIGN_KEY, self.connection.EscapeValues(self.key)))
 
   #XXX(Elmer): We might want to use a single transaction to Save() (or not save)
   # all this object's children. Doing so would require a second optional
