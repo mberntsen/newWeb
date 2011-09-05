@@ -168,7 +168,7 @@ class Record(dict):
       safe_key = connection.EscapeValues(fkey_value)
       record = cursor.Select(
           table=cls.TableName(),
-          conditions='`%s` = %d' % (cls._FOREIGN_KEY, safe_key))
+          conditions='`%s` = %s' % (cls._FOREIGN_KEY, safe_key))
     if not record:
       raise NotExistError('There is No %r with key %r' % (
           cls.__name__, fkey_value))
