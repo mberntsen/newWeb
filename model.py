@@ -183,6 +183,24 @@ class Record(dict):
       cursor.Delete(table=self.TableName(), conditions='`%s` = %s' % (
           self._FOREIGN_KEY, self.connection.EscapeValues(self.key)))
 
+  @classmethod
+  def List(cls, connection, load_foreign=True):
+    """Yields a Record object for every table entry.
+
+    Arguments:
+      @ connection: sqltalk.connection
+        Database connection to use.
+      % load_foreign: bool ~~ True
+        Flags loading of foreign key objects for the resulting Repository.
+
+    Yields:
+      Repository: repository abstraction class.
+    """
+    with connection as cursor:
+      repositories = cursor.Select(table=cls.TableName())
+    for repository in repositories:
+      yield cls(connection, repository, load_foreign=load_foreign)
+
   #XXX(Elmer): We might want to use a single transaction to Save() (or not save)
   # all this object's children. Doing so would require a second optional
   # argument, cursor, and some delegation to a separate save method which
