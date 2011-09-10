@@ -46,13 +46,37 @@ class Record(dict):
   def __eq__(self, other):
     """Simple equality comparison for database objects.
 
-    Objects should be of same type, and have the same foreign key. Checking deep
-    data is unreliable because the other object may not have its foreign
-    relations loaded.
+    To compare equal, two objects must:
+      1) Be of the same type;
+      2) Have the same foreign key
+      3) Have the same content.
+
+    In the case that the compared objects have foreign relations, these  will be
+    compared as well (recursively). If only one of the objects has foreign
+    relations loaded, only the foreign key value will be compared to the value
+    in the other Record.
     """
-    return (type(self) == type(other)
-            and self.key is not None
-            and self.key == other.key)
+    print 'start comparison'
+    if type(self) != type(other):
+      return False
+    if self.key is None or self.key != other.key:
+      return False
+    for local, remote in zip(self.values(), other.values()):
+      if (isinstance(local, Record) + isinstance(remote, Record)) % 2:
+        if (isinstance(local, Record) and local.key != remote or
+            isinstance(remote, Record) and remote.key != local):
+          return False
+      elif local != remote:
+        return False
+    return True
+
+  def __ne__(self, other):
+    """Returns the proper inverse of __eq__.
+
+    Without this, the non-equal checks used in __eq__ will not work, and the
+    `!=` operator will not be the logical inverse of `==`.
+    """
+    return not self == other
 
   def __hash__(self):
     return self.key
