@@ -85,23 +85,49 @@ class Record(dict):
     """
     return not self == other
 
-  def __getitem__(self, key):
-    value = super(Record, self).__getitem__(key)
-    return self._LoadForeign(key, value)
+  def __getitem__(self, field):
+    """Returns the value corresponding to a given `field`.
 
-  def _LoadForeign(self, key, value):
+    If a field represents a foreign key, this will be handled by `_LoadForeign`.
+    """
+    value = super(Record, self).__getitem__(field)
+    return self._LoadForeign(field, value)
+
+  def _LoadForeign(self, field, value):
+    """Loads and returns objects referenced by foreign key.
+
+    This is done by checking the `field` against the class' `_FOREIGN_RELATIONS`
+    mapping. If a match is found the related class name will be resolved to a
+    class (which should be a Record subclass) and the given `value` will be used
+    to load an instance of that class using the `FromKey` classmethod.
+    If the value for the field in `_FOREIGN_RELATIONS` is boolean False, no
+    foreign relation will be resolved and `value` will be returned unchanged.
+
+    If this fails, the `field` will be checked against table names for each
+    of the subclasses that exist for the Record object (`_SUBTYPES`). If a match
+    is found, an instance of the corresponding class will similarly be returned.
+
+    If the `field` is not present in either mapping, its value will be returned
+    unchanged.
+
+    In all cases, if a field represented a foreign relation, it will be saved
+    as to not need lookup in the future.
+    """
     if not isinstance(value, Record):
-      if key in self._SUBTYPES:
-        value = self._SUBTYPES[key].FromKey(self.connection, value)
-      elif key in self._FOREIGN_RELATIONS:
-        foreign_class = getattr(sys.modules[self.__module__],
-                                self._FOREIGN_RELATIONS[key])
+      if field in self._FOREIGN_RELATIONS:
+        class_name = self._FOREIGN_RELATIONS[field]
+        if not class_name:
+          return value
+        foreign_class = getattr(sys.modules[self.__module__], class_name)
         value = foreign_class.FromKey(self.connection, value)
-      self[key] = value
+      elif field in self._SUBTYPES:
+        value = self._SUBTYPES[field].FromKey(self.connection, value)
+      self[field] = value
     return value
 
   def __hash__(self):
-    return self.key
+    """Returns the hashed value of the key."""
+    return hash(self.key)
 
   def __int__(self):
     """Returns the integer key value of the Record.
@@ -114,21 +140,6 @@ class Record(dict):
       # Nor turn strings of numbers into an integer.
       raise ValueError('The foreign key is not an integral number.')
     return self.key
-
-  def _LoadForeignRelations(self):
-    """Automatically loads objects referenced by foreign key.
-
-    This is done by checking fieldnames against the table names for each of the
-    subclasses that exist for the Record object. If a match is found, the value
-    for that key will be used to create an instance of the corresponding class
-    using the FromKey classmethod.
-
-    If you have relations on non-matching fieldnames (such as `owner`
-    referencing the `user` table), you should override this method.
-
-    Similarly, if you have a fieldname that matches a table name but does NOT
-    reference it, you should override this method.
-    """
 
   def _RecordInsert(self, sql_record):
     """Inserts the given `sql_record` into the database.
