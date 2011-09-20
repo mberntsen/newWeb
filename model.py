@@ -3,8 +3,10 @@
 from __future__ import with_statement
 
 __author__ = 'Elmer de Looff <elmer@underdark.nl>'
-__version__ = '0.7'
+__version__ = '0.8'
 
+# Standard modules
+import sys
 
 class Error(Exception):
   """Superclass used for inheritance and external exception handling."""
@@ -25,9 +27,10 @@ class PermissionError(Error):
 class Record(dict):
   """Basic class for database table/record abstraction."""
   _FOREIGN_KEY = None
+  _FOREIGN_RELATIONS = {}
   _TABLE = None
 
-  def __init__(self, connection, record, load_foreign=True):
+  def __init__(self, connection, record):
     """Initializes a Record instance.
 
     Arguments:
@@ -35,13 +38,17 @@ class Record(dict):
         The database connection to use for further queries.
       @ record: dict / sqltalk.ResultSet
         A field-based mapping of the database record information.
-      % load_foreign: bool ~~ True
-        Flags loading of foreign key objects for the resulting Repository.
     """
     super(Record, self).__init__(record)
     self.connection = connection
-    if load_foreign:
-      self._LoadForeignRelations()
+    if not hasattr(Record, '._SUBTYPES'):
+      # Adding classes at runtime is pretty rare, but fails this code.
+      # Pylint believes Record has no method __subclasses__
+      # pylint: disable=E1101
+      Record._SUBTYPES = dict(
+          (cls.TableName(), cls) for cls in Record.__subclasses__())
+      # pylint: enable=E1101
+
 
   def __eq__(self, other):
     """Simple equality comparison for database objects.
@@ -78,6 +85,21 @@ class Record(dict):
     """
     return not self == other
 
+  def __getitem__(self, key):
+    value = super(Record, self).__getitem__(key)
+    return self._LoadForeign(key, value)
+
+  def _LoadForeign(self, key, value):
+    if not isinstance(value, Record):
+      if key in self._SUBTYPES:
+        value = self._SUBTYPES[key].FromKey(self.connection, value)
+      elif key in self._FOREIGN_RELATIONS:
+        foreign_class = getattr(sys.modules[self.__module__],
+                                self._FOREIGN_RELATIONS[key])
+        value = foreign_class.FromKey(self.connection, value)
+      self[key] = value
+    return value
+
   def __hash__(self):
     return self.key
 
@@ -107,17 +129,6 @@ class Record(dict):
     Similarly, if you have a fieldname that matches a table name but does NOT
     reference it, you should override this method.
     """
-    if not hasattr(Record, '._SUBTYPES'):
-      # Adding classes at runtime is pretty rare, but fails this code.
-      # Pylint believes Record has no method __subclasses__
-      # pylint: disable=E1101
-      Record._SUBTYPES = dict(
-          (cls.TableName(), cls) for cls in Record.__subclasses__())
-      # pylint: enable=E1101
-
-    for field, value in self.iteritems():
-      if field in self._SUBTYPES and not isinstance(value, Record):
-        self[field] = self._SUBTYPES[field].FromKey(self.connection, value)
 
   def _RecordInsert(self, sql_record):
     """Inserts the given `sql_record` into the database.
@@ -165,7 +176,7 @@ class Record(dict):
                     conditions='`%s` = %s' % (cls._FOREIGN_KEY, safe_key))
 
   @classmethod
-  def FromKey(cls, connection, fkey_value, load_foreign=True):
+  def FromKey(cls, connection, fkey_value):
     """Returns the Record object that belongs to the given foreign key value.
 
     Arguments:
@@ -173,8 +184,6 @@ class Record(dict):
         Database connection to use.
       @ fkey_value: obj
         The value for the foreign key field
-      % load_foreign: bool ~~ True
-        Flags loading of foreign key objects for the resulting Repository.
 
     Raises:
       NotExistError:
@@ -196,7 +205,7 @@ class Record(dict):
     if not record:
       raise NotExistError('There is No %r with key %r' % (
           cls.__name__, fkey_value))
-    return cls(connection, record[0], load_foreign=load_foreign)
+    return cls(connection, record[0])
 
   def Delete(self):
     """Deletes a loaded record based on `self.TableName` and `self.key`.
@@ -208,14 +217,12 @@ class Record(dict):
           self._FOREIGN_KEY, self.connection.EscapeValues(self.key)))
 
   @classmethod
-  def List(cls, connection, load_foreign=True):
+  def List(cls, connection):
     """Yields a Record object for every table entry.
 
     Arguments:
       @ connection: sqltalk.connection
         Database connection to use.
-      % load_foreign: bool ~~ True
-        Flags loading of foreign key objects for the resulting Repository.
 
     Yields:
       Repository: repository abstraction class.
@@ -223,7 +230,7 @@ class Record(dict):
     with connection as cursor:
       repositories = cursor.Select(table=cls.TableName())
     for repository in repositories:
-      yield cls(connection, repository, load_foreign=load_foreign)
+      yield cls(connection, repository)
 
   #XXX(Elmer): We might want to use a single transaction to Save() (or not save)
   # all this object's children. Doing so would require a second optional
