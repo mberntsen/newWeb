@@ -3,7 +3,7 @@
 from __future__ import with_statement
 
 __author__ = 'Elmer de Looff <elmer@underdark.nl>'
-__version__ = '0.8'
+__version__ = '0.9'
 
 # Standard modules
 import sys
@@ -92,6 +92,30 @@ class Record(dict):
     """
     value = super(Record, self).__getitem__(field)
     return self._LoadForeign(field, value)
+
+  def _GetChildren(self, child_class, relation_field=None):
+    """Returns all `child_class` objects related to this record.
+
+    The table for the given `child_class` will be queried for all fields where
+    the `relation_field` is the same as this record's foreign key (`self.key`).
+
+    These records will then be yielded as instances of the child class.
+
+    Arguments:
+      @ child_class: Record
+        The child class whose objects should be found.
+      % relation_field: str ~~ self.TableName()
+        The fieldname in the `child_class` table which related that table to
+        the table for this record.
+    """
+    relation_field = relation_field or self.TableName()
+    with self.connection as cursor:
+      safe_key = self.connection.EscapeValues(self.key)
+      children = cursor.Select(
+          table=child_class.TableName(),
+          conditions='`%s`=%s' % (relation_field, safe_key))
+    for child in children:
+      yield child_class(self.connection, child)
 
   def _LoadForeign(self, field, value):
     """Loads and returns objects referenced by foreign key.
