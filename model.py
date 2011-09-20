@@ -26,7 +26,7 @@ class PermissionError(Error):
 
 class Record(dict):
   """Basic class for database table/record abstraction."""
-  _FOREIGN_KEY = None
+  _PRIMARY_KEY = 'ID'
   _FOREIGN_RELATIONS = {}
   _TABLE = None
 
@@ -55,12 +55,12 @@ class Record(dict):
 
     To compare equal, two objects must:
       1) Be of the same type;
-      2) Have the same foreign key
+      2) Have the same primary key
       3) Have the same content.
 
     In the case that the compared objects have foreign relations, these  will be
     compared as well (recursively). If only one of the objects has foreign
-    relations loaded, only the foreign key value will be compared to the value
+    relations loaded, only the primary key value will be compared to the value
     in the other Record.
     """
     print 'start comparison'
@@ -88,7 +88,8 @@ class Record(dict):
   def __getitem__(self, field):
     """Returns the value corresponding to a given `field`.
 
-    If a field represents a foreign key, this will be handled by `_LoadForeign`.
+    If a field represents a foreign relation, this will be delegated to
+    the `_LoadForeign` method.
     """
     value = super(Record, self).__getitem__(field)
     return self._LoadForeign(field, value)
@@ -97,7 +98,7 @@ class Record(dict):
     """Returns all `child_class` objects related to this record.
 
     The table for the given `child_class` will be queried for all fields where
-    the `relation_field` is the same as this record's foreign key (`self.key`).
+    the `relation_field` is the same as this record's primary key (`self.key`).
 
     These records will then be yielded as instances of the child class.
 
@@ -156,13 +157,13 @@ class Record(dict):
   def __int__(self):
     """Returns the integer key value of the Record.
 
-    For record objects where the foreign key value is not (always) an integer,
+    For record objects where the primary key value is not (always) an integer,
     this function will raise an error in the situations where it is not.
     """
     if not isinstance(self.key, (int, long)):
       # We should not truncate floating point numbers.
       # Nor turn strings of numbers into an integer.
-      raise ValueError('The foreign key is not an integral number.')
+      raise ValueError('The primary key is not an integral number.')
     return self.key
 
   def _RecordInsert(self, sql_record):
@@ -170,7 +171,7 @@ class Record(dict):
 
     The table used to store this record is gathered from the `self.TableName()`
     property.
-    Upon success, the record's foreign key is set to the result's insertid
+    Upon success, the record's primary key is set to the result's insertid
     """
     with self.connection as cursor:
       record = cursor.Insert(table=self.TableName(), values=sql_record)
@@ -181,65 +182,53 @@ class Record(dict):
 
     The table used to store this record is gathered from the `self.TableName()`
     property. The condition with which the record is updated is the name and
-    value of the Record's foreign key (`self._FOREIGN_KEY` and `self.key` resp.)
+    value of the Record's primary key (`self._PRIMARY_KEY` and `self.key` resp.)
     """
     with self.connection as cursor:
       safe_key = self.connection.EscapeValues(self.key)
       cursor.Update(table=self.TableName(), values=sql_record,
-                    conditions='`%s` = %s' % (self._FOREIGN_KEY, safe_key))
+                    conditions='`%s` = %s' % (self._PRIMARY_KEY, safe_key))
 
   @classmethod
-  def DeleteKey(cls, connection, fkey_value):
-    """Deletes a database record based on the foreign key value.
+  def DeleteKey(cls, connection, pkey_value):
+    """Deletes a database record based on the primary key value.
 
     Arguments:
       @ connection: sqltalk.connection
         Database connection to use.
-      @ fkey_value: obj
-        The value for the foreign key field
-
-    Raises:
-      ValueError
-        If no _FOREIGN_KEY fieldname static variable is defined.
+      @ pkey_value: obj
+        The value for the primary key field
     """
-    if cls._FOREIGN_KEY is None:
-      raise ValueError(
-          'Cannot delete a %r without _FOREIGN_KEY defined.' % cls.__name__)
     with connection as cursor:
-      safe_key = connection.EscapeValues(fkey_value)
+      safe_key = connection.EscapeValues(pkey_value)
       cursor.Delete(table=cls.TableName(),
-                    conditions='`%s` = %s' % (cls._FOREIGN_KEY, safe_key))
+                    conditions='`%s` = %s' % (cls._PRIMARY_KEY, safe_key))
 
   @classmethod
-  def FromKey(cls, connection, fkey_value):
-    """Returns the Record object that belongs to the given foreign key value.
+  def FromKey(cls, connection, pkey_value):
+    """Returns the Record object that belongs to the given primary key value.
 
     Arguments:
       @ connection: sqltalk.connection
         Database connection to use.
-      @ fkey_value: obj
-        The value for the foreign key field
+      @ pkey_value: obj
+        The value for the primary key field
 
     Raises:
       NotExistError:
-        There is no Record for that foreign key value.
-      ValueError
-        If no _FOREIGN_KEY fieldname static variable is defined.
+        There is no Record for that primary key value.
 
     Returns:
       Record: Database record abstraction class.
     """
-    if cls._FOREIGN_KEY is None:
-      raise ValueError(
-          'Cannot load a %r without _FOREIGN_KEY defined.' % cls.__name__)
     with connection as cursor:
-      safe_key = connection.EscapeValues(fkey_value)
+      safe_key = connection.EscapeValues(pkey_value)
       record = cursor.Select(
           table=cls.TableName(),
-          conditions='`%s` = %s' % (cls._FOREIGN_KEY, safe_key))
+          conditions='`%s` = %s' % (cls._PRIMARY_KEY, safe_key))
     if not record:
       raise NotExistError('There is No %r with key %r' % (
-          cls.__name__, fkey_value))
+          cls.__name__, pkey_value))
     return cls(connection, record[0])
 
   def Delete(self):
@@ -249,7 +238,7 @@ class Record(dict):
     """
     with self.connection as cursor:
       cursor.Delete(table=self.TableName(), conditions='`%s` = %s' % (
-          self._FOREIGN_KEY, self.connection.EscapeValues(self.key)))
+          self._PRIMARY_KEY, self.connection.EscapeValues(self.key)))
 
   @classmethod
   def List(cls, connection):
@@ -275,16 +264,13 @@ class Record(dict):
     """Saves or updated the record, based on `self.TableName()` and `self.key`.
 
     Firstly, it makes a strictly data containing SQL record. This means that any
-    record class contained by the record is reduced to that record's foreign key
+    record class contained by the record is reduced to that record's primary key
     (by use of the `key` property). If flagged to do so, it is at this point
     that the foreign record will be recursively `Save()`d.
 
     Once the clean `sql_record` is obtained, a check is performed to see whether
     the object should be inserted into the database, or updated there.
-    This is done by checking the value of the record's own foreign key.
-
-    If the `_FOREIGN_KEY` constant is not defined, the class is considered
-    incomplete and any call to Save() will directly result in a ValueError.
+    This is done by checking the value of the record's own primary key.
 
     If this key is set (is not None), the `sql_record` will be handed off to
     the `_RecordUpdate()` method, which will update the existing database entry.
@@ -298,9 +284,6 @@ class Record(dict):
         saved. N.B. each record is saved using a separate transaction, meaning
         that a failure to save this object will *not* roll back child saves.
     """
-    if self._FOREIGN_KEY is None:
-      raise ValueError('Cannot Save() record without _FOREIGN_KEY defined.')
-
     sql_record = {}
     for key, value in self.iteritems():
       if isinstance(value, Record):
@@ -331,21 +314,20 @@ class Record(dict):
   # pylint: disable=E0202
   @property
   def key(self):
-    """Returns the (unique) foreign key for the object.
+    """Returns the primary key for the object.
 
     This is used for the Save/Update methods, where foreign relations should be
-    stored by their foreign key.
+    stored by their primary key.
     """
-    if self._FOREIGN_KEY:
-      return self.get(self._FOREIGN_KEY)
+    return self.get(self._PRIMARY_KEY)
   # pylint: enable=E0202
 
   # Pylint doesn't understand property setters at all.
   # pylint: disable=E0102, E0202, E1101
   @key.setter
   def key(self, value):
-    """Sets the value of the foreign key constraint."""
-    self[self._FOREIGN_KEY] = value
+    """Sets the value of the primary key."""
+    self[self._PRIMARY_KEY] = value
   # pylint: enable=E0102, E0202, E1101
 
   Error = Error
