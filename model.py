@@ -139,14 +139,37 @@ class Record(dict):
     automatically resolved. The assumption is that the field will not contain a
     meaningful reference. This behavior can be altered by specifying the
     relation in the _FOREIGN_RELATIONS class constant.
+
+    Arguments:
+      @ field: str
+        The field name to be checked for foreign references
+      @ value: obj
+        The current value for the field. This is used as primary key in case
+        of foreign references.
+
+    Raises:
+      ValueError: If anything is wrong with the _FOREIGN_RELATIONS mapping.
+
+    Returns:
+      obj: The value belonging to the given `field`. In case of resolved foreign
+           references, this will be the referenced object. Else it's unchanged.
     """
     if not isinstance(value, Record):
       if field in self._FOREIGN_RELATIONS:
-        class_name = self._FOREIGN_RELATIONS[field]
-        if not class_name:
+        cls = self._FOREIGN_RELATIONS[field]
+        if not cls:
           return value
-        foreign_class = getattr(sys.modules[self.__module__], class_name)
-        value = foreign_class.FromKey(self.connection, value)
+        if isinstance(cls, basestring):
+          try:
+            cls = getattr(sys.modules[self.__module__], cls)
+          except AttributeError:
+            raise ValueError(
+                'Bad _FOREIGN_RELATIONS map: Target %r not a class in %r' % (
+                    cls, self.__module__))
+        if not issubclass(cls, Record):
+          raise ValueError('Bad _FOREIGN_RELATIONS map: '
+                           'Target %r not a subclass of Record' % cls.__name__)
+        value = cls.FromKey(self.connection, value)
       elif field == self.TableName():
         return value
       elif field in self._SUBTYPES:
