@@ -49,7 +49,25 @@ class Record(dict):
           (cls.TableName(), cls) for cls in Record.__subclasses__())
       # pylint: enable=E1101
 
+  def __hash__(self):
+    """Returns the hashed value of the key."""
+    return hash(self.key)
 
+  def __int__(self):
+    """Returns the integer key value of the Record.
+
+    For record objects where the primary key value is not (always) an integer,
+    this function will raise an error in the situations where it is not.
+    """
+    if not isinstance(self.key, (int, long)):
+      # We should not truncate floating point numbers.
+      # Nor turn strings of numbers into an integer.
+      raise ValueError('The primary key is not an integral number.')
+    return self.key
+
+  # ############################################################################
+  # Methods enabling rich comparison
+  #
   def __eq__(self, other):
     """Simple equality comparison for database objects.
 
@@ -85,6 +103,9 @@ class Record(dict):
     """
     return not self == other
 
+  # ############################################################################
+  # Methods enabling auto-loading
+  #
   def __getitem__(self, field):
     """Returns the value corresponding to a given `field`.
 
@@ -93,30 +114,6 @@ class Record(dict):
     """
     value = super(Record, self).__getitem__(field)
     return self._LoadForeign(field, value)
-
-  def _GetChildren(self, child_class, relation_field=None):
-    """Returns all `child_class` objects related to this record.
-
-    The table for the given `child_class` will be queried for all fields where
-    the `relation_field` is the same as this record's primary key (`self.key`).
-
-    These records will then be yielded as instances of the child class.
-
-    Arguments:
-      @ child_class: Record
-        The child class whose objects should be found.
-      % relation_field: str ~~ self.TableName()
-        The fieldname in the `child_class` table which related that table to
-        the table for this record.
-    """
-    relation_field = relation_field or self.TableName()
-    with self.connection as cursor:
-      safe_key = self.connection.EscapeValues(self.key)
-      children = cursor.Select(
-          table=child_class.TableName(),
-          conditions='`%s`=%s' % (relation_field, safe_key))
-    for child in children:
-      yield child_class(self.connection, child)
 
   def _LoadForeign(self, field, value):
     """Loads and returns objects referenced by foreign key.
@@ -150,21 +147,75 @@ class Record(dict):
       self[field] = value
     return value
 
-  def __hash__(self):
-    """Returns the hashed value of the key."""
-    return hash(self.key)
+  # ############################################################################
+  # Methods for proper representation of the Record object
+  #
+  def __repr__(self):
+    return '%s(%s)' % (self.__class__.__name__, super(Record, self).__repr__())
 
-  def __int__(self):
-    """Returns the integer key value of the Record.
+  def __str__(self):
+    return '%s({%s})' % (
+        self.__class__.__name__,
+        ', '.join('%r: %r' % item for item in self.iteritems()))
 
-    For record objects where the primary key value is not (always) an integer,
-    this function will raise an error in the situations where it is not.
+  # ############################################################################
+  # Methods needed to create functional dictionary likeness for value lookups
+  #
+  def get(self, key, default=None):
+    """Returns the value for `key` if its present, otherwise `default`."""
+    try:
+      return self[key]
+    except KeyError:
+      return default
+
+  def iteritems(self):
+    """Yields all field+value pairs in the Record.
+
+    N.B. This automatically resolves foreign references.
     """
-    if not isinstance(self.key, (int, long)):
-      # We should not truncate floating point numbers.
-      # Nor turn strings of numbers into an integer.
-      raise ValueError('The primary key is not an integral number.')
-    return self.key
+    return ((key, self[key]) for key in self)
+
+  def itervalues(self):
+    """Yields all values in the Record, loading foreign references."""
+    return (self[key] for key in self)
+
+  def items(self):
+    """Returns a list of field+value pairs in the Record.
+
+    N.B. This automatically resolves foreign references.
+    """
+    return list(self.iteritems())
+
+  def values(self):
+    """Returns a list of values in the Record, loading foreign references."""
+    return list(self.itervalues())
+
+  # ############################################################################
+  # Private methods to be used for development
+  #
+  def _GetChildren(self, child_class, relation_field=None):
+    """Returns all `child_class` objects related to this record.
+
+    The table for the given `child_class` will be queried for all fields where
+    the `relation_field` is the same as this record's primary key (`self.key`).
+
+    These records will then be yielded as instances of the child class.
+
+    Arguments:
+      @ child_class: Record
+        The child class whose objects should be found.
+      % relation_field: str ~~ self.TableName()
+        The fieldname in the `child_class` table which related that table to
+        the table for this record.
+    """
+    relation_field = relation_field or self.TableName()
+    with self.connection as cursor:
+      safe_key = self.connection.EscapeValues(self.key)
+      children = cursor.Select(
+          table=child_class.TableName(),
+          conditions='`%s`=%s' % (relation_field, safe_key))
+    for child in children:
+      yield child_class(self.connection, child)
 
   def _RecordInsert(self, sql_record):
     """Inserts the given `sql_record` into the database.
