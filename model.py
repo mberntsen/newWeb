@@ -134,6 +134,11 @@ class Record(dict):
 
     In all cases, if a field represented a foreign relation, it will be saved
     as to not need lookup in the future.
+
+    N.B. If the field name the same as the record's `TableName`, it will NOT be
+    automatically resolved. The assumption is that the field will not contain a
+    meaningful reference. This behavior can be altered by specifying the
+    relation in the _FOREIGN_RELATIONS class constant.
     """
     if not isinstance(value, Record):
       if field in self._FOREIGN_RELATIONS:
@@ -142,6 +147,8 @@ class Record(dict):
           return value
         foreign_class = getattr(sys.modules[self.__module__], class_name)
         value = foreign_class.FromKey(self.connection, value)
+      elif field == self.TableName():
+        return value
       elif field in self._SUBTYPES:
         value = self._SUBTYPES[field].FromKey(self.connection, value)
       self[field] = value
