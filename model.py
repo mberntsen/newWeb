@@ -119,21 +119,17 @@ class Record(dict):
     """Loads and returns objects referenced by foreign key.
 
     This is done by checking the `field` against the class' `_FOREIGN_RELATIONS`
-    mapping. If a match is found the related class name will be resolved to a
-    class (which should be a Record subclass) and the given `value` will be used
-    to load an instance of that class using the `FromKey` classmethod.
-    If the value for the field in `_FOREIGN_RELATIONS` is boolean False, no
-    foreign relation will be resolved and `value` will be returned unchanged.
+    mapping. If a match is found, `_LoadForeignFromRelationsTable` is executed
+    and its return value returned.
 
-    If this fails, the `field` will be checked against table names for each
-    of the subclasses that exist for the Record object (`_SUBTYPES`). If a match
-    is found, an instance of the corresponding class will similarly be returned.
+    If the `field` is not present in the class mapping, it will be checked
+    against table names for each of the subclasses of Record. This mapping is
+    maintained in `_SUBTYPES`. If a match is found, an instance of the
+    corresponding class will replace the existing value, and will subsequently
+    be returned.
 
-    If the `field` is not present in either mapping, its value will be returned
-    unchanged.
-
-    In all cases, if a field represented a foreign relation, it will be saved
-    as to not need lookup in the future.
+    If the `field` is not present in either mapping, its value will remain
+    unchanged, and returned as such.
 
     N.B. If the field name the same as the record's `TableName`, it will NOT be
     automatically resolved. The assumption is that the field will not contain a
@@ -147,34 +143,63 @@ class Record(dict):
         The current value for the field. This is used as primary key in case
         of foreign references.
 
-    Raises:
-      ValueError: If anything is wrong with the _FOREIGN_RELATIONS mapping.
-
     Returns:
       obj: The value belonging to the given `field`. In case of resolved foreign
            references, this will be the referenced object. Else it's unchanged.
     """
     if not isinstance(value, Record):
       if field in self._FOREIGN_RELATIONS:
-        cls = self._FOREIGN_RELATIONS[field]
-        if not cls:
-          return value
-        if isinstance(cls, basestring):
-          try:
-            cls = getattr(sys.modules[self.__module__], cls)
-          except AttributeError:
-            raise ValueError(
-                'Bad _FOREIGN_RELATIONS map: Target %r not a class in %r' % (
-                    cls, self.__module__))
-        if not issubclass(cls, Record):
-          raise ValueError('Bad _FOREIGN_RELATIONS map: '
-                           'Target %r not a subclass of Record' % cls.__name__)
-        value = cls.FromKey(self.connection, value)
+        return self._LoadUsingForeignRelations(
+            self._FOREIGN_RELATIONS[field], field, value)
       elif field == self.TableName():
         return value
       elif field in self._SUBTYPES:
         value = self._SUBTYPES[field].FromKey(self.connection, value)
-      self[field] = value
+        self[field] = value
+    return value
+
+  def _LoadUsingForeignRelations(self, cls, field, value):
+    """Loads and returns foreign relation based on given class (name).
+
+    The action taken depends on the given `cls`. If the given class is None (or
+    otherwise boolean false), no action will be taken, and the value will be
+    returned unchanged.
+
+    If the class is given as string, it will be loaded from the current module.
+    It should be a proper subclass of Record, after which the current `value` is
+    used to create a record using `cls.FromKey`.
+
+    Arguments:
+      @ cls: None / type / str
+        The class name or actual type to create an instance from.
+      @ field: str
+        The field name to be checked for foreign references
+      @ value: obj
+        The current value for the field. This is used as primary key in case
+        of foreign references.
+
+    Raises:
+      ValueError: If the class name cannot be found, or the type is not a
+                  subclass of Record.
+
+    Returns:
+      obj: The value belonging to the given `field`. In case of resolved foreign
+           references, this will be the referenced object. Else it's unchanged.
+    """
+    if not cls:
+      return value
+    if isinstance(cls, basestring):
+      try:
+        cls = getattr(sys.modules[self.__module__], cls)
+      except AttributeError:
+        raise ValueError(
+            'Bad _FOREIGN_RELATIONS map: Target %r not a class in %r' % (
+                cls, self.__module__))
+    if not issubclass(cls, Record):
+      raise ValueError('Bad _FOREIGN_RELATIONS map: '
+                       'Target %r not a subclass of Record' % cls.__name__)
+    value = cls.FromKey(self.connection, value)
+    self[field] = value
     return value
 
   # ############################################################################
