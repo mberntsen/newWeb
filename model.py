@@ -292,8 +292,10 @@ class Record(dict):
     """
     with self.connection as cursor:
       safe_key = self.connection.EscapeValues(self.key)
-      cursor.Update(table=self.TableName(), values=sql_record,
+      update = cursor.Update(table=self.TableName(), values=sql_record,
                     conditions='`%s` = %s' % (self._PRIMARY_KEY, safe_key))
+      if not update.affected:
+        cursor.Insert(table=self.TableName(), values=sql_record)
 
   @classmethod
   def DeleteKey(cls, connection, pkey_value):
