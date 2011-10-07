@@ -1,12 +1,13 @@
 #!/usr/bin/python2.5
 """Tests for the templateparser module."""
-__author__ = 'janklopper@underdark.nl (Jan Klopper)'
-__version__ = '0.3'
+__author__ = 'Elmer de Looff <elmer@underdark.nl>'
+__version__ = '0.4'
 
 # Too many public methods
 # pylint: disable-msg=R0904
 
 # Standard modules
+import os
 import unittest
 
 # Unittest target
@@ -242,6 +243,25 @@ class TemplateUnicodeBehavior(unittest.TestCase):
     template = '[love|nolove]'
     output = function_result.encode('utf8')
     self.assertEqual(output, self.parser.ParseString(template, love='love'))
+
+
+class TemplateIncludeTemplate(unittest.TestCase):
+  """TemplateParser properly handles the include statement."""
+  def setUp(self):
+    """Sets up a testbed."""
+    self.parser = templateparser.Parser()
+    self.message = 'This is a subtemplate with [name].'
+    self.template = 'tmp_template'
+    with file(self.template, 'w') as template:
+      template.write(self.message)
+
+  def tearDown(self):
+    os.unlink(self.template)
+
+  def testTemplateInclusion(self):
+    """Templates can include another template."""
+    result = self.parser.ParseString('{{ include tmp_template }}')
+    self.assertEqual(result, self.message)
 
 
 if __name__ == '__main__':
