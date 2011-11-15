@@ -8,6 +8,10 @@ __version__ = '0.9'
 # Standard modules
 import sys
 
+# Record classes have many methods, this is not an actual problem.
+# pylint: disable=R0904
+
+
 class Error(Exception):
   """Superclass used for inheritance and external exception handling."""
 
@@ -364,7 +368,7 @@ class Record(dict):
     for repository in repositories:
       yield cls(connection, repository)
 
-  #XXX(Elmer): We might want to use a single transaction to Save() (or not save)
+  #FIXME(Elmer): We want to use a single transaction for Save() (or not save).
   # all this object's children. Doing so would require a second optional
   # argument, cursor, and some delegation to a separate save method which
   # REQUIRES a cursor. (to reduce the copy/paste redundancy of two branches)
