@@ -40,15 +40,15 @@ class StandaloneHandler(BaseHTTPServer.BaseHTTPRequestHandler):
   sys_version = ''
 
   def handle_one_request(self):
+    self.raw_requestline = self.rfile.readline()
+    if not self.raw_requestline:
+      self.close_connection = 1
+      return
+    if not self.parse_request(): # An error code has been sent, just exit
+      return
     try:
-      self.raw_requestline = self.rfile.readline()
-      if not self.raw_requestline:
-        self.close_connection = 1
-        return
-      if not self.parse_request(): # An error code has been sent, just exit
-        return
-    except (IOError, BaseHTTPServer.socket.error), error:
-      logging.LogException('From what I understand, this should never raise().')
+      self.server.router(self)
+    except BaseHTTPServer.socket.error, error:
       if error.args[0] in (
           errno.EPIPE,         # Unix: Broken pipe.
           errno.ECONNABORTED,  # Unix: Connection aborted.
@@ -57,8 +57,8 @@ class StandaloneHandler(BaseHTTPServer.BaseHTTPRequestHandler):
           10054):              # Winsock: Connection reset. (WSAECONNRESET)
         self.close_connection = 1
       else:
-        logging.LogCritical('This is REALLY unexpected, beyond the previous.')
-    self.server.router(self)
+        logging.LogException(
+            'A problem occurred answering the request: %s.', type(error))
 
   #TODO(Elmer): Move logging to the Request object.
   def log_error(self, logmsg, *args):
