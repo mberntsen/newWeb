@@ -3,7 +3,7 @@
 from __future__ import with_statement
 
 __author__ = 'Elmer de Looff <elmer@underdark.nl>'
-__version__ = '0.9'
+__version__ = '0.10'
 
 # Standard modules
 import sys
@@ -77,7 +77,7 @@ class Record(dict):
 
     To compare equal, two objects must:
       1) Be of the same type;
-      2) Have the same primary key
+      2) Have the same primary key which is NOT None;
       3) Have the same content.
 
     In the case that the compared objects have foreign relations, these  will be
@@ -85,17 +85,19 @@ class Record(dict):
     relations loaded, only the primary key value will be compared to the value
     in the other Record.
     """
-    print 'start comparison'
     if type(self) != type(other):
-      return False
-    if self.key is None or self.key != other.key:
-      return False
-    for local, remote in zip(self.values(), other.values()):
-      if (isinstance(local, Record) + isinstance(remote, Record)) % 2:
-        if (isinstance(local, Record) and local.key != remote or
-            isinstance(remote, Record) and remote.key != local):
+      return False  # Types must be the same.
+    elif not (self.key == other.key is not None):
+      return False  # Records should have the same non-None primary key value.
+    elif len(self) != len(other):
+      return False  # Records must contain the same number of objects.
+    for key, value in super(Record, self).items():
+      other_value = super(Record, other).__getitem__(key)
+      if (isinstance(value, Record) ^ isinstance(other_value, Record)):
+        if (isinstance(value, Record) and value.key != other_value or
+            isinstance(other_value, Record) and other_value.key != value):
           return False
-      elif local != remote:
+      elif value != other_value:
         return False
     return True
 
