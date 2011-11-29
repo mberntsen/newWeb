@@ -252,8 +252,12 @@ def ServerSetup(apache_logging=True):
   package_name = router.f_globals.get('PACKAGE')
   router_pages = router.f_globals['PAGE_CLASS']
   router_routes = router.f_globals['ROUTES']
-  router_config = udders.ParseConfig(os.path.join(
-      os.path.dirname(router_file), router.f_globals['CONFIG']))
+  config_file = router.f_globals.get('CONFIG')
+  if config_file:
+    router_config = udders.ParseConfig(os.path.join(
+        os.path.dirname(router_file), config_file))
+  else:
+    router_config = {}
   handler = Handler(router_pages, router_routes, config=router_config)
   if not apache:
     router_name = os.path.splitext(os.path.basename(router_file))[0]
