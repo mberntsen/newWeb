@@ -102,9 +102,9 @@ def Handler(page_class, routes, config=None):
       apache.DONE: signal for Apache to send the page to the client.
                    This is ignored by the standalone version of uWeb.
     """
+    req = request.Request(req)
+    pages = page_class(req, config=config)
     try:
-      req = request.Request(req)
-      pages = page_class(req, config=config)
       handler, args = router(req.env['PATH_INFO'])
       response = handler(pages, *args)  # pass in `pages` to the unbound method.
     except ReloadModules, message:
@@ -113,7 +113,7 @@ def Handler(page_class, routes, config=None):
     except ImmediateResponse, response:
       response = response[0]
     except (NoRouteError, Exception):
-      response = page_class.InternalServerError()
+      response = pages.InternalServerError()
 
     if not isinstance(response, Response):
       response = Response(content=response)
