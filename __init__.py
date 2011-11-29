@@ -2,8 +2,8 @@
 """Underdark web interface, or uWeb interface"""
 from __future__ import with_statement
 
-__author__ = 'Jan Klopper <jan@underdark.nl>'
-__version__ = '0.7'
+__author__ = 'Elmer de Looff <elmer@underdark.nl>'
+__version__ = '0.8'
 
 # Standard modules
 import htmlentitydefs
@@ -28,6 +28,7 @@ except ImportError:
 
 # Custom modules
 from underdark.libs import app
+from underdark.libs import udders
 from underdark.libs.uweb.pagemaker import *
 from underdark.libs.uweb import request
 
@@ -54,7 +55,7 @@ class DebuggingPageMaker(PageMakerDebuggerMixin, PageMaker):
   """The same basic PageMaker, with added debugging on HTTP 500."""
 
 
-def Handler(req, pageclass, routes, config_file=None):
+def Handler(pageclass, routes, config=None):
   """Handles a web request through processing the routes list.
 
   The url in the received `req` object is taken and matches against the
@@ -91,30 +92,33 @@ def Handler(req, pageclass, routes, config_file=None):
     apache.DONE: signal for Apache to send the page to the client. Ignored by
                  the standalone version of uWeb.
   """
-  req = request.Request(req)
-  pages = pageclass(req, config_file=config_file)
-  try:
-    req_method, req_arguments = Router(routes, req.env['PATH_INFO'])
-    response = getattr(pages, req_method)(*req_arguments)
-  except ReloadModules, message:
-    reload_message = reload(sys.modules[pageclass.__module__])
-    response = Response(content='%s\n%s' % (message, reload_message))
-  except ImmediateResponse, response:
-    response = response[0]
-  except (Exception, NoRouteError):
-    response = pages.InternalServerError()
+  def RealHandler(req, pageclass=pageclass, routes=routes, config=config):
+    req = request.Request(req)
+    pages = pageclass(req, config=config)
+    try:
+      req_method, req_arguments = Router(routes, req.env['PATH_INFO'])
+      response = getattr(pages, req_method)(*req_arguments)
+    except ReloadModules, message:
+      reload_message = reload(sys.modules[pageclass.__module__])
+      response = Response(content='%s\n%s' % (message, reload_message))
+    except ImmediateResponse, response:
+      response = response[0]
+    except (Exception, NoRouteError):
+      response = pages.InternalServerError()
 
-  if not isinstance(response, Response):
-    response = Response(content=response)
-  req.SetHttpStatus(response.httpcode)
-  req.SetContentType(response.content_type)
-  for header_pair in response.headers.iteritems():
-    req.AddHeader(*header_pair)
-  for cookie in response.cookies:
-    req.AddCookie(**cookie)
-  req.Write(response.content)
-  if apache:
-    return apache.DONE
+    if not isinstance(response, Response):
+      response = Response(content=response)
+    req.SetHttpStatus(response.httpcode)
+    req.SetContentType(response.content_type)
+    for header_pair in response.headers.iteritems():
+      req.AddHeader(*header_pair)
+    for cookie in response.cookies:
+      req.AddCookie(**cookie)
+    req.Write(response.content)
+    if apache:
+      return apache.DONE
+
+  return RealHandler
 
 
 def Router(routes, url):
@@ -184,54 +188,60 @@ def HtmlUnescape(html):
   return HTML_ENTITY_SEARCH.sub(_FixEntities, html)
 
 
-def ServerSetup(router, apache_logging=True):
+def ServerSetup(apache_logging=True):
   """Sets up a the runtime environment of the webserver.
 
   If the router (the caller of this function) runs in `standalone` mode (defined
   by absence of the `apache` module), the runtime environment will be a service
   as defined by the app framework.
-  This reads a config file to use for configuring the webserver itself, sets up
-  output redirection and logging to sqlite database.
 
-  In `standalone` mode, the assumption is made that the passed in `router` is
-  a file that lives in a directory one path below what is considered the
-  `package`. This package name will be used to create a directory for log files.
+  If provided through the CONFIG constant, the configuration file will be read
+  and parsed. This configuration will be used for the `StandAloneServer` for
+  host and port configurations, and the PageMaker will use it for all sorts of
+  configuration, for example database connection into and default search paths.
 
-  Also, if present, the file 'config.cfg' will be read from the package path
-  and used to configure the webserver. The config portion used is [server],
-  and the supported settings are 'host' and 'port'.
-
-  When running in `apache` mode (that is, there is an apache module), this
-  function sets up logging to sqlite, in a directory that's defined by the
-  router's module constant PACKAGE.
-  If this constant is not present, it will default to 'mod_python_project'.
+  Logging:
+    For both `standalone` and `apache` mode, the PACKAGE constant will set the
+    directory under which log files should be accumulated.
+    * For `apache` this will create a log database 'apache.sqlite' only, and if
+      the PACKAGE constant is not available, this will default to 'uweb_project'
+    * For `standalone` mode, there will be '.sqlite' log files for each router,
+      and the base-name will be the same as that of the router. Additionally
+      there will be access and error logs, again sharing the base name with the
+      router itself. The default directory name to bundle these files under will
+      be the name of the directory one up from where the router runs.
 
   Arguments:
-    @ router: function
-      The main router of the webserver.
     % apache_logging: bool ~~ True
       Whether or not to log when running from inside Apache. Enabling logging
-      on apache has the disadvantage of opening and closing the logging database
-      for each and every request that Apache handles.
-      This may affect performance significantly.
+      will cause the log-database to be opened and closed with every request.
+      This might significantly affect performance.
   """
-  if not apache:
-    # The following is based on the assumption that the package path contains a
-    # directory (typically `www`) which contains the router module.
-    # Third from the right is the package directory's name, which we need.
-    router_file = sys.modules['__main__'].__file__
-    package_dir = os.path.abspath(os.path.join(router_file, '../..'))
-    package_name = os.path.basename(package_dir)
-    config_location = os.path.join(package_dir, 'config.cfg')
-    if not os.path.exists(config_location):
-      config_location = None
-    def main(router=router, **options):
-      """Sets up a closure that is compatible with the UD app framework."""
-      standalone.RunStandAlone(router, **options)
+  router = sys._getframe(1)
+  router_file = router.f_code.co_filename
 
-    app.Service(stack_depth=3, app=main, config=config_location,
-                working_dir=package_dir, package=package_name)
-  elif apache_logging:
-    package = router.func_globals.get('PACKAGE', 'mod_python_project')
-    log_dir = app.FirstWritablePath(app.MakePaths(app.LOGGING_PATHS, package))
-    app.SetUpLogging(os.path.join(log_dir, 'apache.sqlite'))
+  # Configuration based on constants provided
+  package_name = router.f_globals.get('PACKAGE')
+  router_pages = router.f_globals['PAGE_CLASS']
+  router_routes = router.f_globals['ROUTES']
+  router_config = udders.ParseConfig(os.path.join(
+      os.path.dirname(router_file), router.f_globals['CONFIG']))
+  handler = Handler(router_pages, router_routes, config=router_config)
+  if not apache:
+    router_name = os.path.splitext(os.path.basename(router_file))[0]
+    package_dir = os.path.abspath(os.path.join(
+        os.path.dirname(router_file), os.path.pardir))
+    package_name = package_name or os.path.basename(package_dir)
+
+    def main(router=handler):
+      """Sets up a closure that is compatible with the UD app framework."""
+      standalone.StandAloneServer(router, router_name, router_config).Start()
+
+    app.Service(stack_depth=3, app=main, working_dir=package_dir,
+                package=package_name)
+  else:
+    router.f_globals['handler'] = handler
+    if apache_logging:
+      package = package_name or 'uweb_project'
+      log_dir = app.FirstWritablePath(app.MakePaths(app.LOGGING_PATHS, package))
+      app.SetUpLogging(os.path.join(log_dir, 'apache.sqlite'))

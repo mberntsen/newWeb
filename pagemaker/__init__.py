@@ -3,7 +3,7 @@
 from __future__ import with_statement
 
 __author__ = 'Elmer de Looff <elmer@underdark.nl>'
-__version__ = '0.5'
+__version__ = '0.6'
 
 # Standard modules
 import datetime
@@ -15,7 +15,6 @@ import warnings
 # Custom modules
 from underdark.libs import logging
 from underdark.libs import pysession
-from underdark.libs import udders
 from underdark.libs.uweb import templateparser
 
 RFC_1123_DATE = '%a, %d %b %Y %T GMT'
@@ -115,15 +114,15 @@ class BasePageMaker(object):
   # Default Static() handler cache durations, per MIMEtype, in days
   CACHE_DURATION = MimeTypeDict({'text': 7, 'image': 30, 'application': 7})
 
-  def __init__(self, req, config_file=None):
+  def __init__(self, req, config=None):
     """sets up the template parser and database connections
 
     Arguments:
       @ req: request.Request
         The originating request, including environment, GET, POST and cookies.
-      % config_file: str ~~ None
-        Configfile for the pagemaker, with database connection information
-        and other settings. These will be stored on the instance dict `options`.
+      % config: dict ~~ None
+        Configuration for the pagemaker, with database connection information
+        and other settings. This will be available through `self.options`.
     """
     self.__SetupPaths()
     self._parser = None
@@ -131,11 +130,7 @@ class BasePageMaker(object):
     self.cookies = req.vars['cookie']
     self.get = req.vars['get']
     self.post = req.vars['post']
-    if config_file:
-      self.options = udders.ParseConfig(
-          os.path.join(self.LOCAL_DIR, config_file))
-    else:
-      self.options = {}
+    self.options = config or {}
 
   @classmethod
   def __SetupPaths(cls):
@@ -214,13 +209,13 @@ class BasePageMaker(object):
 
 
 class PageMakerDebuggerMixin(object):
-  CACHE_DURATION = MimeTypeDict({})
-
   """Replaces the default handler for Internal Server Errors.
 
   This one prints a host of debugging and request information, though it still
   lacks interactive functions.
   """
+  CACHE_DURATION = MimeTypeDict({})
+
   def _ParseStackFrames(self, stack):
     """Generates list items for traceback information.
 

@@ -1,7 +1,7 @@
 #!/usr/bin/python
 """uweb standalone webserver"""
-__author__ = 'Jan Klopper <jan@underdark.nl>'
-__version__ = '0.1'
+__author__ = 'Elmer de Looff <elmer@underdark.nl>'
+__version__ = '0.3'
 
 # Standard modules
 import BaseHTTPServer
@@ -16,27 +16,38 @@ class ServerRunningError(Exception):
   """Another process is already using this port."""
 
 
-class StandaloneServer(object):
-  def __init__(self, router, config=None):
+class StandAloneServer(object):
+  CONFIG_SECTION = 'standalone'
+  DEFAULT_HOST = '0.0.0.0'
+  DEFAULT_PORT = 8082
+
+  def __init__(self, router, router_name, config):
     try:
-      config = config or {}
-      host = config.get('host', '0.0.0.0')
-      port = int(config.get('port', '8082'))
-      self.httpd = BaseHTTPServer.HTTPServer((host, port), StandaloneHandler)
+      host, port = self._ReadPortConfig(router_name, config)
+      self.httpd = BaseHTTPServer.HTTPServer((host, port), StandAloneHandler)
       self.httpd.router = router
-      print 'server running'
     except BaseHTTPServer.socket.error:
       raise ServerRunningError(
-          'A server is already running on host %r, port %r' % (host, port))
+          'Could not bind to %r:%d. Socket already in use?' % (host, port))
     except ValueError:
       raise ValueError('The configured port %r is not a valid number' % port)
 
+  def _ReadPortConfig(self, router_name, config):
+    router_specific_config = '%s:%s' % (self.CONFIG_SECTION, router_name)
+    if router_specific_config in config:
+      config = config[router_specific_config]
+    else:
+      config = config.get(self.CONFIG_SECTION, {})
+    return (config.get('host', self.DEFAULT_HOST),
+            int(config.get('port', self.DEFAULT_PORT)))
+
   def Start(self):
+    print 'Running uWeb on %s:%d' % self.httpd.server_address
     self.httpd.serve_forever()
 
 
-class StandaloneHandler(BaseHTTPServer.BaseHTTPRequestHandler):
-  server_version = 'uweb Standalone/%s' % __version__
+class StandAloneHandler(BaseHTTPServer.BaseHTTPRequestHandler):
+  server_version = 'uWeb StandAlone/%s' % __version__
   sys_version = ''
 
   def handle_one_request(self):
@@ -72,9 +83,3 @@ class StandaloneHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     logging.LogDebug('Origin [%s] - - %s', self.address_string(), logmsg % args)
     sys.stdout.write('%s [%s] - - %s\n' % (
         self.log_date_time_string(), self.client_address[0], logmsg % args))
-
-
-def RunStandAlone(router, **config):
-  server = StandaloneServer(router, config=config.get('standalone'))
-  print 'Running uWeb on %s:%d' % server.httpd.server_address
-  server.Start()
