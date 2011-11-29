@@ -3,7 +3,7 @@
 from __future__ import with_statement
 
 __author__ = 'Elmer de Looff <elmer@underdark.nl>'
-__version__ = '0.8'
+__version__ = '0.9'
 
 # Standard modules
 import htmlentitydefs
@@ -13,18 +13,15 @@ import sys
 import warnings
 
 try:
-  # Import the apache module from inside mod_python. This allows us to trigger
-  # a DONE so that Apache knows when and how to respond to the client.
+  # We mostly need to import this module to detect we're running on mod_python
   from mod_python import apache
 except ImportError:
-  # We are *NOT* running from inside Apache. Import the standalone routines so
-  # that we can set up a local webserver
-
-  # The following global exists to signal the apache module is NOT loaded.
+  # Not running on mod_python. We'll assume uWeb needs to run standalone.
+  import standalone
+  # Make sure we have a global `apache` we can test for truthness later on.
   # pylint: disable=C0103
   apache = False
   # pylint: enable=C0103
-  import standalone
 
 # Custom modules
 from underdark.libs import app
@@ -55,56 +52,68 @@ class DebuggingPageMaker(PageMakerDebuggerMixin, PageMaker):
   """The same basic PageMaker, with added debugging on HTTP 500."""
 
 
-def Handler(pageclass, routes, config=None):
-  """Handles a web request through processing the routes list.
+def Handler(page_class, routes, config=None):
+  """Returns a configured closure for handling page requests.
+
+  This closure is configured with a precomputed set of routes and handlers using
+  the Router function. After this, incoming requests are processed and delegated
+  to the correct PageMaker handler.
 
   The url in the received `req` object is taken and matches against the
   available `routes` (refer to Router() for more documentation on this).
 
-  Once a method is known, the request and the arguments that came from the
-  Router return are passed to the relevant `pageclass` method.
-
-  The return value from the `pageclass` method will be written to the `req`
-  object. When this is completed, the Handler will issue an apache.OK value,
-  indicating that it has successfully processed the request.
-
-  The processing in this function knows two main interruptions:
-    1) Exception `NoRouteError`:
-       This triggers the PageMaker method InternalServerError, which generates
-       an appropriate response for the requesting client.
-    2) Exception `ReloadModules`
-       This halts any running execution of web-requests and reloads the
-       `pageclass`. The response will be a text/plain page with the result of
-       the reload statement
 
   Takes:
-    @ req: obj
-      the apache request object
-    @ pageclass: PageMaker
+    @ page_class: PageMaker
       Class that holds request handling methods as defined in the `routes`
     @ routes: iterable of 2-tuple
-      Each tuple is a pair of pattern and handler. More info in Router().
-    % config_file: str ~~ 'config.cfg'
-      Filename to read handler configuration from. This typically contains
-      sections for databases and the like.
+      Each tuple is a pair of pattern and handler name. More info in Router().
+    % config: dict ~~ None
+      Configuration for the PageMaker. Typically contains entries for database
+      connections, default search paths etc.
 
   Returns:
-    apache.DONE: signal for Apache to send the page to the client. Ignored by
-                 the standalone version of uWeb.
+    RequestHandler: Configured closure that is ready to process requests.
   """
-  def RealHandler(req, pageclass=pageclass, routes=routes, config=config):
-    req = request.Request(req)
-    pages = pageclass(req, config=config)
+  router = Router(routes, page_class)
+  del routes
+
+  def RequestHandler(req):
+    """Closure to handle incoming web requests.
+
+    Incoming requests are transformed to a proper uWeb Request object, and then
+    processed by the `router`, which is provided by the outer scope.
+
+    The router may return in two ways:
+      1) Returns a handler and arguments, in which case these are used to
+         create a regular response for the client.
+      2) Raise `NoRouteError`, in which case `InternalServerError` on the
+         pagemaker is returned instead.
+
+    During processing of a request, two additional error situations may come up:
+      1) `ReloadModules`
+         This halts any running execution of web-requests and reloads the
+         `pageclass`. The response will be a text/plain page with the result of
+         the reload statement
+      2) Any other Exception
+         Like NoRouteError this will return `InternalServerError` to the client.
+
+    Returns:
+      apache.DONE: signal for Apache to send the page to the client.
+                   This is ignored by the standalone version of uWeb.
+    """
     try:
-      req_method, req_arguments = Router(routes, req.env['PATH_INFO'])
-      response = getattr(pages, req_method)(*req_arguments)
+      req = request.Request(req)
+      pages = page_class(req, config=config)
+      handler, args = router(req.env['PATH_INFO'])
+      response = handler(pages, *args)  # pass in `pages` to the unbound method.
     except ReloadModules, message:
-      reload_message = reload(sys.modules[pageclass.__module__])
+      reload_message = reload(sys.modules[page_class.__module__])
       response = Response(content='%s\n%s' % (message, reload_message))
     except ImmediateResponse, response:
       response = response[0]
-    except (Exception, NoRouteError):
-      response = pages.InternalServerError()
+    except (NoRouteError, Exception):
+      response = page_class.InternalServerError()
 
     if not isinstance(response, Response):
       response = Response(content=response)
@@ -117,42 +126,58 @@ def Handler(pageclass, routes, config=None):
     req.Write(response.content)
     if apache:
       return apache.DONE
+  return RequestHandler
 
-  return RealHandler
 
-
-def Router(routes, url):
+def Router(routes, page_class):
   """Returns the first request handler that matches the request URL.
 
-  Each `url` is matched against the `routes` mapping. The `routes` mapping
-  consists of 2-tuples that define a `pattern` and a `handler`:
-  - The `pattern` part of each route is a regular expression that the `url`
-    is matched against. If it matches, the paired `handler` will be returned.
-  - The `handler` portion of each route is a string that indicated the method
-    on the PageMaker that is to be called to handle the requested `url`.
+  The `routes` argument is an iterable of 2-tuples, each of which contain a
+  pattern (regex) and the name of the handler to use for matching requests.
 
-  Once a handler has been found to match, a 2-tuple of that handler, and the
-  matches from the pattern regex is returned.
+  Before returning the closure, all regexen are compiled, and handler methods
+  are retrieved from the provided `page_class`.
 
-  More specific is, in this context, synonymous with being mentioned later.
-
-  Takes:
+  Arguments:
     @ routes: iterable of 2-tuples.
-      Each tuple is a pair of `pattern` and `handler`.
-    @ requested_url: str
-      Requested URL that is to be matched against the mapping.
+      Each tuple is a pair of `pattern` and `handler`, both are strings.
+    @ page_class: PageMaker
+      The class on which the methods that handle requests exist.
 
   Returns:
-    2-tuple: handler name, and matches resulting from `pattern` regex.
-
-  Raises:
-    NoRouteError: None of the patterns match the requested `url`.
+    RequestRouter: Configured closure that processes urls.
   """
-  for pattern, handler in routes:
-    matches = re.match(pattern + '$', url)
-    if matches:
-      return handler, matches.groups()
-  raise NoRouteError(url +' cannot be handled')
+  req_routes = []
+  for pattern, method in routes:
+    req_routes.append((re.compile(pattern + '$'), getattr(page_class, method)))
+
+  def RequestRouter(url):
+    """Returns the appropriate handler and arguments for the given `url`.
+
+    The`url` is matched against the compiled patterns in the `req_routes`
+    provided by the outer scope. Upon finding a pattern that matches, the
+    match groups from the regex and the unbound handler method are returned.
+
+    N.B. The rules are such that the first matching route will be used. There
+    is no further concept of specificity. Routes should be written with this in
+    mind.
+
+    Arguments:
+      @ url: str
+        The URL requested by the client.
+
+    Raises:
+      NoRouteError: None of the patterns match the requested `url`.
+
+    Returns:
+      2-tuple: handler method (unbound), and tuple of pattern matches.
+    """
+    for pattern, handler in req_routes:
+      match = pattern.match(url)
+      if match:
+        return handler, match.groups()
+    raise NoRouteError(url +' cannot be handled')
+  return RequestRouter
 
 
 def HtmlUnescape(html):
@@ -217,7 +242,10 @@ def ServerSetup(apache_logging=True):
       will cause the log-database to be opened and closed with every request.
       This might significantly affect performance.
   """
+  # We need _getframe here, there's not really a neater way to do this.
+  # pylint: disable=W0212
   router = sys._getframe(1)
+  # pylint: enable=W0212
   router_file = router.f_code.co_filename
 
   # Configuration based on constants provided
