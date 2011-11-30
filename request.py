@@ -2,11 +2,11 @@
 """Underdark micro-Web framework, uWeb, Request module."""
 
 __author__ = 'Elmer de Looff <elmer@underdark.nl>'
-__version__ = '0.6'
+__version__ = '0.7'
 
 # Standard modules
-import collections
 import cgi
+import cStringIO
 import Cookie as cookie
 import os
 import re
@@ -66,7 +66,7 @@ class Request(object):
     self.vars = {'cookie': Cookie(self.env.get('HTTP_COOKIE')),
                  'get': QueryArgsDict(cgi.parse_qs(self.env['QUERY_STRING']))}
     if self.env['REQUEST_METHOD'] == 'POST':
-      self.vars['post'] = IndexedFieldStorage(post_data_fp, environ=self.env)
+      self.vars['post'] = ParseForm(post_data_fp, self.env)
     else:
       self.vars['post'] = IndexedFieldStorage()
 
@@ -197,31 +197,33 @@ class QueryArgsDict(dict):
 
 def EnvironBaseHttp(request):
   path_info, _sep, query_string = request.path.partition('?')
-  return {'CONTENT_TYPE': request.headers.get('content-type', ''),
-          'CONTENT_LENGTH': request.headers.get('content-length', 0),
-          'HTTP_COOKIE': request.headers.get('cookie', ''),
-          'HTTP_HOST': request.headers.get('host', ''),
-          'HTTP_REFERER': request.headers.get('referer', ''),
-          'HTTP_USER_AGENT': request.headers.get('user-agent', ''),
-          'PATH_INFO': urllib.unquote_plus(path_info),
-          'QUERY_STRING': query_string,
-          'REMOTE_ADDR': request.client_address[0],
-          'REQUEST_METHOD': request.command,
-          'UWEB_MODE': 'BASE_HTTP'}
+  environ = {'CONTENT_TYPE': request.headers.get('content-type', ''),
+             'CONTENT_LENGTH': request.headers.get('content-length', 0),
+             'HTTP_COOKIE': request.headers.get('cookie', ''),
+             'HTTP_HOST': request.headers.get('host', ''),
+             'HTTP_REFERER': request.headers.get('referer', ''),
+             'HTTP_USER_AGENT': request.headers.get('user-agent', ''),
+             'PATH_INFO': urllib.unquote_plus(path_info),
+             'QUERY_STRING': query_string,
+             'REMOTE_ADDR': request.client_address[0],
+             'REQUEST_METHOD': request.command,
+             'UWEB_MODE': 'STANDALONE'}
+  return HeadersIntoEnviron(environ, request.headers)
 
 
 def EnvironModPython(request):
-  return {'CONTENT_TYPE': request.headers_in.get('content-type', ''),
-          'CONTENT_LENGTH': request.headers_in.get('content-length', 0),
-          'HTTP_COOKIE': request.headers_in.get('cookie', ''),
-          'HTTP_HOST': request.hostname,
-          'HTTP_REFERER': request.headers_in.get('referer', ''),
-          'HTTP_USER_AGENT': request.headers_in.get('user-agent', ''),
-          'PATH_INFO': urllib.unquote_plus(request.uri),
-          'QUERY_STRING': request.args or '',
-          'REMOTE_ADDR': request.connection.remote_ip,
-          'REQUEST_METHOD': request.method,
-          'UWEB_MODE': 'MOD_PYTHON'}
+  environ = {'CONTENT_TYPE': request.headers_in.get('content-type', ''),
+             'CONTENT_LENGTH': request.headers_in.get('content-length', 0),
+             'HTTP_COOKIE': request.headers_in.get('cookie', ''),
+             'HTTP_HOST': request.hostname,
+             'HTTP_REFERER': request.headers_in.get('referer', ''),
+             'HTTP_USER_AGENT': request.headers_in.get('user-agent', ''),
+             'PATH_INFO': urllib.unquote_plus(request.uri),
+             'QUERY_STRING': request.args or '',
+             'REMOTE_ADDR': request.connection.remote_ip,
+             'REQUEST_METHOD': request.method,
+             'UWEB_MODE': 'MOD_PYTHON'}
+  return HeadersIntoEnviron(environ, request.headers_in)
 
 
 def ExtendEnvironBaseHttp(environ, request):
@@ -237,7 +239,7 @@ def ExtendEnvironBaseHttp(environ, request):
        'SERVER_LOCAL_NAME': socket.gethostname(),
        'SERVER_LOCAL_IP': GetLocalIp(environ['REMOTE_ADDR']),
        'SERVER_PROTOCOL': request.request_version})
-  return HeadersIntoEnviron(environ, request.headers)
+  return environ
 
 
 def ExtendEnvironModPython(environ, request):
@@ -257,7 +259,7 @@ def ExtendEnvironModPython(environ, request):
        'MODPYTHON_HANDLER': request.handler,
        'MODPYTHON_INTERPRETER': request.interpreter,
        'MODPYTHON_PHASE': request.phase})
-  return HeadersIntoEnviron(environ, request.headers_in)
+  return environ
 
 
 def GetLocalIp(remote_addr):
@@ -317,3 +319,15 @@ def HeadersIntoEnviron(environ, headers, skip_pre_existing_http=True):
     else:
       environ['HTTP_' + name] = value
   return environ
+
+
+def ParseForm(file_handle, environ):
+  """Returns an IndexedFieldStorage object from the POST data and environment.
+
+  This small wrapper is necessary because cgi.FieldStorage assumes that the
+  provided file handles supports .readline() iteration. File handles as provided
+  by BaseHTTPServer do not support this, so we need to convert them to proper
+  cStringIO objects first.
+  """
+  data = cStringIO.StringIO(file_handle.read(int(environ['CONTENT_LENGTH'])))
+  return IndexedFieldStorage(fp=data, environ=environ)
