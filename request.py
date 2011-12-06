@@ -12,7 +12,6 @@ import os
 import re
 import socket
 import urllib
-import urlparse
 
 # Custom modules
 #from underdark.libs import logging
@@ -163,9 +162,9 @@ class IndexedFieldStorage(cgi.FieldStorage):
   def read_urlencoded(self):
     indexed = {}
     self.list = []
-    for field, value in urlparse.parse_qsl(self.fp.read(self.length),
-                                           self.keep_blank_values,
-                                           self.strict_parsing):
+    for field, value in cgi.parse_qsl(self.fp.read(self.length),
+                                      self.keep_blank_values,
+                                      self.strict_parsing):
       if self.FIELD_AS_ARRAY.match(field):
         field_group, field_key = self.FIELD_AS_ARRAY.match(field).groups()
         indexed.setdefault(field_group, cgi.MiniFieldStorage(field_group, {}))
