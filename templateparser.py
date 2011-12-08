@@ -8,11 +8,10 @@ Error classes:
   Error: Default error class for templateparser
   TemplateReadError: Template file could not be read or found.
 """
-__author__ = 'Jan Klopper & Elmer de Looff'
-__version__ = '0.5'
+__author__ = 'Elmer de Looff <elmer@underdark.nl'
+__version__ = '1.0'
 
 # Standard modules
-import itertools
 import os
 import re
 import urllib
@@ -61,8 +60,10 @@ class Parser(dict):
       path:      str - Template directory path.
       templates: list of str - Names of templates to preload. Default None.
     """
-    super(Parser, self).__init__(templates)
+    super(Parser, self).__init__()
     self.template_dir = path
+    for template in templates:
+      self.AddTemplate(template)
 
   def __getitem__(self, template):
     """Retrieves a stored template by name.
@@ -76,104 +77,21 @@ class Parser(dict):
         Template name, or the relative path to find it on.
 
     Returns:
-      2-tuple: static template parts, template tags.
+      Template: A template object, created from a previously loaded file.
 
     Raises:
       TemplateReadError: Template name doesn't exist and cannot be loaded.
     """
     if template not in self:
-      template_path = os.path.join(self.template_dir, template)
-      self[template] = Template.FromFile(self, template_path)
+      self.AddTemplate(template)
     return super(Parser, self).__getitem__(template)
 
-#  def __setitem__(self, name, template):
-#    """Stores the `template` using the given `name` after pre-parsing."""
-#    super(Parser, self).__setitem__(name, self._PreParse(template))
-
-  def _Parse(self, template, replacements):
-    """Replaced template-tags, and interleaves them with static template parts.
-
-    Arguments:
-      @ template: 2-tuple
-        Text parts and tags from the template.
-      @ replacements: dict
-        Dictionary of replacement objects. Tags are looked up in here.
-
-    Returns: str, the template with replaced tags.
-    """
-    texts, tags = template
-    return SafeString(''.join(x.next() for x in itertools.cycle(
-        (iter(texts), self._TagReplace(tags, replacements)))))
-
-  def _PreParse(self, template):
-    template = ''.join(self._ProcessFunctions(template))
-    return self._SplitTags(template)
-
-  def _ProcessFunctions(self, template):
-    nodes = TEMPLATE_FUNCTION.split(template)
-    for index, node in enumerate(nodes):
-      if bool(index % 2):
-        # node is a function
-        name, data = node.split(None, 1)
-        if name == 'inline':
-          with file(os.path.join(self.template_dir, data)) as inline_template:
-            yield ''.join(self._ProcessFunctions(inline_template.read()))
-        else:
-          yield '{{ %s %s }}' % (name, data)
-      else:
-        yield node
-
-  @staticmethod
-  def _SplitTags(template):
-    """Splits a template string into static parts and tags to be replaced."""
-    nodes = TEMPLATE_TAG.split(template)
-    # First list contains static texts, second list contains template tags
-    return nodes[::2], nodes[1::2]
-
-  @staticmethod
-  def _TagReplace(tags, replacements):
-    """Replaces tags from a given `tags` iterable, using `replacements`.
-
-    N.B. All <unicode> tags will be converted to utf8 byte strings.
-
-    If a tag fails parsing at any point, due to bad tag-names, nonexisting keys
-    or attributes, or a bad function name, the tag is returned verbatim.
-
-    Arguments:
-      @ tags: iter of str
-        Strings that describe tags, indices and functions on them.
-      @ replacements: dict
-        Replacements
-
-    Yields:
-      str, replaced tag, or the original, unreplaced tag.
-    """
-    for tag in tags:
-      parts = tag.split('|')
-      needle_and_indices = parts[0].split(':')
-      funcs = parts[1:]
-      try:
-        replacement = replacements[needle_and_indices[0]]
-        for index in needle_and_indices[1:]:
-          replacement = Parser._CollectFromIndex(replacement, index)
-        if funcs:
-          for func in funcs:
-            replacement = TEMPLATE_FUNCTIONS[func](replacement)
-        elif type(replacement) == SafeString:
-          yield replacement
-          continue
-        else:
-          replacement = TEMPLATE_FUNCTIONS['default'](replacement)
-
-        # We will encode our returns down to utf8 byte strings.
-        if type(replacement) == unicode:
-          yield replacement.encode('utf8')
-        else:
-          yield replacement
-      except (AttributeError, IndexError, KeyError):
-        # AttributeError and IndexError originate from `CollectFromIndex`
-        # KeyError is raised only at the beginning of this try block.
-        yield '[%s]' % tag
+  def AddTemplate(self, template):
+    try:
+      template_path = os.path.join(self.template_dir, template)
+      self[template] = Template.FromFile(self, template_path)
+    except IOError:
+      raise TemplateReadError('Could not load template %r' % template_path)
 
   def Parse(self, template, **replacements):
     """Returns the referenced template with its tags replaced by **replacements.
@@ -191,7 +109,6 @@ class Parser(dict):
       str - The template with relevant tags replaced by the replacement dict.
     """
     return self[template].Parse(**replacements)
-    return self._Parse(self[template], replacements)
 
   def ParseString(self, template, **replacements):
     """Returns the given `template` with its tags replaced by **replacements.
@@ -208,7 +125,6 @@ class Parser(dict):
       str, template with replaced tags.
     """
     return Template(self, template).Parse(**replacements)
-    return self._Parse(self._PreParse(template), replacements)
 
   @staticmethod
   def RegisterFunction(name, function):
@@ -232,13 +148,14 @@ class Template(list):
   def __init__(self, parser, raw_template):
     super(Template, self).__init__()
     self.parser = parser
-    print self.parser
     self.scopes = [self]
-    self.Extend(raw_template)
+    self.AddString(raw_template)
 
   def __repr__(self):
-    return '%s(%r)' % (type(self).__name__,
-                       ', '.join('%s=%s' % item for item in vars(self)))
+    return '%s(%s)' % (type(self).__name__, list(self))
+
+  def __str__(self):
+    return ''.join(map(str, self))
 
   @classmethod
   def FromFile(cls, parser, template_path):
@@ -248,16 +165,21 @@ class Template(list):
     except IOError:
       raise TemplateReadError('Cannot open: %r' % template_path)
 
-  def Extend(self, template):
+  def AddString(self, raw_template):
     scope_depth = len(self.scopes)
-    nodes = TEMPLATE_FUNCTION.split(template)
+    nodes = TEMPLATE_FUNCTION.split(raw_template)
     for index, node in enumerate(nodes):
       if index % 2:
         self._ExtendFunction(node)
       else:
         self._ExtendText(node)
     if len(self.scopes) != scope_depth:
-      raise TemplateSyntaxError('Incorrect number of open scopes: %d' % len(self.scopes))
+      raise TemplateSyntaxError('Incorrect number of open scopes.')
+
+  def AddTemplate(self, name):
+    if self.parser is not None:
+      return self._AddPart(self.parser[name])
+    raise TemplateReadError('Cannot add template without a parser present.')
 
   def Parse(self, **kwds):
     output = []
@@ -266,12 +188,14 @@ class Template(list):
     return SafeString(''.join(output))
 
   def _ExtendFunction(self, node):
-    name, data = node.split(None, 1)
+    data = node.split()
+    name = data.pop(0)
     if name == 'inline':
-      self.AddTemplate(data)
+      self.AddTemplate(data[0])
     elif name == 'for':
-      alias, _in, tag = data.split(None, 2)
+      alias, _in, tag = data
       loop = TemplateLoop(self, tag, alias)
+      self._AddPart(loop)
       self.scopes.append(loop)
     elif name == 'endfor':
       if isinstance(self.scopes[-1], TemplateLoop):
@@ -286,41 +210,38 @@ class Template(list):
     for index, node in enumerate(nodes):
       if index % 2:
         self._AddPart(TemplateTag.FromString(node))
-      else:
+      elif node:
         self._AddPart(TemplateText(node))
 
   def _AddPart(self, item):
     self.scopes[-1].append(item)
 
-  def AddTemplate(self, name):
-    if self.parser is not None:
-      for part in self.parser[name]:
-        self._AddPart(part)
-      return self.extend(self.parser[name])
-    raise TemplateReadError('Cannot add template without a parser present.')
 
 class TemplateLoop(list):
   def __init__(self, template, tag, alias):
     super(TemplateLoop, self).__init__()
     self.template = template
-    self.tag = TemplateTag(tag)
+    self.tag = TemplateTag.FromString(tag)
     self.alias = alias
 
   def __repr__(self):
-    return '%s(%r)' % (type(self).__name__, str(self))
+    return '%s(%s)' % (type(self).__name__, list(self))
 
   def __str__(self):
-    'FOR %s IN %s' % (self.alias, self.tag)
+    return '{{ for %s in %s }} %s {{ endfor }}' % (
+        self.alias, self.tag, ''.join(map(str, self)))
 
   def Parse(self, **kwds):
-    replacements = copy(kwds)
+    output = []
+    replacements = kwds.copy()
     for alias in self.tag.Get(**kwds):
       replacements[self.alias] = alias
-      yield ''.join(tag.Parse(**replacements) for tag in self)
+      output.append(''.join(tag.Parse(**replacements) for tag in self))
+    return ''.join(output)
 
 
 class TemplateTag(object):
-  def __init__(self, name, indices=(), functions=None):
+  def __init__(self, name, indices=(), functions=()):
     self.name = name
     self.indices = indices
     self.functions = functions
@@ -335,7 +256,7 @@ class TemplateTag(object):
 
   @classmethod
   def FromString(cls, tag):
-    tag_and_funcs = tag.split('|')
+    tag_and_funcs = tag.strip('[]').split('|')
     name_and_indices = tag_and_funcs[0].split(':')
     return cls(name_and_indices[0], name_and_indices[1:], tag_and_funcs[1:])
 
@@ -346,17 +267,21 @@ class TemplateTag(object):
       raise TemplateKeyError('No replacement with name %r' % self.name)
 
   def Parse(self, **kwds):
-    if self.name not in kwds:
+    try:
+      value = kwds[self.name]
+      for index in self.indices:
+        value = self._GetIndex(value, index)
+    except (AttributeError, LookupError):
+      # On any failure to get the given index, return the unmodified tag.
       return str(self)
-    value = kwds[self.name]
-    for index in self.indices:
-      value = self._GetIndex(value, index)
+    # Process functions, or apply default if value is not SafeString
     if self.functions:
       for func in self.functions:
         value = TAG_FUNCTIONS[func](value)
     else:
       if not isinstance(value, SafeString):
         value = TAG_FUNCTIONS['default'](value)
+
     if isinstance(value, unicode):
       return value.encode('utf8')
     return value

@@ -258,10 +258,22 @@ class TemplateIncludeTemplate(unittest.TestCase):
     os.unlink('tmp_template')
 
   def testTemplateInclusion(self):
-    """Templates can include another template."""
+    """Templates can include another template by name"""
     template = '{{ inline tmp_template }}'
     output = 'This is a subtemplate by Elmer.'
     self.assertEqual(output, self.parser.ParseString(template, name='Elmer'))
+
+
+class TemplateLoops(unittest.TestCase):
+  def setUp(self):
+    """Sets up a parser instance, as it never changes."""
+    self.parser = templateparser.Parser()
+
+  def testBasicLoop(self):
+    """Templates support lazy iterated for loops"""
+    template = '{{ for var in [range] }}number [var], {{ endfor }}'
+    result = 'number 0, number 1, number 2, number 3, number 4, '
+    self.assertEqual(result, self.parser.ParseString(template, range=range(5)))
 
 
 if __name__ == '__main__':
