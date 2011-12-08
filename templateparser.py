@@ -21,7 +21,8 @@ import urllib
 # - Alphanumeric characters (a-zA-Z0-9)
 # - underscores, pipes or colons (_|:)
 # Whitespace or other illegal characters trigger literal processing of brackets.
-TAGSPLITTER = re.compile(r'\[([\w:|]+)\]')
+TEMPLATE_FUNCTION = re.compile(r'\{\{\s*(.*?)\s*\}\}')
+TEMPLATE_TAG = re.compile(r'\[([\w:|]+)\]')
 
 
 class Error(Exception):
@@ -80,9 +81,9 @@ class Parser(dict):
         raise TemplateReadError('Cannot open: %r' % template_path)
     return super(Parser, self).__getitem__(template)
 
-  def __setitem__(self, key, value):
-    """Writes the template parts to the given key."""
-    super(Parser, self).__setitem__(key, self._SplitTags(value))
+  def __setitem__(self, name, template):
+    """Stores the `template` using the given `name` after pre-parsing."""
+    super(Parser, self).__setitem__(name, self._PreParse(template))
 
   @staticmethod
   def _CollectFromIndex(replacement, index):
@@ -114,8 +115,7 @@ class Parser(dict):
         # TypeError: source object is unsubscriptable.
         return getattr(replacement, index)
 
-  @staticmethod
-  def _Parse(template, replacements):
+  def _Parse(self, template, replacements):
     """Replaced template-tags, and interleaves them with static template parts.
 
     Arguments:
@@ -128,12 +128,31 @@ class Parser(dict):
     """
     texts, tags = template
     return SafeString(''.join(x.next() for x in itertools.cycle(
-        (iter(texts), Parser._TagReplace(tags, replacements)))))
+        (iter(texts), self._TagReplace(tags, replacements)))))
+
+  def _PreParse(self, template):
+    template = ''.join(self._ProcessFunctions(template))
+    return self._SplitTags(template)
+
+  def _ProcessFunctions(self, template):
+    nodes = TEMPLATE_FUNCTION.split(template)
+    for index, node in enumerate(nodes):
+      if bool(index % 2):
+        # node is a function
+        name, data = node.split(None, 1)
+        if name == 'inline':
+          with file(os.path.join(self.template_dir, data)) as inline_template:
+            yield ''.join(self._ProcessFunctions(inline_template.read()))
+        else:
+          yield '{{ %s %s }}' % (name, data)
+      else:
+        yield node
 
   @staticmethod
   def _SplitTags(template):
     """Splits a template string into static parts and tags to be replaced."""
-    nodes = TAGSPLITTER.split(template)
+    nodes = TEMPLATE_TAG.split(template)
+    # First list contains static texts, second list contains template tags
     return nodes[::2], nodes[1::2]
 
   @staticmethod
@@ -198,8 +217,7 @@ class Parser(dict):
     """
     return self._Parse(self[template], replacements)
 
-  @staticmethod
-  def ParseString(template, **replacements):
+  def ParseString(self, template, **replacements):
     """Returns the given `template` with its tags replaced by **replacements.
 
     Arguments:
@@ -213,7 +231,7 @@ class Parser(dict):
     Returns:
       str, template with replaced tags.
     """
-    return Parser._Parse(Parser._SplitTags(template), replacements)
+    return self._Parse(self._PreParse(template), replacements)
 
   @staticmethod
   def RegisterFunction(name, function):

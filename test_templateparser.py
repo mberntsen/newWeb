@@ -250,18 +250,18 @@ class TemplateIncludeTemplate(unittest.TestCase):
   def setUp(self):
     """Sets up a testbed."""
     self.parser = templateparser.Parser()
-    self.message = 'This is a subtemplate with [name].'
-    self.template = 'tmp_template'
-    with file(self.template, 'w') as template:
-      template.write(self.message)
+    self.template = 'This is a subtemplate by [name].'
+    with file('tmp_template', 'w') as template:
+      template.write(self.template)
 
   def tearDown(self):
-    os.unlink(self.template)
+    os.unlink('tmp_template')
 
   def testTemplateInclusion(self):
     """Templates can include another template."""
-    result = self.parser.ParseString('{{ include tmp_template }}')
-    self.assertEqual(result, self.message)
+    template = '{{ inline tmp_template }}'
+    output = 'This is a subtemplate by Elmer.'
+    self.assertEqual(output, self.parser.ParseString(template, name='Elmer'))
 
 
 if __name__ == '__main__':
