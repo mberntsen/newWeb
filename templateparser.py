@@ -29,6 +29,14 @@ class Error(Exception):
   """Superclass used for inheritance and external exception handling."""
 
 
+class TemplateKeyError(Error):
+  """There is no replacement with the requested key."""
+
+
+class TemplateSyntaxError(Error):
+  """The template contains illegal syntax."""
+
+
 class TemplateReadError(Error, IOError):
   """Template file could not be read or found."""
 
@@ -74,46 +82,13 @@ class Parser(dict):
       TemplateReadError: Template name doesn't exist and cannot be loaded.
     """
     if template not in self:
-      try:
-        template_path = os.path.join(self.template_dir, template)
-        self[template] = file(template_path).read()
-      except IOError:
-        raise TemplateReadError('Cannot open: %r' % template_path)
+      template_path = os.path.join(self.template_dir, template)
+      self[template] = Template.FromFile(self, template_path)
     return super(Parser, self).__getitem__(template)
 
-  def __setitem__(self, name, template):
-    """Stores the `template` using the given `name` after pre-parsing."""
-    super(Parser, self).__setitem__(name, self._PreParse(template))
-
-  @staticmethod
-  def _CollectFromIndex(replacement, index):
-    """Gathers the `index` from the `replacement` by index, key or attribute.
-
-    Arguments:
-      @ replacement: obj
-        The replacement object, iterable, mapping or any kind of object.
-      @ index: str
-        The index, key or attribute name to find on the replacement.
-
-    Raises:
-      IndexError: the int()'ed `index` does not exist on the `replacement`.
-      AttributeError: resulting error if the `index` does not exist in any form.
-
-    Returns:
-      str, the string contained on the `index` of the replacement.
-      """
-    try:
-      # Assume integer-indexable object (list, mapping).
-      return replacement[int(index)]
-    except (TypeError, ValueError):
-      # ValueError: int() call failed, index is a string.
-      # TypeError: int() call succeeded, but source object is unsubscriptable.
-      try:
-        return replacement[index]
-      except (KeyError, TypeError):
-        # KeyError, index definitely not a key, but can still be an attributes.
-        # TypeError: source object is unsubscriptable.
-        return getattr(replacement, index)
+#  def __setitem__(self, name, template):
+#    """Stores the `template` using the given `name` after pre-parsing."""
+#    super(Parser, self).__setitem__(name, self._PreParse(template))
 
   def _Parse(self, template, replacements):
     """Replaced template-tags, and interleaves them with static template parts.
@@ -215,6 +190,7 @@ class Parser(dict):
     Returns:
       str - The template with relevant tags replaced by the replacement dict.
     """
+    return self[template].Parse(**replacements)
     return self._Parse(self[template], replacements)
 
   def ParseString(self, template, **replacements):
@@ -231,6 +207,7 @@ class Parser(dict):
     Returns:
       str, template with replaced tags.
     """
+    return Template(self, template).Parse(**replacements)
     return self._Parse(self._PreParse(template), replacements)
 
   @staticmethod
@@ -243,12 +220,192 @@ class Parser(dict):
       @ function: function
         The function that should be used. Ideally this returns a string.
     """
-    TEMPLATE_FUNCTIONS[name] = function
+    TAG_FUNCTIONS[name] = function
 
   TemplateReadError = TemplateReadError
 
 class SafeString(str):
   """A template string, which has had all its processing done already."""
+
+
+class Template(list):
+  def __init__(self, parser, raw_template):
+    super(Template, self).__init__()
+    self.parser = parser
+    print self.parser
+    self.scopes = [self]
+    self.Extend(raw_template)
+
+  def __repr__(self):
+    return '%s(%r)' % (type(self).__name__,
+                       ', '.join('%s=%s' % item for item in vars(self)))
+
+  @classmethod
+  def FromFile(cls, parser, template_path):
+    try:
+      with file(template_path) as template:
+        return cls(parser, template.read())
+    except IOError:
+      raise TemplateReadError('Cannot open: %r' % template_path)
+
+  def Extend(self, template):
+    scope_depth = len(self.scopes)
+    nodes = TEMPLATE_FUNCTION.split(template)
+    for index, node in enumerate(nodes):
+      if index % 2:
+        self._ExtendFunction(node)
+      else:
+        self._ExtendText(node)
+    if len(self.scopes) != scope_depth:
+      raise TemplateSyntaxError('Incorrect number of open scopes: %d' % len(self.scopes))
+
+  def Parse(self, **kwds):
+    output = []
+    for tag in self:
+      output.append(tag.Parse(**kwds))
+    return SafeString(''.join(output))
+
+  def _ExtendFunction(self, node):
+    name, data = node.split(None, 1)
+    if name == 'inline':
+      self.AddTemplate(data)
+    elif name == 'for':
+      alias, _in, tag = data.split(None, 2)
+      loop = TemplateLoop(self, tag, alias)
+      self.scopes.append(loop)
+    elif name == 'endfor':
+      if isinstance(self.scopes[-1], TemplateLoop):
+        self.scopes.pop()
+      else:
+        raise TemplateSyntaxError('Unexpected {{ endfor }}')
+    else:
+      raise TemplateSyntaxError('Unexpected command %r' % name)
+
+  def _ExtendText(self, node):
+    nodes = TEMPLATE_TAG.split(node)
+    for index, node in enumerate(nodes):
+      if index % 2:
+        self._AddPart(TemplateTag.FromString(node))
+      else:
+        self._AddPart(TemplateText(node))
+
+  def _AddPart(self, item):
+    self.scopes[-1].append(item)
+
+  def AddTemplate(self, name):
+    if self.parser is not None:
+      for part in self.parser[name]:
+        self._AddPart(part)
+      return self.extend(self.parser[name])
+    raise TemplateReadError('Cannot add template without a parser present.')
+
+class TemplateLoop(list):
+  def __init__(self, template, tag, alias):
+    super(TemplateLoop, self).__init__()
+    self.template = template
+    self.tag = TemplateTag(tag)
+    self.alias = alias
+
+  def __repr__(self):
+    return '%s(%r)' % (type(self).__name__, str(self))
+
+  def __str__(self):
+    'FOR %s IN %s' % (self.alias, self.tag)
+
+  def Parse(self, **kwds):
+    replacements = copy(kwds)
+    for alias in self.tag.Get(**kwds):
+      replacements[self.alias] = alias
+      yield ''.join(tag.Parse(**replacements) for tag in self)
+
+
+class TemplateTag(object):
+  def __init__(self, name, indices=(), functions=None):
+    self.name = name
+    self.indices = indices
+    self.functions = functions
+
+  def __repr__(self):
+    return '%s(%r)' % (type(self).__name__, str(self))
+
+  def __str__(self):
+    return '[%s%s%s]' % (self.name,
+                         ''.join(':%s' % index for index in self.indices),
+                         ''.join('|%s' % func for func in self.functions))
+
+  @classmethod
+  def FromString(cls, tag):
+    tag_and_funcs = tag.split('|')
+    name_and_indices = tag_and_funcs[0].split(':')
+    return cls(name_and_indices[0], name_and_indices[1:], tag_and_funcs[1:])
+
+  def Get(self, **kwds):
+    try:
+      return kwds[self.name]
+    except KeyError:
+      raise TemplateKeyError('No replacement with name %r' % self.name)
+
+  def Parse(self, **kwds):
+    if self.name not in kwds:
+      return str(self)
+    value = kwds[self.name]
+    for index in self.indices:
+      value = self._GetIndex(value, index)
+    if self.functions:
+      for func in self.functions:
+        value = TAG_FUNCTIONS[func](value)
+    else:
+      if not isinstance(value, SafeString):
+        value = TAG_FUNCTIONS['default'](value)
+    if isinstance(value, unicode):
+      return value.encode('utf8')
+    return value
+
+  @staticmethod
+  def _GetIndex(haystack, needle):
+    """Returns the `needle` from the `haystack` by index, key or attribute name.
+
+    Arguments:
+      @ haystack: obj
+        The replacement object, iterable, mapping or any kind of object.
+      @ needle: str
+        The index, key or attribute name to find on the replacement.
+
+    Raises:
+      IndexError: the int()'ed `index` does not exist on the `replacement`.
+      AttributeError: resulting error if the `index` does not exist in any form.
+
+    Returns:
+      str, the string contained on the `index` of the replacement.
+      """
+    if needle.isdigit():
+      try:
+        # `needle` is a number so either an index, or a numeric dict-key
+        return haystack[int(needle)]
+      except KeyError:
+        # `haystack` is a dictionary, or a numeric key is illegal
+        return haystack[needle]
+    try:
+      # `needle` is a string, so either a dict-key, or an attribute name.
+      return haystack[needle]
+    except (KeyError, TypeError):
+      # KeyError, `needle` is not a key, but may still be an attribute.
+      # TypeError: `haystack` is no dict, but may have attributes nonetheless.
+      return getattr(haystack, needle)
+
+
+class TemplateText(object):
+  def __init__(self, value):
+    self.value = value
+
+  def __repr__(self):
+    return '%s(%r)' % (type(self).__name__, str(self))
+
+  def __str__(self):
+    return self.value
+
+  def Parse(self, **_kwds):
+    return self.value
 
 
 def HtmlEscape(text):
@@ -272,8 +429,8 @@ def HtmlEscape(text):
   return html.replace('<', '&lt;')
 
 
-TEMPLATE_FUNCTIONS = {
-        'default': HtmlEscape,
-        'html': HtmlEscape,
-        'raw': lambda x: x,
-        'url': urllib.quote_plus}
+TAG_FUNCTIONS = {
+    'default': HtmlEscape,
+    'html': HtmlEscape,
+    'raw': lambda x: x,
+    'url': urllib.quote_plus}
