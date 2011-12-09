@@ -143,6 +143,9 @@ class Template(list):
     self.scopes = [self]
     self.AddString(raw_template)
 
+  def __eq__(self, other):
+    return isinstance(other, type(self)) and str(other) == str(self)
+
   def __repr__(self):
     return '%s(%s)' % (type(self).__name__, list(self))
 
@@ -235,6 +238,7 @@ class TemplateLoop(list):
 class TemplateTag(object):
   INDEX_PREFIX = ':'
   FUNCT_PREFIX = '|'
+  TAG_DELIMITERS = '[]'
 
   def __init__(self, name, indices=(), functions=()):
     self.name = name
@@ -252,7 +256,7 @@ class TemplateTag(object):
 
   @classmethod
   def FromString(cls, tag):
-    tag_and_funcs = tag.strip('[]').split(cls.FUNCT_PREFIX)
+    tag_and_funcs = tag.strip(cls.TAG_DELIMITERS).split(cls.FUNCT_PREFIX)
     name_and_indices = tag_and_funcs[0].split(cls.INDEX_PREFIX)
     return cls(name_and_indices[0], name_and_indices[1:], tag_and_funcs[1:])
 

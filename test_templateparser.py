@@ -14,53 +14,129 @@ import unittest
 import templateparser as templateparser
 
 
-class TemplateBasicTags(unittest.TestCase):
+class Parser(unittest.TestCase):
+  """Basic tests for the Parser class and equality of Template objects."""
+  def setUp(self):
+    """Creates a template file and a similar instance attribute."""
+    self.name = 'tmp_template'
+    self.raw = 'This is a basic [noun]'
+    self.template = templateparser.Template(self.raw)
+    with file(self.name, 'w') as template:
+      template.write('This is a basic [noun]')
+      template.flush()
+
+  def tearDown(self):
+    """Removes the template file from the filesystem."""
+    os.unlink('tmp_template')
+
+  def testAddTemplate(self):
+    """[Parser] AddTemplate adds a template to the parser"""
+    parser = templateparser.Parser()
+    self.assertEqual(0, len(parser))
+    parser.AddTemplate(self.name)
+    self.assertEqual(1, len(parser))
+    self.assertEqual(self.template, parser[self.name])
+
+  def testAccessTemplate(self):
+    """[Parser] getting a template by key loads it when required"""
+    parser = templateparser.Parser()
+    self.assertEqual(0, len(parser))
+    self.assertEqual(self.template, parser[self.name])
+    self.assertEqual(1, len(parser))
+
+  def testOverWriteTemplate(self):
+    """[Parser] AddTemplate overrides previously loaded template"""
+    custom_raw = 'My very own [adj] template'
+    custom_tmpl = templateparser.Template(custom_raw)
+    parser = templateparser.Parser()
+    parser.AddTemplate(self.name)
+    # Create a new template in place of the existing one, and reload it.
+    with file(self.name, 'w') as tmpl:
+      tmpl.write(custom_raw)
+      tmpl.flush()
+    # Assert the template has not yet changed, load it, assert that is has.
+    self.assertNotEqual(custom_tmpl, parser[self.name])
+    parser.AddTemplate(self.name)
+    self.assertEqual(custom_tmpl, parser[self.name])
+
+  def testPreloadTemplates(self):
+    """[Parser] Templates can be preloaded when instantiating the Parser"""
+    parser = templateparser.Parser(templates=[self.name])
+    self.assertEqual(1, len(parser))
+    self.assertEqual(self.template, parser[self.name])
+
+  def testParseVersusParseString(self):
+    """[Parser] Parse and ParseString only differ in cached lookup"""
+    parser = templateparser.Parser()
+    result_parse = parser[self.name].Parse()
+    result_parse_string = parser.ParseString(self.raw)
+    self.assertEqual(result_parse, result_parse_string)
+
+
+class ParserPerformance(unittest.TestCase):
+  """Basic performance test of the Template's initialization and Parsing."""
+  @staticmethod
+  def testPerformance():
+    """[Parser] Basic performance test for 2 template replacements"""
+    for _template in range(100):
+      template = 'This [obj:foo] is just a quick [bar]'
+      tmpl = templateparser.Template(template)
+      for _parse in xrange(100):
+        tmpl.Parse(obj={'foo': 'template'}, bar='hack')
+
+
+class TemplateTagBasic(unittest.TestCase):
   """Tests validity and parsing of simple tags."""
   def setUp(self):
-    """Sets up a parser instance, as it never changes."""
+    """Makes the Template class available on the instance."""
     self.tmpl = templateparser.Template
 
-  def testPlainTemplate(self):
-    """Templates without tags get returned whole"""
+  def testTaglessTemplate(self):
+    """[BasicTag] Templates without tags get returned verbatim as SafeString"""
     template = 'Template without any tags'
     parsed_template = self.tmpl(template).Parse()
     self.assertEqual(template, parsed_template)
+
+  def testSafeString(self):
+    """[BasicTag] Templates without tags get returned verbatim as SafeString"""
+    template = 'Template without any tags'
+    parsed_template = self.tmpl(template).Parse()
     self.assertTrue(isinstance(parsed_template, templateparser.SafeString))
 
   def testSingleTagTemplate(self):
-    """Templates with basic tags get returned proper"""
+    """[BasicTag] Templates with basic tags get returned proper"""
     template = 'Template with [single] tag'
     result = 'Template with just one tag'
     self.assertEqual(result, self.tmpl(template).Parse(single='just one'))
 
   def testCasedTag(self):
-    """Template tags may contain uppercase and lowercase or a mix thereof"""
-    template = 'The parser has no trouble with [cAsE] case.'
-    result = 'The parser has no trouble with mixed case.'
+    """[BasicTag] Tag names are case-sensitive"""
+    template = 'The parser has no trouble with [cAsE] [case].'
+    result = 'The parser has no trouble with mixed [case].'
     self.assertEqual(result, self.tmpl(template).Parse(cAsE='mixed'))
 
   def testUnderscoredTag(self):
-    """Template tags may contains underscores as part of their name"""
+    """[BasicTag] Tag names may contain underscores"""
     template = 'The template may contain [under_scored] tags.'
     result = 'The template may contain underscored tags.'
     self.assertEqual(
         result, self.tmpl(template).Parse(under_scored='underscored'))
 
   def testMultiTagTemplate(self):
-    """Templates with multiple (repeating) tags get parsed properly"""
+    """[BasicTag] Multiple instances of a tag will all be replaced"""
     template = '[adjective] [noun] are better than other [noun].'
     result = 'Beefy cows are better than other cows.'
     self.assertEqual(
         result, self.tmpl(template).Parse(noun='cows', adjective='Beefy'))
 
-  def testBrokenTags(self):
-    """Empty tags or tags containing whitespace are not actual tags"""
-    template = 'This [ is a ] broken [] template, ][, really'
+  def testEmptyOrWhitespace(self):
+    """[BasicTag] Empty tags or tags containing whitespace aren't actual tags"""
+    template = 'This [is a] broken [] template, really'
     self.assertEqual(template, self.tmpl(template).Parse(
-        **{' is a ': 'HORRIBLY', '': ', NASTY'}))
+        **{'is a': 'HORRIBLY', '': ', NASTY'}))
 
   def testBadCharacterTags(self):
-    """Tags with bad characters are not considered tags"""
+    """[BasicTag] Tags containing bad characters are not considered tags"""
     bad_chars = """ :~!@#$%^&*()+-={}\|;':",./<>? """
     template = ''.join('[%s] [check]' % char for char in bad_chars)
     result = ''.join('[%s] ..' % char for char in bad_chars)
@@ -69,34 +145,34 @@ class TemplateBasicTags(unittest.TestCase):
     self.assertEqual(result, self.tmpl(template).Parse(**replaces))
 
   def testUnreplacedTag(self):
-    """Template tags for which there is no replacement still exist in output"""
+    """[BasicTag] Template tags without replacement are returned verbatim"""
     template = 'Template with an [undefined] tag.'
     self.assertEqual(template, self.tmpl(template).Parse())
 
   def testBracketsInsideTag(self):
-    """The last opening bracket and first closing bracket are the delimiters"""
-    template = 'Template tags may not contain [[spam] [eggs]].'
+    """[BasicTag] Innermost bracket pair are the tag's delimiters"""
+    template = 'Template tags may not contain [[spam][eggs]].'
     result = 'Template tags may not contain [opening or closing brackets].'
     self.assertEqual(result, self.tmpl(template).Parse(
-        **{'[spam': 'EPIC', 'eggs]': 'FAIL',
-           'spam': 'opening or', 'eggs': 'closing brackets'}))
+        **{'[spam': 'EPIC', 'eggs]': 'FAIL', 'spam][eggs': 'EPIC FAIL',
+           'spam': 'opening or ', 'eggs': 'closing brackets'}))
 
 
-class TemplateIndexedTags(unittest.TestCase):
+class TemplateTagIndexed(unittest.TestCase):
   """Tests the handling of complex tags (those with attributes/keys/indexes)."""
   def setUp(self):
     """Sets up a parser instance, as it never changes."""
     self.tmpl = templateparser.Template
 
   def testTemplateMappingKey(self):
-    """Template tags can address mappings properly"""
+    """[IndexedTag] Template tags can address mappings properly"""
     template = 'This uses a [dictionary:key].'
     result = 'This uses a spoon.'
     self.assertEqual(
         result, self.tmpl(template).Parse(dictionary={'key': 'spoon'}))
 
   def testTemplateIndexing(self):
-    """Template tags can access indexed iterables"""
+    """[IndexedTag] Template tags can access indexed iterables"""
     template = 'Template that grabs the [obj:2] key from the given tuple/list.'
     result = 'Template that grabs the third key from the given tuple/list.'
     numbers = 'first', 'second', 'third'
@@ -105,7 +181,7 @@ class TemplateIndexedTags(unittest.TestCase):
     self.assertEqual(result, self.tmpl(template).Parse(obj=numbers))
 
   def testTemplateAttributes(self):
-    """Template tags will do attribute lookups, but only if 'by key' fails"""
+    """[IndexedTag] Template tags will do attribute lookups after key-lookups"""
     class Mapping(dict):
       """A subclass of a dictionary, so we can define attributes on it."""
       NAME = 'attribute'
@@ -120,7 +196,7 @@ class TemplateIndexedTags(unittest.TestCase):
     self.assertEqual(lookup_dict, self.tmpl(template).Parse(tag=mapp))
 
   def testTemplateMissingIndexes(self):
-    """Complex tags with missing indexes (:index) will NOT be replaced"""
+    """[IndexedTag] Tags with bad indexes will be returned verbatim"""
     class Object(object):
       """A simple object to store an attribute on."""
       NAME = 'Freeman'
@@ -131,19 +207,11 @@ class TemplateIndexedTags(unittest.TestCase):
         titles=['Mr'], names=Object(), date={}))
 
   def testTemplateMultipleIndexing(self):
-    """Template tags can contain nested indexes"""
+    """[IndexedTag] Template tags can contain multiple nested indexes"""
     template = 'Welcome to the [foo:bar:zoink].'
     result = 'Welcome to the World.'
     self.assertEqual(result, self.tmpl(template).Parse(
         foo={'bar': {'zoink': 'World'}}))
-
-  def testPerformance(self):
-    """Basic performance test for 2 template replacements"""
-    for _template in range(100):
-      template = 'This [obj:foo] is just a quick [bar]'
-      tmpl = self.tmpl(template)
-      for _parse in xrange(100):
-        tmpl.Parse(obj={'foo':'text'}, bar='hack')
 
 class TemplateTagFunctions(unittest.TestCase):
   """Tests the functions that are performed on replaced tags."""
@@ -151,15 +219,15 @@ class TemplateTagFunctions(unittest.TestCase):
     """Sets up a parser instance, as it never changes."""
     self.parser = templateparser.Parser()
 
-  def testPipedFunctionUse(self):
-    """Piped functions do not break the parser"""
+  def testBasicFunction(self):
+    """[TagFunctions] Raw function does not affect output"""
     template = 'This function does [none|raw].'
     result = 'This function does "nothing".'
     self.assertEqual(result, self.parser.ParseString(
         template, none='"nothing"'))
 
-  def testDefaultHtmlEscapeFunction(self):
-    """The default function escapes HTML entities, and works properly"""
+  def testDefaultHtmlSafe(self):
+    """[TagFunctions] The default function escapes HTML entities"""
     default = 'This function does [none].'
     escaped = 'This function does [none|html].'
     result = 'This function does &quot;nothing&quot;.'
@@ -167,7 +235,7 @@ class TemplateTagFunctions(unittest.TestCase):
     self.assertEqual(result, self.parser.ParseString(escaped, none='"nothing"'))
 
   def testNoDefaultForSafeString(self):
-    """SafeString objects are not fed through the default templating function"""
+    """[TagFunctions] The default function does not act upon SafeString parts"""
     first_template = 'Hello doctor [name]'
     second_template = '<assistant> [quote].'
     result = '<assistant> Hello doctor &quot;Who&quot;.'
@@ -176,14 +244,14 @@ class TemplateTagFunctions(unittest.TestCase):
     self.assertEqual(result, result_second)
 
   def testCustomFunction(self):
-    """Custom functions added to the parser work as expected"""
+    """[TagFunctions] Custom functions can be added to the Parser"""
     self.parser.RegisterFunction('twice', lambda x: x + ' ' + x)
     template = 'The following will be stated [again|twice].'
     result = 'The following will be stated twice twice.'
     self.assertEqual(result, self.parser.ParseString(template, again='twice'))
 
-  def testMultipleFunctions(self):
-    """Multiple functions can be piped after one another"""
+  def testFunctionChaining(self):
+    """[TagFunctions] Multiple functions can be chained after one another"""
     self.parser.RegisterFunction('len', len)
     self.parser.RegisterFunction('count', lambda x: '%s characters' % x)
     template = 'A replacement processed by two functions: [spam|len|count].'
@@ -191,18 +259,18 @@ class TemplateTagFunctions(unittest.TestCase):
     self.assertEqual(result, self.parser.ParseString(template, spam='ham&eggs'))
 
   def testFunctionSeparation(self):
-    """Template functions are only called for fragments that require them"""
+    """[TagFunctions] Tag functions are only called when requested by tags"""
     fragments_received = []
     def CountAndReturn(fragment):
       """Returns the given fragment after adding it to a counter list."""
       fragments_received.append(fragment)
       return fragment
 
-    self.parser.RegisterFunction('x', CountAndReturn)
-    template = 'X only has [num|x] call, else it\'s [expletive] [noun|raw].'
-    result = 'X only has one call, else it\'s horribly broken.'
+    self.parser.RegisterFunction('count', CountAndReturn)
+    template = 'Count only has [num|count] call, or it is [noun|raw].'
+    result = 'Count only has one call, or it is broken.'
     self.assertEqual(result, self.parser.ParseString(
-        template, num='one', expletive='horribly', noun='broken'))
+        template, num='one', noun='broken'))
     self.assertEqual(1, len(fragments_received))
 
 
@@ -212,24 +280,15 @@ class TemplateUnicodeSupport(unittest.TestCase):
     """Sets up a parser instance, as it never changes."""
     self.parser = templateparser.Parser()
 
-  def testUnicodeInput(self):
-    """TemplateParser can handle unicode objects on input, converts to utf8"""
+  def testUnicodeReplacements(self):
+    """[Unicode] Unicode in tag replacements is converted to utf8"""
     template = 'Underdark Web framework, also known as [name].'
     result = u'Underdark Web framework, also known as \xb5Web.'.encode('utf8')
     name = u'\xb5Web'
     self.assertEqual(result, self.parser.ParseString(template, name=name))
 
-  def testCreoleTemplateParsing(self):
-    """The Creole module's return of <unicode> doesn't break the parser"""
-    from underdark.libs import creole
-    self.parser.RegisterFunction('creole', creole.CreoleToHtml)
-    template = 'Creole [expression|creole]!'
-    result = 'Creole <p><strong>rocks</strong> \xc2\xb5Web</p>\n!'
-    self.assertEqual(result, self.parser.ParseString(
-        template, expression=u'**rocks** \xb5Web'))
-
-  def testTemplateFunctionReturnUnicode(self):
-    """Template functions may return unicode objects, they are later encoded"""
+  def testUnicodeTagFunction(self):
+    """[Unicode] Template functions returning unicode are converted to utf8"""
     function_result = u'No more \N{BLACK HEART SUIT}'
     def StaticReturn(_fragment):
       """Returns a static string, for any input fragment."""
@@ -239,6 +298,11 @@ class TemplateUnicodeSupport(unittest.TestCase):
     template = '[love|nolove]'
     result = function_result.encode('utf8')
     self.assertEqual(result, self.parser.ParseString(template, love='love'))
+
+  def testUnicodeTemplate(self):
+    """[Unicode] Templates may contain utf8"""
+    template = u'We \u2665 \xb5Web!'.encode('utf8')
+    self.assertEqual(template, self.parser.ParseString(template))
 
 
 class TemplateControlFunctions(unittest.TestCase):
@@ -270,16 +334,15 @@ class TemplateControlFunctions(unittest.TestCase):
 
   def testLoopCount(self):
     """{{ for }} Parser will loop once for each item in the for loop"""
-    template = '{{ for num in [range] }}x{{ endfor }}'
+    template = '{{ for num in [values] }}x{{ endfor }}'
     result = 'xxxxx'
-    self.assertEqual(result, self.parser.ParseString(template, range=range(5)))
+    self.assertEqual(result, self.parser.ParseString(template, values=range(5)))
 
   def testLoopReplaceBasic(self):
     """{{ for }} The loop variable is available via tagname"""
-    template = '{{ for var in [numbers] }}number [var], {{ endfor }}'
-    result = 'number 0, number 1, number 2, number 3, number 4, '
-    self.assertEqual(result, self.parser.ParseString(
-        template, numbers=range(5)))
+    template = '{{ for num in [values] }}[num], {{ endfor }}'
+    result = '0, 1, 2, 3, 4, '
+    self.assertEqual(result, self.parser.ParseString(template, values=range(5)))
 
   def testLoopReplaceScope(self):
     """{{ for }} The loop variable overwrites similar names from outer scope"""
@@ -294,6 +357,32 @@ class TemplateControlFunctions(unittest.TestCase):
     result = 'xxxxx'
     self.assertEqual(result, self.parser.ParseString(
       template, numbers=[range(10), range(5), range(10)]))
+
+  def testLoopVariableIndex(self):
+    """{{ for }} Loops variable tags support indexing and functions"""
+    template = '{{ for bundle in [bundles]}}[bundle:1:name|upper], {{ endfor }}'
+    bundles = [('1', {'name': 'Spam'}), ('2', {'name': 'Eggs'})]
+    result = 'SPAM, EGGS, '
+    self.parser.RegisterFunction('upper', str.upper)
+    self.assertEqual(result, self.parser.ParseString(template, bundles=bundles))
+
+  def testLoopWithInline(self):
+    """{{ for }} Loops can contain an {{ inline }} section"""
+    inline = '<li>Hello [name]</li>'
+    self.parser['name'] = self.tmpl(inline)
+    names = 'John', 'Eric'
+    template = '{{ for name in [names] }}{{ inline name }}{{ endfor }}'
+    result = '<li>Hello John</li><li>Hello Eric</li>'
+    self.assertEqual(result, self.parser.ParseString(template, names=names))
+
+  def testLoopWithInlineLoop(self):
+    """{{ for }} Loops can contain nested {{ for }} loops"""
+    inline = '{{ for char in [name] }}[char].{{ endfor }}'
+    self.parser['name'] = self.tmpl(inline)
+    names = 'John', 'Eric'
+    template = '{{ for name in [names] }}<li>{{ inline name }}</li>{{ endfor }}'
+    result = '<li>J.o.h.n.</li><li>E.r.i.c.</li>'
+    self.assertEqual(result, self.parser.ParseString(template, names=names))
 
 if __name__ == '__main__':
   unittest.main(testRunner=unittest.TextTestRunner(verbosity=2))
