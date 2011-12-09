@@ -16,13 +16,6 @@ import os
 import re
 import urllib
 
-# Tags are delimited by square brackets, and must contain only the following:
-# - Alphanumeric characters (a-zA-Z0-9)
-# - underscores, pipes or colons (_|:)
-# Whitespace or other illegal characters trigger literal processing of brackets.
-TEMPLATE_FUNCTION = re.compile(r'\{\{\s*(.*?)\s*\}\}')
-TEMPLATE_TAG = re.compile(r'\[([\w:|]+)\]')
-
 
 class Error(Exception):
   """Superclass used for inheritance and external exception handling."""
@@ -41,24 +34,16 @@ class TemplateReadError(Error, IOError):
 
 
 class Parser(dict):
-  """Template parser \o/
-
-  Methods:
-    __init__: Initializes the template parser.
-    Parse: Parses a template by replacing tags with their values.
-
-  Members:
-    path:      str - Path to the templates, absolute or relative.
-    templates: dict - Names of the templates with their template data.
-  """
   def __init__(self, path='.', templates=()):
     """Initializes the template parser.
 
     This sets up the template directory and preloads templates if required.
 
     Arguments:
-      path:      str - Template directory path.
-      templates: list of str - Names of templates to preload. Default None.
+      % path: str ~~ '.'
+        Search path for loading templates using AddTemplate().
+      % templates: iter of str ~~ None
+        Names of templates to preload.
     """
     super(Parser, self).__init__()
     self.template_dir = path
@@ -76,11 +61,11 @@ class Parser(dict):
       @ template: str
         Template name, or the relative path to find it on.
 
-    Returns:
-      Template: A template object, created from a previously loaded file.
-
     Raises:
       TemplateReadError: Template name doesn't exist and cannot be loaded.
+
+    Returns:
+      Template: A template object, created from a previously loaded file.
     """
     if template not in self:
       self.AddTemplate(template)
@@ -106,7 +91,7 @@ class Parser(dict):
         Dictionary of replacement objects. Tags are looked up in here.
 
     Returns:
-      str - The template with relevant tags replaced by the replacement dict.
+      str: The template with relevant tags replaced by the replacement dict.
     """
     return self[template].Parse(**replacements)
 
@@ -122,7 +107,7 @@ class Parser(dict):
 
 
     Returns:
-      str, template with replaced tags.
+      str: template with replaced tags.
     """
     return Template(template, parser=self).Parse(**replacements)
 
@@ -145,6 +130,13 @@ class SafeString(str):
 
 
 class Template(list):
+  # Tags are delimited by square brackets, and must contain only the following:
+  # - Alphanumeric characters (a-zA-Z0-9)
+  # - underscores, pipes or colons (_|:)
+  # Whitespace or other illegal characters inside tags will make them literals.
+  FUNCTION = re.compile(r'\{\{\s*(.*?)\s*\}\}')
+  TAG = re.compile(r'\[([\w:|]+)\]')
+
   def __init__(self, raw_template, parser=None):
     super(Template, self).__init__()
     self.parser = parser
@@ -167,7 +159,7 @@ class Template(list):
 
   def AddString(self, raw_template):
     scope_depth = len(self.scopes)
-    nodes = TEMPLATE_FUNCTION.split(raw_template)
+    nodes = self.FUNCTION.split(raw_template)
     for index, node in enumerate(nodes):
       if index % 2:
         self._ExtendFunction(node)
@@ -206,7 +198,7 @@ class Template(list):
       raise TemplateSyntaxError('Unexpected command %r' % name)
 
   def _ExtendText(self, node):
-    nodes = TEMPLATE_TAG.split(node)
+    nodes = self.TAG.split(node)
     for index, node in enumerate(nodes):
       if index % 2:
         self._AddPart(TemplateTag.FromString(node))
@@ -241,6 +233,9 @@ class TemplateLoop(list):
 
 
 class TemplateTag(object):
+  INDEX_PREFIX = ':'
+  FUNCT_PREFIX = '|'
+
   def __init__(self, name, indices=(), functions=()):
     self.name = name
     self.indices = indices
@@ -250,28 +245,30 @@ class TemplateTag(object):
     return '%s(%r)' % (type(self).__name__, str(self))
 
   def __str__(self):
-    return '[%s%s%s]' % (self.name,
-                         ''.join(':%s' % index for index in self.indices),
-                         ''.join('|%s' % func for func in self.functions))
+    return '[%s%s%s]' % (
+        self.name,
+        ''.join(self.INDEX_PREFIX + index for index in self.indices),
+        ''.join(self.FUNCT_PREFIX + func for func in self.functions))
 
   @classmethod
   def FromString(cls, tag):
-    tag_and_funcs = tag.strip('[]').split('|')
-    name_and_indices = tag_and_funcs[0].split(':')
+    tag_and_funcs = tag.strip('[]').split(cls.FUNCT_PREFIX)
+    name_and_indices = tag_and_funcs[0].split(cls.INDEX_PREFIX)
     return cls(name_and_indices[0], name_and_indices[1:], tag_and_funcs[1:])
 
   def Get(self, **kwds):
     try:
-      return kwds[self.name]
+      value = kwds[self.name]
+      for index in self.indices:
+        value = self._GetIndex(value, index)
+      return value
     except KeyError:
       raise TemplateKeyError('No replacement with name %r' % self.name)
 
   def Parse(self, **kwds):
     try:
-      value = kwds[self.name]
-      for index in self.indices:
-        value = self._GetIndex(value, index)
-    except (AttributeError, LookupError):
+      value = self.Get(**kwds)
+    except TemplateKeyError:
       # On any failure to get the given index, return the unmodified tag.
       return str(self)
     # Process functions, or apply default if value is not SafeString
@@ -292,31 +289,33 @@ class TemplateTag(object):
 
     Arguments:
       @ haystack: obj
-        The replacement object, iterable, mapping or any kind of object.
+        The searched object; iterable, mapping or any kind of object.
       @ needle: str
-        The index, key or attribute name to find on the replacement.
+        The index, key or attribute name to find on the haystack.
 
     Raises:
-      IndexError: the int()'ed `index` does not exist on the `replacement`.
-      AttributeError: resulting error if the `index` does not exist in any form.
+      TemplateKeyError: One or more of the given needles don't exist.
 
     Returns:
-      str, the string contained on the `index` of the replacement.
+      obj: the object existing on `needle` in `haystack`.
       """
-    if needle.isdigit():
-      try:
-        # `needle` is a number so either an index, or a numeric dict-key
-        return haystack[int(needle)]
-      except KeyError:
-        # `haystack` is a dictionary, or a numeric key is illegal
-        return haystack[needle]
     try:
-      # `needle` is a string, so either a dict-key, or an attribute name.
-      return haystack[needle]
-    except (KeyError, TypeError):
-      # KeyError, `needle` is not a key, but may still be an attribute.
-      # TypeError: `haystack` is no dict, but may have attributes nonetheless.
-      return getattr(haystack, needle)
+      if needle.isdigit():
+        try:
+          # `needle` is a number; likely an index or a numeric dict-key.
+          return haystack[int(needle)]
+        except KeyError:
+          # `haystack` should be a dict; numeric attributes are invalid syntax.
+          return haystack[needle]
+      try:
+        # `needle` is a string; either a dict-key, or an attribute name.
+        return haystack[needle]
+      except (KeyError, TypeError):
+        # KeyError, `haystack` has no key `needle` but may have matching attr.
+        # TypeError: `haystack` is no mapping but may have a matching attr.
+        return getattr(haystack, needle)
+    except (AttributeError, LookupError):
+      raise TemplateKeyError('Item has no index, key or attribute %r.' % needle)
 
 
 class TemplateText(object):
