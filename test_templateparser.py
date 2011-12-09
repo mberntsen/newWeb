@@ -1,7 +1,7 @@
 #!/usr/bin/python2.5
 """Tests for the templateparser module."""
 __author__ = 'Elmer de Looff <elmer@underdark.nl>'
-__version__ = '1.0'
+__version__ = '1.1'
 
 # Too many public methods
 # pylint: disable-msg=R0904
