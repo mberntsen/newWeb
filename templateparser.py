@@ -89,7 +89,7 @@ class Parser(dict):
   def AddTemplate(self, template):
     try:
       template_path = os.path.join(self.template_dir, template)
-      self[template] = Template.FromFile(self, template_path)
+      self[template] = Template.FromFile(template_path, parser=self)
     except IOError:
       raise TemplateReadError('Could not load template %r' % template_path)
 
@@ -124,7 +124,7 @@ class Parser(dict):
     Returns:
       str, template with replaced tags.
     """
-    return Template(self, template).Parse(**replacements)
+    return Template(template, parser=self).Parse(**replacements)
 
   @staticmethod
   def RegisterFunction(name, function):
@@ -145,7 +145,7 @@ class SafeString(str):
 
 
 class Template(list):
-  def __init__(self, parser, raw_template):
+  def __init__(self, raw_template, parser=None):
     super(Template, self).__init__()
     self.parser = parser
     self.scopes = [self]
@@ -158,10 +158,10 @@ class Template(list):
     return ''.join(map(str, self))
 
   @classmethod
-  def FromFile(cls, parser, template_path):
+  def FromFile(cls, template_path, parser=None):
     try:
       with file(template_path) as template:
-        return cls(parser, template.read())
+        return cls(template.read(), parser=parser)
     except IOError:
       raise TemplateReadError('Cannot open: %r' % template_path)
 
