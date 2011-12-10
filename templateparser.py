@@ -162,12 +162,9 @@ class SafeString(str):
 
 class Template(list):
   """Contained for template parts, allowing for rich content construction."""
-  # Tags are delimited by square brackets, and must contain only the following:
-  # - Alphanumeric characters (a-zA-Z0-9)
-  # - underscores, pipes or colons (_|:)
-  # Whitespace or other illegal characters inside tags will make them literals.
   FUNCTION = re.compile(r'\{\{\s*(.*?)\s*\}\}')
-  TAG = re.compile(r'\[([\w:|]+)\]')
+  # For a full tag syntax exlanation, refer to the TAG regex in TemplateTag.
+  TAG = re.compile('(\[\w+(?::[\w:]+)?(?:\|[\w|]+)?\])')
 
   def __init__(self, raw_template, parser=None):
     """Initializes a Template
@@ -353,9 +350,15 @@ class TemplateTag(object):
   Their final value is determined during parsing. For more explanation on this,
   refer to the documentation for Parse().
   """
-  INDEX_PREFIX = ':'
-  FUNCT_PREFIX = '|'
-  TAG_DELIMITERS = '[]'
+  PFX_INDEX = ':'
+  PFX_FUNCT = '|'
+  TAG = re.compile(r"""
+      \[               # Tags start with a opening square bracket.
+      (\w+?)           # Tagname of at least 1 alphanum (incl underscores).
+      (?:\:([\w:]+))?  # Zero or more indices (alphanum), prefixed by a colon.
+      (?:\|([\w|]+))?  # Zero or more functions (alphanum), prefixed by a pipe.
+      \]               # Tags end with a closing square bracket.
+      """, re.VERBOSE)
 
   def __init__(self, name, indices=(), functions=()):
     """Initializes a TemplateTag instant.
@@ -378,8 +381,8 @@ class TemplateTag(object):
   def __str__(self):
     return '[%s%s%s]' % (
         self.name,
-        ''.join(self.INDEX_PREFIX + index for index in self.indices),
-        ''.join(self.FUNCT_PREFIX + func for func in self.functions))
+        ''.join(self.PFX_INDEX + index for index in self.indices),
+        ''.join(self.PFX_FUNCT + func for func in self.functions))
 
   @classmethod
   def FromString(cls, tag):
@@ -392,9 +395,10 @@ class TemplateTag(object):
       * In addition to the characters stated above, tags may contain only
         alphanumeric values, underscores and dashes. Spaces are _not_ allowed.
     """
-    tag_and_funcs = tag.strip(cls.TAG_DELIMITERS).split(cls.FUNCT_PREFIX)
-    name_and_indices = tag_and_funcs[0].split(cls.INDEX_PREFIX)
-    return cls(name_and_indices[0], name_and_indices[1:], tag_and_funcs[1:])
+    name, indices, functions = cls.TAG.match(tag).groups()
+    indices = indices.split(cls.PFX_INDEX) if indices else ()
+    functions = functions.split(cls.PFX_FUNCT) if functions else ()
+    return cls(name, indices, functions)
 
   def GetValue(self, **kwds):
     """Returns the value for the tag, after reducing indices.
@@ -420,7 +424,7 @@ class TemplateTag(object):
     each index being that of the next step. `[tag:0:0]` with a replacements
     dictionary {tag=[['foo']]} will reduce to 'foo' as the value for the tag.
 
-    After reducing indexes, functiones are applied. As before, functions are
+    After reducing indexes, functions are applied. As before, functions are
     applied one after the other. The second function works on the result of the
     first. If no functions are defined for a tag, the default tag function
     will be applied. SafeString objects are exempt from this default function;
