@@ -162,7 +162,7 @@ class SafeString(str):
 
 class Template(list):
   """Contained for template parts, allowing for rich content construction."""
-  FUNCTION = re.compile(r'\{\{\s*(.*?)\s*\}\}')
+  FUNCTION = re.compile(r'\s*\{\{\s*(.*?)\s*\}\}')
   # For a full tag syntax exlanation, refer to the TAG regex in TemplateTag.
   TAG = re.compile('(\[\w+(?::[\w:]+)?(?:\|[\w|]+)?\])')
 

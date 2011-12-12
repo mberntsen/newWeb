@@ -37,6 +37,7 @@ class PageMaker(uweb.DebuggingPageMaker, login.OpenIdMixin):
   def Index(self, _path):
     """Returns the index.html template"""
     logging.LogInfo('Index page requested')
+    self.persistent.Set('conn_id', self.persistent.Get('conn_id', 0) + 1)
 
     if 'uweb_cookie_name' in self.post:
       self.CustomCookie()
@@ -73,6 +74,7 @@ class PageMaker(uweb.DebuggingPageMaker, login.OpenIdMixin):
     nulldata = '<li><em>NULL</em></li>'
     return self.parser.Parse('index.html',
                               method=self.req.env['REQUEST_METHOD'],
+                              conn_id=self.persistent.Get('conn_id'),
                               getvars=''.join(gethtml) or nulldata,
                               postvars=''.join(posthtml) or nulldata,
                               cookies=''.join(cookieshtml) or nulldata,

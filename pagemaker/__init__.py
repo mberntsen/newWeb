@@ -10,6 +10,7 @@ import datetime
 import mimetypes
 import os
 import sys
+import threading
 import warnings
 
 # Custom modules
@@ -21,8 +22,8 @@ RFC_1123_DATE = '%a, %d %b %Y %T GMT'
 
 __all__ = (
     'DatabaseError', 'ReloadModules', 'BasePageMaker', 'PageMakerDebuggerMixin',
-    'PageMakerDatabaseMixin', 'PageMakerMongodbMixin', 'PageMakerMysqlMixin',
-    'PageMakerSqliteMixin', 'PageMakerSessionMixin', 'Response')
+    'PageMakerMongodbMixin', 'PageMakerMysqlMixin', 'PageMakerSqliteMixin',
+    'PageMakerSessionMixin', 'Response')
 
 
 class DatabaseError(Exception):
@@ -31,6 +32,45 @@ class DatabaseError(Exception):
 
 class ReloadModules(Exception):
   """Communicates the handler that it should reload the pageclass"""
+
+
+class CacheStorage(object):
+  """A semi-persistent storage with dict-like interface."""
+  def __init__(self):
+    super(CacheStorage, self).__init__()
+    self._dict = {}
+    self._lock = threading.RLock()
+
+  def __contains__(self, key):
+    return key in self._dict
+
+  def Get(self, key, *default):
+    """Returns the current value for `key`, or the `default` if it doesn't."""
+    with self._lock:
+      if len(default) > 1:
+        raise ValueError('Only one default value accepted')
+      try:
+        return self._dict[key]
+      except KeyError:
+        if default:
+          return default[0]
+        raise
+
+  def Set(self, key, value):
+    """Sets the `key` in the dictionary storage to `value`."""
+    self._dict[key] = value
+
+  def SetDefault(self, key, default=None):
+    """Returns the value for `key` or sets it to `default` if it doesn't exist.
+
+    Arguments:
+      @ key: obj
+        The key to retrieve from the dictionary storage.
+      @ default: obj ~~ None
+        The default new value for the given key if it doesn't exist yet.
+    """
+    with self._lock:
+      return self._dict.setdefault(key, default)
 
 
 class MimeTypeDict(dict):
@@ -106,6 +146,9 @@ class MimeTypeDict(dict):
 
 class BasePageMaker(object):
   """Provides the base pagemaker methods for all the html generators."""
+  # Constant for persistent storage accross requests. This will be accessible
+  # by all threads of the same application (in the same Python process).
+  PERSISTENT = CacheStorage()
   # Base paths for templates and public data. These are used in the PageMaker
   # classmethods that set up paths specific for that pagemaker.
   PUBLIC_DIR = 'www'
@@ -125,12 +168,12 @@ class BasePageMaker(object):
         and other settings. This will be available through `self.options`.
     """
     self.__SetupPaths()
-    self._parser = None
     self.req = req
     self.cookies = req.vars['cookie']
     self.get = req.vars['get']
     self.post = req.vars['post']
     self.options = config or {}
+    self.persistent = self.PERSISTENT
 
   @classmethod
   def __SetupPaths(cls):
@@ -153,10 +196,10 @@ class BasePageMaker(object):
     assigned in there, this path will be used.
     Otherwise, the `TEMPLATE_DIR` will be used to load templates from.
     """
-    if self._parser is None:
-      self._parser = templateparser.Parser(
-          self.options.get('templates', {}).get('path', self.TEMPLATE_DIR))
-    return self._parser
+    if '__parser' not in self.persistent:
+      self.persistent.Set('__parser', templateparser.Parser(
+          self.options.get('templates', {}).get('path', self.TEMPLATE_DIR)))
+    return self.persistent.Get('__parser')
 
   def InternalServerError(self):
     """Returns a plain text notification about an internal server error."""
@@ -294,96 +337,52 @@ class PageMakerDebuggerMixin(object):
                  'traceback': ''.join(stack_trace)}))
 
 
-class PageMakerDatabaseMixin(object):
-  """Sets up the PageMaker for a database Mixin class."""
-  def __init__(self, *args, **kwds):
-    super(PageMakerDatabaseMixin, self).__init__(*args, **kwds)
-    self._connection = None
-    self._cursor = None
-
-
-class PageMakerMongodbMixin(PageMakerDatabaseMixin):
+class PageMakerMongodbMixin(object):
   """Adds MongoDB support to PageMaker."""
   @property
   def connection(self):
     """Returns a MongoDB database connection."""
-    if self._connection is None:
+    if '__mongo' not in self.persistent:
       import pymongo
       try:
-        self._connection = pymongo.connection.Connection(
+        self.persistent.Set('__mongo', pymongo.connection.Connection(
             host=self.options['mongodb'].get('host', 'localhost'),
-            port=self.options['mongodb'].get('port', None))
+            port=self.options['mongodb'].get('port', None)))
       except pymongo.errors.AutoReconnect:
         raise DatabaseError('MongoDb is unavailable')
       except pymongo.errors.ConnectionFailure:
         raise DatabaseError('MongoDb is unavailable')
-    return self._connection
-
-  @property
-  def cursor(self):
-    """Provides a cursor to the database as specified in the options dict"""
-    warnings.warn('Cursor property is disappearing, please use the connection '
-                  'property and its context manager instead',
-                  DeprecationWarning, stacklevel=2)
-    logging.LogWarning('Cursor property is disappearing, please use the '
-                       'connection property and its context manager instead')
-    if self._cursor is None:
-      self._cursor = getattr(
-          self.connection, self.options['mongodb']['database'])
-    return self._cursor
+    return self.persistent.Get('__mongo')
 
 
-class PageMakerMysqlMixin(PageMakerDatabaseMixin):
+class PageMakerMysqlMixin(object):
   """Adds MySQL support to PageMaker."""
   @property
   def connection(self):
     """Returns a MySQL database connection."""
-    if self._connection is None:
+    if '__mysql' not in self.persistent:
       from underdark.libs.sqltalk import mysql
       mysqlopts = self.options['mysql']
-      self._connection = mysql.Connect(
+      self.persistent.Set('__mysql', mysql.Connect(
           host=mysqlopts.get('host', 'localhost'),
           user=mysqlopts.get('user'),
           passwd=mysqlopts.get('password'),
           db=mysqlopts.get('database'),
           charset=mysqlopts.get('charset', 'utf8'),
-          debug=PageMakerDebuggerMixin in self.__class__.__mro__)
-    return self._connection
-
-  @property
-  def cursor(self):
-    """Provides a cursor to the database as specified in the options dict"""
-    warnings.warn('Cursor property is disappearing, please use the connection '
-                  'property and its context manager instead',
-                  DeprecationWarning, stacklevel=2)
-    logging.LogWarning('Cursor property is disappearing, please use the '
-                       'connection property and its context manager instead')
-    if self._cursor is None:
-      self._cursor = self.connection.Cursor()
-    return self._cursor
+          debug=PageMakerDebuggerMixin in self.__class__.__mro__))
+    return self.persistent.Get('__mysql')
 
 
-class PageMakerSqliteMixin(PageMakerDatabaseMixin):
+class PageMakerSqliteMixin(object):
   """Adds SQLite support to PageMaker."""
   @property
   def connection(self):
     """Returns an SQLite database connection."""
-    if self._connection is None:
+    if '__sqlite' not in self.persistent:
       from underdark.libs.sqltalk import sqlite
-      self._connection = sqlite.Connect(self.options['sqlite']['database'])
+      self.persistent.Set('__sqlite', sqlite.Connect(
+          self.options['sqlite']['database']))
     return self._connection
-
-  @property
-  def cursor(self):
-    """Provides a cursor to the database as specified in the options dict"""
-    warnings.warn('Cursor property is disappearing, please use the connection '
-                  'property and its context manager instead',
-                  DeprecationWarning, stacklevel=2)
-    logging.LogWarning('Cursor property is disappearing, please use the '
-                       'connection property and its context manager instead')
-    if self._cursor is None:
-      self._cursor = self.connection.Cursor()
-    return self._cursor
 
 
 class PageMakerSessionMixin(object):
@@ -395,9 +394,9 @@ class PageMakerSessionMixin(object):
   @property
   def userid(self):
     """Provides the ID of the logged in user, if a valid session is available"""
-    if self._userid is None:
-      self._userid = self._GetSessionUserId()
-    return self._userid
+    if '__session_userid' not in self.persistent:
+      self.persistent.Set('__session_userid', self._GetSessionUserId())
+    return self.persistent('__session_userid')
 
   def _GetSessionHandler(self):
     """Creates a session handler used to check sessions"""
