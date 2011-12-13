@@ -41,47 +41,18 @@ class PageMaker(uweb.DebuggingPageMaker, login.OpenIdMixin):
 
     if 'uweb_cookie_name' in self.post:
       self.CustomCookie()
-
-    gethtml = []
-    for getvar in sorted(self.get):
-      gethtml.append(self.parser.Parse(
-          'varlisting.html', var=(getvar, self.get[getvar])))
-
-    posthtml = []
-    for postvar in sorted(self.post):
-      posthtml.append(self.parser.Parse(
-          'varlisting.html', var=(postvar, self.post.getlist(postvar))))
-
-    cookieshtml = []
-    for cookie in sorted(self.cookies):
-      cookieshtml.append(self.parser.Parse(
-          'varlisting.html', var=(cookie, self.cookies[cookie].value)))
-
-    headershtml = []
-    for header in sorted(self.req.headers.items()):
-      headershtml.append(self.parser.Parse('varlisting.html', var=header))
-
-    envhtml = []
-    for environ_item in sorted(self.req.env.items()):
-      envhtml.append(self.parser.Parse('varlisting.html', var=environ_item))
-
-    extenvhtml = []
-    environ_keys = set(self.req.env)
-    for ext_only in sorted(set(self.req.ExtendedEnvironment()) - environ_keys):
-      extenvhtml.append(self.parser.Parse(
-          'varlisting.html', var=(ext_only, self.req.env[ext_only])))
-
-    nulldata = '<li><em>NULL</em></li>'
-    return self.parser.Parse('index.html',
-                              method=self.req.env['REQUEST_METHOD'],
-                              conn_id=self.persistent.Get('conn_id'),
-                              getvars=''.join(gethtml) or nulldata,
-                              postvars=''.join(posthtml) or nulldata,
-                              cookies=''.join(cookieshtml) or nulldata,
-                              headers=''.join(headershtml),
-                              env=''.join(envhtml),
-                              ext_env=''.join(extenvhtml),
-                              **self.CommonBlocks('main'))
+    return self.parser.Parse(
+        'index.html',
+        method=self.req.env['REQUEST_METHOD'],
+        conn_id=self.persistent.Get('conn_id'),
+        getvars=[(var, self.get[var]) for var in sorted(self.get)],
+        postvars=[(var, self.post.getlist(var)) for var in sorted(self.post)],
+        cookies=[(cookie, self.cookies[cookie].value)
+                 for cookie in sorted(self.cookies)],
+        headers=sorted(self.req.headers.items()),
+        env=sorted(self.req.env.items()),
+        ext_env=sorted(self.req.ExtendedEnvironment().items()),
+        **self.CommonBlocks('main'))
 
   @staticmethod
   def MakeFail():
