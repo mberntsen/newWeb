@@ -45,8 +45,9 @@ class StandAloneServer(object):
     router_config = config.get(router_specific_config, {})
     if key in router_config:
       value = router_config[key]
-    router_config = config.get(self.CONFIG_SECTION, {})
-    value = router_config.get(key, default)
+    else:
+      router_config = config.get(self.CONFIG_SECTION, {})
+      value = router_config.get(key, default)
     if isinstance(value, basestring):
       if value.lower() in ('true', 'false'):
         return value.lower() == 'true'
