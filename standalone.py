@@ -16,29 +16,29 @@ class ServerRunningError(Exception):
   """Another process is already using this port."""
 
 
-class StandAloneServer(object):
+class StandAloneServer(BaseHTTPServer.HTTPServer):
   CONFIG_SECTION = 'standalone'
   DEFAULT_HOST = '0.0.0.0'
   DEFAULT_PORT = 8082
 
   def __init__(self, router, router_name, config):
+    self.access_logging = self._ConfigVariable(
+        'access_logging', config, router_name, default=True)
+    self.error_logging = self._ConfigVariable(
+        'error_logging', config, router_name, default=True)
     try:
       host = self._ConfigVariable(
           'host', config, router_name, default=self.DEFAULT_HOST)
       port = self._ConfigVariable(
           'port', config, router_name, default=self.DEFAULT_PORT)
-      self.httpd = BaseHTTPServer.HTTPServer((host, port), StandAloneHandler)
-      self.httpd.router = router
+      BaseHTTPServer.HTTPServer.__init__(self, (host, port), StandAloneHandler)
+      self.router = router
     except BaseHTTPServer.socket.error:
       raise ServerRunningError(
           'Could not bind to %r:%d. Socket already in use?' % (host, port))
     except ValueError:
       raise ValueError('The configured port %r is not a valid number' % port)
-    self.httpd.access_logging = self._ConfigVariable(
-    'access_logging', config, router_name, default=True)
-    self.httpd.error_logging = self._ConfigVariable(
-        'error_logging', config, router_name, default=True)
-
+    print 'Running uWeb on %s:%d' % self.server_address
 
   def _ConfigVariable(self, key, config, name, default=None):
     router_specific_config = '%s:%s' % (self.CONFIG_SECTION, name)
@@ -55,9 +55,18 @@ class StandAloneServer(object):
         return int(value)
     return value
 
-  def Start(self):
-    print 'Running uWeb on %s:%d' % self.httpd.server_address
-    self.httpd.serve_forever()
+  def handle_error(self, _request, client_address):
+    error = sys.exc_info()[1]
+    # Ignore known errors that happen if the client closes the socket.
+    if error.args[0] not in (
+        errno.EPIPE,         # Unix: Broken pipe.
+        errno.ECONNABORTED,  # Unix: Connection aborted.
+        errno.ECONNRESET,    # Unix: Connection reset by peer.
+        10053,               # Winsock: Connection aborted. (WSAECONNABORTED)
+        10054):              # Winsock: Connection reset. (WSAECONNRESET)
+      message = 'Exception happened during processing of request from %s:%s.'
+      sys.stderr.write(message % client_address)
+      logging.LogException(message, *client_address)
 
 
 class StandAloneHandler(BaseHTTPServer.BaseHTTPRequestHandler):
@@ -69,26 +78,15 @@ class StandAloneHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     if not self.raw_requestline:
       self.close_connection = 1
       return
-    if not self.parse_request(): # An error code has been sent, just exit
+    if not self.parse_request():
+      # An error code has been sent, just exit
       return
-    try:
-      self.server.router(self)
-    except BaseHTTPServer.socket.error, error:
-      if error.args[0] in (
-          errno.EPIPE,         # Unix: Broken pipe.
-          errno.ECONNABORTED,  # Unix: Connection aborted.
-          errno.ECONNRESET,    # Unix: Connection reset by peer.
-          10053,               # Winsock: Connection aborted. (WSAECONNABORTED)
-          10054):              # Winsock: Connection reset. (WSAECONNRESET)
-        self.close_connection = 1
-      else:
-        logging.LogException(
-            'A problem occurred answering the request: %s.', type(error))
+    self.server.router(self)
 
   #TODO(Elmer): Move logging to the Request object.
   def log_error(self, logmsg, *args):
+    """Logs an error both to logging module (as ERROR) and to sys.stderr."""
     if self.server.error_logging:
-      """Logs an error both to logging module (as ERROR) and to sys.stderr."""
       logline = logmsg % args
       logging.LogError('Origin [%s] - - %s', self.address_string(), logline)
       sys.stderr.write('%s [%s] - - %s\n' % (

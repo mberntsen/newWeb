@@ -265,7 +265,8 @@ def ServerSetup(apache_logging=True):
 
     def main(router=handler):
       """Sets up a closure that is compatible with the UD app framework."""
-      standalone.StandAloneServer(router, router_name, router_config).Start()
+      server = standalone.StandAloneServer(router, router_name, router_config)
+      server.serve_forever()
 
     app.Service(stack_depth=3, app=main, working_dir=package_dir,
                 package=package_name)
