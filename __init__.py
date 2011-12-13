@@ -75,7 +75,7 @@ def Handler(page_class, routes, config=None):
   Returns:
     RequestHandler: Configured closure that is ready to process requests.
   """
-  router = Router(routes, page_class)
+  router = Router(routes)
   del routes
 
   def RequestHandler(req):
@@ -105,8 +105,8 @@ def Handler(page_class, routes, config=None):
     req = request.Request(req)
     pages = page_class(req, config=config)
     try:
-      handler, args = router(req.env['PATH_INFO'])
-      response = handler(pages, *args)  # pass in `pages` to the unbound method.
+      method, args = router(req.env['PATH_INFO'])
+      response = getattr(pages, method)(*args)
     except ReloadModules, message:
       reload_message = reload(sys.modules[page_class.__module__])
       response = Response(content='%s\n%s' % (message, reload_message))
@@ -129,7 +129,7 @@ def Handler(page_class, routes, config=None):
   return RequestHandler
 
 
-def Router(routes, page_class):
+def Router(routes):
   """Returns the first request handler that matches the request URL.
 
   The `routes` argument is an iterable of 2-tuples, each of which contain a
@@ -141,15 +141,13 @@ def Router(routes, page_class):
   Arguments:
     @ routes: iterable of 2-tuples.
       Each tuple is a pair of `pattern` and `handler`, both are strings.
-    @ page_class: PageMaker
-      The class on which the methods that handle requests exist.
 
   Returns:
     RequestRouter: Configured closure that processes urls.
   """
   req_routes = []
   for pattern, method in routes:
-    req_routes.append((re.compile(pattern + '$'), getattr(page_class, method)))
+    req_routes.append((re.compile(pattern + '$'), method))
 
   def RequestRouter(url):
     """Returns the appropriate handler and arguments for the given `url`.
