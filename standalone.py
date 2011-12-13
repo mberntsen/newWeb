@@ -23,7 +23,10 @@ class StandAloneServer(object):
 
   def __init__(self, router, router_name, config):
     try:
-      host, port = self._ReadPortConfig(router_name, config)
+      host = self._ConfigVariable(
+          'host', config, router_name, default=self.DEFAULT_HOST)
+      port = self._ConfigVariable(
+          'port', config, router_name, default=self.DEFAULT_PORT)
       self.httpd = BaseHTTPServer.HTTPServer((host, port), StandAloneHandler)
       self.httpd.router = router
     except BaseHTTPServer.socket.error:
@@ -31,15 +34,25 @@ class StandAloneServer(object):
           'Could not bind to %r:%d. Socket already in use?' % (host, port))
     except ValueError:
       raise ValueError('The configured port %r is not a valid number' % port)
+    self.httpd.access_logging = self._ConfigVariable(
+    'access_logging', config, router_name, default=True)
+    self.httpd.error_logging = self._ConfigVariable(
+        'error_logging', config, router_name, default=True)
 
-  def _ReadPortConfig(self, router_name, config):
-    router_specific_config = '%s:%s' % (self.CONFIG_SECTION, router_name)
-    if router_specific_config in config:
-      config = config[router_specific_config]
-    else:
-      config = config.get(self.CONFIG_SECTION, {})
-    return (config.get('host', self.DEFAULT_HOST),
-            int(config.get('port', self.DEFAULT_PORT)))
+
+  def _ConfigVariable(self, key, config, name, default=None):
+    router_specific_config = '%s:%s' % (self.CONFIG_SECTION, name)
+    router_config = config.get(router_specific_config, {})
+    if key in router_config:
+      value = router_config[key]
+    router_config = config.get(self.CONFIG_SECTION, {})
+    value = router_config.get(key, default)
+    if isinstance(value, basestring):
+      if value.lower() in ('true', 'false'):
+        return value.lower() == 'true'
+      elif value.isdigit():
+        return int(value)
+    return value
 
   def Start(self):
     print 'Running uWeb on %s:%d' % self.httpd.server_address
@@ -73,13 +86,17 @@ class StandAloneHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
   #TODO(Elmer): Move logging to the Request object.
   def log_error(self, logmsg, *args):
-    """Logs an error both to logging module (as ERROR) and to sys.stderr."""
-    logging.LogError('Origin [%s] - - %s', self.address_string(), logmsg % args)
-    sys.stderr.write('%s [%s] - - %s\n' % (
-        self.log_date_time_string(), self.client_address[0], logmsg % args))
+    if self.server.error_logging:
+      """Logs an error both to logging module (as ERROR) and to sys.stderr."""
+      logline = logmsg % args
+      logging.LogError('Origin [%s] - - %s', self.address_string(), logline)
+      sys.stderr.write('%s [%s] - - %s\n' % (
+          self.log_date_time_string(), self.client_address[0], logline))
 
   def log_message(self, logmsg, *args):
     """Logs messages both to logging module (as DEBUG) and to sys.stdout."""
-    logging.LogDebug('Origin [%s] - - %s', self.address_string(), logmsg % args)
-    sys.stdout.write('%s [%s] - - %s\n' % (
-        self.log_date_time_string(), self.client_address[0], logmsg % args))
+    if self.server.access_logging:
+      logline = logmsg % args
+      logging.LogDebug('Origin [%s] - - %s', self.address_string(), logline)
+      sys.stdout.write('%s [%s] - - %s\n' % (
+          self.log_date_time_string(), self.client_address[0], logline))
