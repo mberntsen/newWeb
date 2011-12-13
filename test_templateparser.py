@@ -340,14 +340,14 @@ class TemplateControlFunctions(unittest.TestCase):
 
   def testLoopReplaceBasic(self):
     """{{ for }} The loop variable is available via tagname"""
-    template = '{{ for num in [values] }}[num], {{ endfor }}'
-    result = '0, 1, 2, 3, 4, '
+    template = '{{ for num in [values] }}[num],{{ endfor }}'
+    result = '0,1,2,3,4,'
     self.assertEqual(result, self.parser.ParseString(template, values=range(5)))
 
   def testLoopReplaceScope(self):
     """{{ for }} The loop variable overwrites similar names from outer scope"""
-    template = '[num] {{ for num in [numbers] }}[num], {{ endfor }}[num]'
-    result = 'OUTER 0, 1, 2, 3, 4, OUTER'
+    template = '[num], {{ for num in [numbers] }}[num], {{ endfor }}[num]'
+    result = 'OUTER,0,1,2,3,4,OUTER'
     self.assertEqual(result, self.parser.ParseString(
         template, numbers=range(5), num='OUTER'))
 
@@ -362,7 +362,7 @@ class TemplateControlFunctions(unittest.TestCase):
     """{{ for }} Loops variable tags support indexing and functions"""
     template = '{{ for bundle in [bundles]}}[bundle:1:name|upper], {{ endfor }}'
     bundles = [('1', {'name': 'Spam'}), ('2', {'name': 'Eggs'})]
-    result = 'SPAM, EGGS, '
+    result = 'SPAM,EGGS,'
     self.parser.RegisterFunction('upper', str.upper)
     self.assertEqual(result, self.parser.ParseString(template, bundles=bundles))
 
