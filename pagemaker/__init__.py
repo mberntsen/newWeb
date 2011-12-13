@@ -277,11 +277,11 @@ class PageMakerDebuggerMixin(object):
     """
     while stack:
       frame = stack.tb_frame
-      yield self.parser.Parse('stack_frame.xhtml', frame={
+      yield self.debug_parser.Parse('stack_frame.xhtml', frame={
           'file': frame.f_code.co_filename,
           'scope': frame.f_code.co_name,
           'locals': ''.join(
-              self.parser.Parse('var_row.xhtml', var=(name, repr(value)))
+              self.debug_parser.Parse('var_row.xhtml', var=(name, repr(value)))
               for name, value in sorted(frame.f_locals.items())),
           'source': ''.join(
               self._SourceLines(frame.f_code.co_filename, frame.f_lineno))})
@@ -303,30 +303,29 @@ class PageMakerDebuggerMixin(object):
     """
     import linecache
     for line_num in xrange(line_num - context, line_num + context + 1):
-      yield self.parser.Parse('var_row.xhtml', var=(
+      yield self.debug_parser.Parse('var_row.xhtml', var=(
           line_num, linecache.getline(filename, line_num)))
 
   def InternalServerError(self):
     """Returns a HTTP 500 response with detailed failure analysis."""
-    self.parser.template_dir = os.path.abspath(
-        os.path.join(os.path.dirname(__file__), 'error_templates'))
     cookies = [
-        self.parser.Parse('var_row.xhtml', var=(name, self.cookies[name].value))
+        self.debug_parser.Parse(
+            'var_row.xhtml', var=(name, self.cookies[name].value))
         for name in sorted(self.cookies)]
     environ = [
-        self.parser.Parse('var_row.xhtml', var=var)
+        self.debug_parser.Parse('var_row.xhtml', var=var)
         for var in sorted(self.req.ExtendedEnvironment().items())]
     post_data = [
-        self.parser.Parse('var_row.xhtml', var=(var, self.post[var]))
+        self.debug_parser.Parse('var_row.xhtml', var=(var, self.post[var]))
         for var in sorted(self.post)]
     query_args = [
-        self.parser.Parse('var_row.xhtml', var=(var, self.get[var]))
+        self.debug_parser.Parse('var_row.xhtml', var=(var, self.get[var]))
         for var in sorted(self.get)]
     nulldata = '<tr><td colspan="2"><em>NULL</em></td></tr>'
     stack_trace = reversed(list(self._ParseStackFrames(sys.exc_traceback)))
     return Response(
         httpcode=200,
-        content=self.parser.Parse(
+        content=self.debug_parser.Parse(
             'http_500.xhtml',
             cookies=''.join(cookies) or nulldata,
             environ=''.join(environ) or nulldata,
@@ -335,6 +334,14 @@ class PageMakerDebuggerMixin(object):
             exc={'type': sys.exc_type.__name__,
                  'value': sys.exc_value,
                  'traceback': ''.join(stack_trace)}))
+
+  @property
+  def debug_parser(self):
+    if not '__debug_parser' in self.persistent:
+      template_dir = os.path.join(os.path.dirname(__file__), 'error_templates')
+      self.persistent.Set('__debug_parser',
+                          templateparser.Parser(os.path.abspath(template_dir)))
+    return self.persistent.Get('__debug_parser')
 
 
 class PageMakerMongodbMixin(object):
