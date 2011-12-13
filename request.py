@@ -99,7 +99,7 @@ class Request(object):
         When specified, the cookie is only used for http(s) requests, and is not
         accessible through Javascript (DOM).
     """
-    new_cookie = Cookie({key: value})
+    new_cookie = Cookie({key.encode('ascii'): value})
     if 'max_age' in attrs:
       attrs['max-age'] = attrs.pop('max_age')
     new_cookie[key].update(attrs)
