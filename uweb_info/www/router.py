@@ -8,6 +8,7 @@ from underdark.libs.uweb.uweb_info import pages
 __author__ = 'Elmer de Looff <elmer@underdark.nl>'
 __version__ = '0.2'
 
+CONFIG = 'example.conf'
 PACKAGE = 'uweb_info'
 
 # PAGE_CLASS is the constant that defines the class that should handle requests
