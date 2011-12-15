@@ -278,30 +278,49 @@ class Record(dict):
     for child in children:
       yield child_class(self.connection, child)
 
-  def _RecordInsert(self, sql_record):
-    """Inserts the given `sql_record` into the database.
+  def _RecordInsert(self):
+    """Inserts the record's current values in the database as a new record.
 
-    The table used to store this record is gathered from the `self.TableName()`
-    property.
     Upon success, the record's primary key is set to the result's insertid
     """
     with self.connection as cursor:
-      record = cursor.Insert(table=self.TableName(), values=sql_record)
+      record = cursor.Insert(table=self.TableName(), values=self._SqlRecord())
     self.key = record.insertid
 
-  def _RecordUpdate(self, sql_record):
-    """Updates the existing database entry with values from `sql_record`.
+  def _RecordUpdate(self):
+    """Updates the existing database entry with the record's current values.
 
-    The table used to store this record is gathered from the `self.TableName()`
-    property. The condition with which the record is updated is the name and
-    value of the Record's primary key (`self._PRIMARY_KEY` and `self.key` resp.)
+    The constraint with which the record is updated is the name and value of
+    the Record's primary key (`self._PRIMARY_KEY` and `self.key` resp.)
     """
+    sql_record = self._SqlRecord()
     with self.connection as cursor:
       safe_key = self.connection.EscapeValues(self.key)
       update = cursor.Update(table=self.TableName(), values=sql_record,
                     conditions='`%s` = %s' % (self._PRIMARY_KEY, safe_key))
       if not update.affected:
+        #FIXME(Elmer): Fails upon storing a record without changes.
+        # This is because MySQL will see that nothing has changed and returns
+        # '0 rows affected'. What we need to do is update only changed values.
         cursor.Insert(table=self.TableName(), values=sql_record)
+
+  def _SaveForeign(self):
+    """Recursively saves all nested Record instances."""
+    for value in self.itervalues():
+      if isinstance(value, Record):
+        value.Save(save_foreign=True)
+
+  def _SqlRecord(self):
+    """Returns a dictionary of the record's database values
+
+    For any Record object present, its primary key value (`Record.key`) is used.
+    """
+    sql_record = {}
+    for key, value in self.iteritems():
+      if isinstance(value, Record):
+        sql_record[key] = value.key
+      else:
+        sql_record[key] = value
 
   # ############################################################################
   # Public methods for creation, deletion and storing Record objects.
@@ -397,21 +416,10 @@ class Record(dict):
   # argument, cursor, and some delegation to a separate save method which
   # REQUIRES a cursor. (to reduce the copy/paste redundancy of two branches)
   def Save(self, save_foreign=False):
-    """Saves or updated the record, based on `self.TableName()` and `self.key`.
+    """Saves the changes made to the record.
 
-    Firstly, it makes a strictly data containing SQL record. This means that any
-    record class contained by the record is reduced to that record's primary key
-    (by use of the `key` property). If flagged to do so, it is at this point
-    that the foreign record will be recursively `Save()`d.
-
-    Once the clean `sql_record` is obtained, a check is performed to see whether
-    the object should be inserted into the database, or updated there.
-    This is done by checking the value of the record's own primary key.
-
-    If this key is set (is not None), the `sql_record` will be handed off to
-    the `_RecordUpdate()` method, which will update the existing database entry.
-    In the other case, the `sql_record` will be handed off to the
-    `_RecordInsert()` method which will create the database entry.
+    This can mean updating an existing database entry, ot inserting a new one
+    for record that lack a primary key value (`self.key`).
 
     Arguments:
       % save_foreign: bool ~~ False
@@ -420,19 +428,12 @@ class Record(dict):
         saved. N.B. each record is saved using a separate transaction, meaning
         that a failure to save this object will *not* roll back child saves.
     """
-    sql_record = {}
-    for key, value in self.iteritems():
-      if isinstance(value, Record):
-        if save_foreign:
-          value.Save(save_foreign=True)
-        sql_record[key] = value.key
-      else:
-        sql_record[key] = value
-
+    if save_foreign:
+      self._SaveForeign()
     if self.key is not None:
-      self._RecordUpdate(sql_record)
+      self._RecordUpdate()
     else:
-      self._RecordInsert(sql_record)
+      self._RecordInsert()
 
   @classmethod
   def TableName(cls):
@@ -470,7 +471,3 @@ class Record(dict):
   AlreadyExistError = AlreadyExistError
   NotExistError = NotExistError
   PermissionError = PermissionError
-
-
-class VersionedRecord(Record):
-  pass
