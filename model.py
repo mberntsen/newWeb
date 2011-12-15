@@ -303,6 +303,28 @@ class Record(dict):
       if not update.affected:
         cursor.Insert(table=self.TableName(), values=sql_record)
 
+  # ############################################################################
+  # Public methods for creation, deletion and storing Record objects.
+  #
+  @classmethod
+  def Create(cls, connection, record):
+    """Creates a proper record object and stores it to the database.
+
+    After storing it to the database, the live object is returned
+
+    Arguments:
+      @ connection: sqltalk.connection
+        Database connection to use.
+      @ record: mapping
+        The record data to write to the database.
+
+    Returns:
+      Record: the record that was created from the initiation mapping.
+    """
+    record = cls(connection, record)
+    record.Save()
+    return record
+
   @classmethod
   def DeleteKey(cls, connection, pkey_value):
     """Deletes a database record based on the primary key value.
