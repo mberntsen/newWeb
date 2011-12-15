@@ -470,3 +470,7 @@ class Record(dict):
   AlreadyExistError = AlreadyExistError
   NotExistError = NotExistError
   PermissionError = PermissionError
+
+
+class VersionedRecord(Record):
+  pass
