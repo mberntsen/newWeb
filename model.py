@@ -3,7 +3,7 @@
 from __future__ import with_statement
 
 __author__ = 'Elmer de Looff <elmer@underdark.nl>'
-__version__ = '0.10'
+__version__ = '0.12'
 
 # Standard modules
 import sys
@@ -310,6 +310,13 @@ class Record(dict):
       if isinstance(value, Record):
         value.Save(save_foreign=True)
 
+  def _SaveSelf(self):
+    """Saves the record class itself, creating or updating a database record."""
+    if self.key is not None:
+      self._RecordUpdate()
+    else:
+      self._RecordInsert()
+
   def _SqlRecord(self):
     """Returns a dictionary of the record's database values
 
@@ -321,6 +328,7 @@ class Record(dict):
         sql_record[key] = value.key
       else:
         sql_record[key] = value
+    return sql_record
 
   # ############################################################################
   # Public methods for creation, deletion and storing Record objects.
@@ -341,6 +349,7 @@ class Record(dict):
       Record: the record that was created from the initiation mapping.
     """
     record = cls(connection, record)
+    print record
     record.Save()
     return record
 
@@ -371,7 +380,7 @@ class Record(dict):
 
     Raises:
       NotExistError:
-        There is no Record for that primary key value.
+        There is no Record that matches the given primary key value.
 
     Returns:
       Record: Database record abstraction class.
@@ -382,7 +391,7 @@ class Record(dict):
           table=cls.TableName(),
           conditions='`%s` = %s' % (cls._PRIMARY_KEY, safe_key))
     if not record:
-      raise NotExistError('There is No %r with key %r' % (
+      raise NotExistError('There is no %r for primary key %r' % (
           cls.__name__, pkey_value))
     return cls(connection, record[0])
 
@@ -404,7 +413,7 @@ class Record(dict):
         Database connection to use.
 
     Yields:
-      Repository: repository abstraction class.
+      Record: Database record abstraction class.
     """
     with connection as cursor:
       repositories = cursor.Select(table=cls.TableName())
@@ -430,10 +439,7 @@ class Record(dict):
     """
     if save_foreign:
       self._SaveForeign()
-    if self.key is not None:
-      self._RecordUpdate()
-    else:
-      self._RecordInsert()
+    self._SaveSelf()
 
   @classmethod
   def TableName(cls):
@@ -471,3 +477,136 @@ class Record(dict):
   AlreadyExistError = AlreadyExistError
   NotExistError = NotExistError
   PermissionError = PermissionError
+
+
+class VersionedRecord(Record):
+  """Basic class for database table/record abstraction."""
+  _RECORD_KEY = None
+
+  # ############################################################################
+  # Public methods for creation, deletion and storing Record objects.
+  #
+  @classmethod
+  def FromIdentifier(cls, connection, identifier):
+    """Returns the newest Record object that matches the given identifier.
+
+    N.B. Newest is defined as 'last in lexicographical sort'.
+
+    Arguments:
+      @ connection: sqltalk.connection
+        Database connection to use.
+      @ identifier: obj
+        The value of the record key field
+
+    Raises:
+      NotExistError:
+        There is no Record that matches the given identifier.
+
+    Returns:
+      Record: The newest record for the given identifier.
+    """
+    safe_id = connection.EscapeValues(identifier)
+    with connection as cursor:
+      record = cursor.Select(
+          table=cls.TableName(), limit=1, order=[(cls._RECORD_KEY, True)],
+          conditions='`%s`=%s' % (cls._RECORD_KEY, safe_id))
+
+    if not record:
+      raise NotExistError('There is no %r for identifier %r' % (
+          cls.__name__, identifier))
+    return cls(connection, record[0])
+
+  @classmethod
+  def List(cls, connection):
+    """Yields the latest Record for each versioned entry in the table.
+
+    Arguments:
+      @ connection: sqltalk.connection
+        Database connection to use.
+
+    Yields:
+      Record: The Record with the newest version for each versioned entry.
+    """
+    with connection as cursor:
+      records = cursor.Execute("""
+          SELECT `%(table)s`.*
+          FROM `%(table)s`
+          JOIN (SELECT MAX(`%(primary)s`) AS `max`
+                FROM `%(table)s`
+                GROUP BY `%(record_key)s`) AS `versions`
+              ON (`%(table)s`.`%(primary)s` = `versions`.`max`)
+          """ % {'primary': cls._PRIMARY_KEY,
+                 'record_key': cls._RECORD_KEY,
+                 'table': cls._TABLE})
+    for record in records:
+      yield cls(connection, record)
+
+  @classmethod
+  def ListVersions(cls, connection, identifier):
+    """Yields all versions for a given record identifier.
+
+    Arguments:
+      @ connection: sqltalk.connection
+        Database connection to use.
+
+    Yields:
+      Record: One for each stored version for the identifier.
+    """
+    safe_id = connection.EscapeValues(identifier)
+    with connection as cursor:
+      records = cursor.Select(table=cls.TableName(),
+                              conditions='`%s`=%s' % (cls._RECORD_KEY, safe_id))
+    for record in records:
+      yield cls(connection, record)
+
+  # ############################################################################
+  # Private methods to control VersionedRecord behaviour
+  #
+  @classmethod
+  def _NextRecordKey(cls, connection):
+    """Returns the next record key to use, the previous (or zero) plus one."""
+    return (cls._MaxRecordKey(connection) or 0) + 1
+
+  @classmethod
+  def _MaxRecordKey(cls, connection):
+    """Returns the currently largest record key value."""
+    with connection as cursor:
+      last_key = cursor.Select(table=cls.TableName(), fields=cls._RECORD_KEY,
+                               order=[(cls._RECORD_KEY, True)], limit=1)
+    if last_key:
+      return last_key[0][0]
+
+  def _SaveSelf(self):
+    """Saves the versioned record to the database.
+
+    If the appropriate record key has not been set, the next one will be gotten
+    from the `_NextRecordKey` method and added to the record.
+
+    N.B. Even when no data was changed, calling Save() will add a new record
+    to the database. This is because no check is done whether the record has
+    actually changed.
+    """
+    if self.record_key is None:
+      self.record_key = self._NextRecordKey(self.connection)
+    self.key = None
+    self._RecordInsert()
+
+  # Pylint falsely believes this property is overwritten by its setter later on.
+  # pylint: disable=E0202
+  @property
+  def record_key(self):
+    """Returns the value of the version field of the record.
+
+    This is used for the Save/Update methods, where foreign relations should be
+    stored by their primary key.
+    """
+    return self.get(self._RECORD_KEY)
+  # pylint: enable=E0202
+
+  # Pylint doesn't understand property setters at all.
+  # pylint: disable=E0102, E0202, E1101
+  @record_key.setter
+  def record_key(self, value):
+    """Sets the value of the primary key."""
+    self[self._RECORD_KEY] = value
+  # pylint: enable=E0102, E0202, E1101
