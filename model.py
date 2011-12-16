@@ -46,7 +46,7 @@ class Record(dict):
     self.connection = connection
     if not hasattr(Record, '_SUBTYPES'):
       # Adding classes at runtime is pretty rare, but fails this code.
-      Record._SUBTYPES = dict(RecordSubclasses)
+      Record._SUBTYPES = dict(RecordSubclasses())
 
   def __hash__(self):
     """Returns the hashed value of the key."""
