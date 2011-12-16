@@ -8,9 +8,6 @@ __version__ = '0.12'
 # Standard modules
 import sys
 
-# Record classes have many methods, this is not an actual problem.
-# pylint: disable=R0904
-
 
 class Error(Exception):
   """Superclass used for inheritance and external exception handling."""
@@ -28,6 +25,8 @@ class PermissionError(Error):
   """The entity has insufficient rights to access the resource."""
 
 
+# Record classes have many methods, this is not an actual problem.
+# pylint: disable=R0904
 class Record(dict):
   """Basic class for database table/record abstraction."""
   _PRIMARY_KEY = 'ID'
@@ -45,16 +44,9 @@ class Record(dict):
     """
     super(Record, self).__init__(record)
     self.connection = connection
-    if not hasattr(Record, '._SUBTYPES'):
+    if not hasattr(Record, '_SUBTYPES'):
       # Adding classes at runtime is pretty rare, but fails this code.
-      # Pylint believes Record has no method __subclasses__
-      # pylint: disable=E1101
-      Record._SUBTYPES = dict(
-          (cls.TableName(), cls) for cls in Record.__subclasses__())
-      del Record._SUBTYPES['versionedRecord']
-      Record._SUBTYPES.update(dict(
-          (cls.TableName(), cls) for cls in VersionedRecord.__subclasses__()))
-      # pylint: enable=E1101
+      Record._SUBTYPES = dict(RecordSubclasses)
 
   def __hash__(self):
     """Returns the hashed value of the key."""
@@ -610,3 +602,30 @@ class VersionedRecord(Record):
     """Sets the value of the primary key."""
     self[self._RECORD_KEY] = value
   # pylint: enable=E0102, E0202, E1101
+
+
+def RecordSubclasses():
+  """Yields Record subclasses that have been defined outside this module.
+
+  This is necessary to accurately perform automatic loading of foreign elements.
+  There is one requirement to this, and that's that all subclasses of Record
+  are loaded in memory by the time the first Record is instantiated, because
+  this function will only be called once by default.
+  """
+  def GetSubTypes(cls, seen=None):
+    """Recursively and depth-first retrieve subclasses of a given type."""
+    seen = seen or set()
+    # Pylint mistakenly believes there is no method __subclasses__
+    # pylint: disable=E1101
+    for sub in cls.__subclasses__():
+    # pylint: enable=E1101
+      if sub not in seen:
+        seen.add(sub)
+        yield sub
+        for sub in GetSubTypes(sub, seen):
+          yield sub
+
+  for cls in GetSubTypes(Record):
+    # Do not yield subclasses defined in this module
+    if cls.__module__ != __name__:
+      yield cls.TableName(), cls
