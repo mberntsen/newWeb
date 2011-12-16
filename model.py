@@ -51,6 +51,9 @@ class Record(dict):
       # pylint: disable=E1101
       Record._SUBTYPES = dict(
           (cls.TableName(), cls) for cls in Record.__subclasses__())
+      del Record._SUBTYPES['versionedRecord']
+      Record._SUBTYPES.update(dict(
+          (cls.TableName(), cls) for cls in VersionedRecord.__subclasses__()))
       # pylint: enable=E1101
 
   def __hash__(self):
