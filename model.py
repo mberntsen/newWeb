@@ -278,44 +278,47 @@ class Record(dict):
     for child in children:
       yield child_class(self.connection, child)
 
-  def _RecordInsert(self):
+  def _RecordInsert(self, cursor):
     """Inserts the record's current values in the database as a new record.
 
     Upon success, the record's primary key is set to the result's insertid
     """
-    with self.connection as cursor:
-      record = cursor.Insert(table=self.TableName(), values=self._SqlRecord())
+    record = cursor.Insert(table=self.TableName(), values=self._SqlRecord())
     self.key = record.insertid
 
-  def _RecordUpdate(self):
+  def _RecordUpdate(self, cursor):
     """Updates the existing database entry with the record's current values.
 
     The constraint with which the record is updated is the name and value of
     the Record's primary key (`self._PRIMARY_KEY` and `self.key` resp.)
     """
     sql_record = self._SqlRecord()
-    with self.connection as cursor:
-      safe_key = self.connection.EscapeValues(self.key)
-      update = cursor.Update(table=self.TableName(), values=sql_record,
-                    conditions='`%s` = %s' % (self._PRIMARY_KEY, safe_key))
-      if not update.affected:
-        #FIXME(Elmer): Fails upon storing a record without changes.
-        # This is because MySQL will see that nothing has changed and returns
-        # '0 rows affected'. What we need to do is update only changed values.
-        cursor.Insert(table=self.TableName(), values=sql_record)
+    safe_key = cursor.connection.EscapeValues(self.key)
+    update = cursor.Update(table=self.TableName(), values=sql_record,
+                  conditions='`%s` = %s' % (self._PRIMARY_KEY, safe_key))
+    if not update.affected:
+      #FIXME(Elmer): Fails upon storing a record without changes.
+      # This is because MySQL will see that nothing has changed and returns
+      # '0 rows affected'. What we need to do is update only changed values.
+      cursor.Insert(table=self.TableName(), values=sql_record)
 
-  def _SaveForeign(self):
+  def _SaveForeign(self, cursor):
     """Recursively saves all nested Record instances."""
     for value in self.itervalues():
       if isinstance(value, Record):
-        value.Save(save_foreign=True)
+        # Accessing protected members of a foreign class. These methods are
+        # indeed not to be called lightly, but we know what we're doing :-)
+        # pylint: disable=W0212
+        value._SaveForeign(cursor)
+        value._SaveSelf(cursor)
+        # pylint: enable=W0212
 
-  def _SaveSelf(self):
+  def _SaveSelf(self, cursor):
     """Saves the record class itself, creating or updating a database record."""
     if self.key is not None:
-      self._RecordUpdate()
+      self._RecordUpdate(cursor)
     else:
-      self._RecordInsert()
+      self._RecordInsert(cursor)
 
   def _SqlRecord(self):
     """Returns a dictionary of the record's database values
@@ -323,7 +326,7 @@ class Record(dict):
     For any Record object present, its primary key value (`Record.key`) is used.
     """
     sql_record = {}
-    for key, value in self.iteritems():
+    for key, value in super(Record, self).iteritems():
       if isinstance(value, Record):
         sql_record[key] = value.key
       else:
@@ -349,7 +352,6 @@ class Record(dict):
       Record: the record that was created from the initiation mapping.
     """
     record = cls(connection, record)
-    print record
     record.Save()
     return record
 
@@ -420,10 +422,6 @@ class Record(dict):
     for repository in repositories:
       yield cls(connection, repository)
 
-  #FIXME(Elmer): We want to use a single transaction for Save() (or not save).
-  # all this object's children. Doing so would require a second optional
-  # argument, cursor, and some delegation to a separate save method which
-  # REQUIRES a cursor. (to reduce the copy/paste redundancy of two branches)
   def Save(self, save_foreign=False):
     """Saves the changes made to the record.
 
@@ -437,9 +435,10 @@ class Record(dict):
         saved. N.B. each record is saved using a separate transaction, meaning
         that a failure to save this object will *not* roll back child saves.
     """
-    if save_foreign:
-      self._SaveForeign()
-    self._SaveSelf()
+    with self.connection as cursor:
+      if save_foreign:
+        self._SaveForeign(cursor)
+      self._SaveSelf(cursor)
 
   @classmethod
   def TableName(cls):
@@ -481,7 +480,7 @@ class Record(dict):
 
 class VersionedRecord(Record):
   """Basic class for database table/record abstraction."""
-  _RECORD_KEY = None
+  _RECORD_KEY = 'recordKey'
 
   # ############################################################################
   # Public methods for creation, deletion and storing Record objects.
@@ -537,7 +536,7 @@ class VersionedRecord(Record):
               ON (`%(table)s`.`%(primary)s` = `versions`.`max`)
           """ % {'primary': cls._PRIMARY_KEY,
                  'record_key': cls._RECORD_KEY,
-                 'table': cls._TABLE})
+                 'table': cls.TableName()})
     for record in records:
       yield cls(connection, record)
 
@@ -563,20 +562,19 @@ class VersionedRecord(Record):
   # Private methods to control VersionedRecord behaviour
   #
   @classmethod
-  def _NextRecordKey(cls, connection):
+  def _NextRecordKey(cls, cursor):
     """Returns the next record key to use, the previous (or zero) plus one."""
-    return (cls._MaxRecordKey(connection) or 0) + 1
+    return (cls._MaxRecordKey(cursor) or 0) + 1
 
   @classmethod
-  def _MaxRecordKey(cls, connection):
+  def _MaxRecordKey(cls, cursor):
     """Returns the currently largest record key value."""
-    with connection as cursor:
-      last_key = cursor.Select(table=cls.TableName(), fields=cls._RECORD_KEY,
-                               order=[(cls._RECORD_KEY, True)], limit=1)
+    last_key = cursor.Select(table=cls.TableName(), fields=cls._RECORD_KEY,
+                             order=[(cls._RECORD_KEY, True)], limit=1)
     if last_key:
       return last_key[0][0]
 
-  def _SaveSelf(self):
+  def _SaveSelf(self, cursor):
     """Saves the versioned record to the database.
 
     If the appropriate record key has not been set, the next one will be gotten
@@ -587,9 +585,9 @@ class VersionedRecord(Record):
     actually changed.
     """
     if self.record_key is None:
-      self.record_key = self._NextRecordKey(self.connection)
+      self.record_key = self._NextRecordKey(cursor)
     self.key = None
-    self._RecordInsert()
+    self._RecordInsert(cursor)
 
   # Pylint falsely believes this property is overwritten by its setter later on.
   # pylint: disable=E0202
