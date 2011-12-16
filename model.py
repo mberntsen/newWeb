@@ -3,7 +3,7 @@
 from __future__ import with_statement
 
 __author__ = 'Elmer de Looff <elmer@underdark.nl>'
-__version__ = '0.12'
+__version__ = '0.13'
 
 # Standard modules
 import sys
@@ -299,7 +299,7 @@ class Record(dict):
 
   def _SaveForeign(self, cursor):
     """Recursively saves all nested Record instances."""
-    for value in self.itervalues():
+    for value in super(self, Record).itervalues():
       if isinstance(value, Record):
         # Accessing protected members of a foreign class. These methods are
         # indeed not to be called lightly, but we know what we're doing :-)
