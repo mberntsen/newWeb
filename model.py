@@ -509,7 +509,6 @@ class VersionedRecord(Record):
       record = cursor.Select(
           table=cls.TableName(), limit=1, order=[(cls._PRIMARY_KEY, True)],
           conditions='`%s`=%s' % (cls._RECORD_KEY, safe_id))
-
     if not record:
       raise NotExistError('There is no %r for identifier %r' % (
           cls.__name__, identifier))
