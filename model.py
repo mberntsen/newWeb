@@ -44,6 +44,7 @@ class Record(dict):
     """
     super(Record, self).__init__(record)
     self.connection = connection
+    self._record = self._SqlRecord()
     if not hasattr(Record, '_SUBTYPES'):
       # Adding classes at runtime is pretty rare, but fails this code.
       Record._SUBTYPES = dict(RecordSubclasses())
@@ -278,42 +279,53 @@ class Record(dict):
 
     Upon success, the record's primary key is set to the result's insertid
     """
-    record = cursor.Insert(table=self.TableName(), values=self._SqlRecord())
-    self.key = record.insertid
+    result = cursor.Insert(table=self.TableName(), values=self._SqlRecord())
+    self.key = result.insertid
+    self._record[self._PRIMARY_KEY] = result.insertid
 
-  def _RecordUpdate(self, cursor):
-    """Updates the existing database entry with the record's current values.
-
-    The constraint with which the record is updated is the name and value of
-    the Record's primary key (`self._PRIMARY_KEY` and `self.key` resp.)
-    """
+  def _Changes(self):
+    """Returns the differences of the current state vs the last stored state."""
     sql_record = self._SqlRecord()
-    safe_key = cursor.connection.EscapeValues(self.key)
-    update = cursor.Update(table=self.TableName(), values=sql_record,
-                  conditions='`%s` = %s' % (self._PRIMARY_KEY, safe_key))
-    if not update.affected:
-      #FIXME(Elmer): Fails upon storing a record without changes.
-      # This is because MySQL will see that nothing has changed and returns
-      # '0 rows affected'. What we need to do is update only changed values.
-      cursor.Insert(table=self.TableName(), values=sql_record)
+    for key, value in sql_record.items():
+      if self._record.get(key) == value:
+        del sql_record[key]
+    return sql_record
 
   def _SaveForeign(self, cursor):
     """Recursively saves all nested Record instances."""
     for value in super(Record, self).itervalues():
       if isinstance(value, Record):
-        # Accessing protected members of a foreign class. These methods are
-        # indeed not to be called lightly, but we know what we're doing :-)
+        # Accessing protected members of a foreign class. Also, the only means
+        # of recursively saving the record tree without opening multiple
+        # database transactions (which would lead to exceptions really fast).
         # pylint: disable=W0212
         value._SaveForeign(cursor)
         value._SaveSelf(cursor)
         # pylint: enable=W0212
 
   def _SaveSelf(self, cursor):
-    """Saves the record class itself, creating or updating a database record."""
-    if self.key is not None:
-      self._RecordUpdate(cursor)
+    """Updates the existing database entry with the record's current values.
+
+    The constraint with which the record is updated is the name and value of
+    the Record's primary key (`self._PRIMARY_KEY` and `self.key` resp.)
+    """
+    difference = self._Changes()
+    if not difference:
+      print 'no changes'
+      return
+    try:
+      primary = self.connection.EscapeValues(self._record[self._PRIMARY_KEY])
+    except KeyError:
+      raise Error('Cannot update record without pre-existing primary key.')
+    result = cursor.Update(
+        table=self.TableName(), values=difference,
+        conditions='`%s` = %s' % (self._PRIMARY_KEY, primary))
+    # (Elmer): This can probably be removed, but needs checking before doing so.
+    if not result.affected:
+      raise ValueError(
+          'No affected rows after applying calculated diff: %s' % difference)
     else:
-      self._RecordInsert(cursor)
+      self._record.update(difference)
 
   def _SqlRecord(self):
     """Returns a dictionary of the record's database values
@@ -346,8 +358,13 @@ class Record(dict):
     Returns:
       Record: the record that was created from the initiation mapping.
     """
-    record = cls(connection, record)
-    record.Save()
+    with connection as cursor:
+      record = cls(connection, record)
+      # Accessing protected members of a foreign class. Seemt to be the only way
+      # to do this neatly without copying in the method or duplicating code.
+      # pylint: disable=W0212
+      record._RecordInsert(cursor)
+      # pylint: enable=W0212
     return record
 
   @classmethod
