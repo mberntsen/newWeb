@@ -299,7 +299,7 @@ class Record(dict):
 
   def _SaveForeign(self, cursor):
     """Recursively saves all nested Record instances."""
-    for value in super(self, Record).itervalues():
+    for value in super(Record, self).itervalues():
       if isinstance(value, Record):
         # Accessing protected members of a foreign class. These methods are
         # indeed not to be called lightly, but we know what we're doing :-)
