@@ -156,7 +156,7 @@ class Record(dict):
       elif field == self.TableName():
         return value
       elif field in self._SUBTYPES:
-        value = self._SUBTYPES[field].FromKey(self.connection, value)
+        value = self._SUBTYPES[field].FromPrimary(self.connection, value)
         self[field] = value
     return value
 
@@ -169,7 +169,7 @@ class Record(dict):
 
     If the class is given as string, it will be loaded from the current module.
     It should be a proper subclass of Record, after which the current `value` is
-    used to create a record using `cls.FromKey`.
+    used to create a record using `cls.FromPrimary`.
 
     Arguments:
       @ cls: None / type / str
@@ -200,7 +200,7 @@ class Record(dict):
     if not issubclass(cls, Record):
       raise ValueError('Bad _FOREIGN_RELATIONS map: '
                        'Target %r not a subclass of Record' % cls.__name__)
-    value = cls.FromKey(self.connection, value)
+    value = cls.FromPrimary(self.connection, value)
     self[field] = value
     return value
 
@@ -383,7 +383,7 @@ class Record(dict):
                     conditions='`%s` = %s' % (cls._PRIMARY_KEY, safe_key))
 
   @classmethod
-  def FromKey(cls, connection, pkey_value):
+  def FromPrimary(cls, connection, pkey_value):
     """Returns the Record object that belongs to the given primary key value.
 
     Arguments:
