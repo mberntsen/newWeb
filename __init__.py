@@ -105,6 +105,7 @@ def Handler(page_class, routes, config=None):
     req = request.Request(req)
     pages = page_class(req, config=config)
     try:
+      pages._PostInit()
       method, args = router(req.env['PATH_INFO'])
       response = getattr(pages, method)(*args)
     except ReloadModules, message:

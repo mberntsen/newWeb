@@ -175,6 +175,9 @@ class BasePageMaker(object):
     self.options = config or {}
     self.persistent = self.PERSISTENT
 
+  def _PostInit(self):
+    """Method that gets called for derived classes of BasePageMaker."""
+
   @classmethod
   def __SetupPaths(cls):
     """This sets up the correct paths for the PageMaker subclasses.

@@ -64,7 +64,7 @@ class StandAloneServer(BaseHTTPServer.HTTPServer):
         errno.ECONNRESET,    # Unix: Connection reset by peer.
         10053,               # Winsock: Connection aborted. (WSAECONNABORTED)
         10054):              # Winsock: Connection reset. (WSAECONNRESET)
-      message = 'Exception happened during processing of request from %s:%s.'
+      message = 'Exception happened during processing of request from %s:%s.\n'
       sys.stderr.write(message % client_address)
       logging.LogException(message, *client_address)
 
