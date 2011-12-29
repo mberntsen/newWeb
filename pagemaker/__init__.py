@@ -404,9 +404,9 @@ class PageMakerSessionMixin(object):
   @property
   def userid(self):
     """Provides the ID of the logged in user, if a valid session is available"""
-    if '__session_userid' not in self.persistent:
-      self.persistent.Set('__session_userid', self._GetSessionUserId())
-    return self.persistent('__session_userid')
+    if self._userid is None:
+      self._userid = self._GetSessionUserId()
+    return self._userid
 
   def _GetSessionHandler(self):
     """Creates a session handler used to check sessions"""
