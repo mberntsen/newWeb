@@ -6,6 +6,8 @@ __author__ = 'Elmer de Looff <elmer@underdark.nl>'
 __version__ = '0.13'
 
 # Standard modules
+import datetime
+import simplejson
 import sys
 
 
@@ -250,6 +252,33 @@ class Record(dict):
   # ############################################################################
   # Private methods to be used for development
   #
+  def _Changes(self):
+    """Returns the differences of the current state vs the last stored state."""
+    sql_record = self._SqlRecord()
+    for key, value in sql_record.items():
+      if self._record.get(key) == value:
+        del sql_record[key]
+    return sql_record
+
+  def _DictLike(self, complete=False, recursive=False):
+    """Returns a dictionary representation of the Record."""
+    #XXX(Elmer): This might be better as a function outside the Record.
+    self_dict = {}
+    iteritems = self.iteritems if complete else super(Record, self).iteritems
+    for key, value in iteritems():
+      if isinstance(value, Record):
+        if complete and recursive:
+          # Recursively fetching a complete proper record requires calling this
+          # protected method on the retrieved object
+          # pylint: disable=W0212
+          self_dict[key] = value._DictLike(complete=True, recursive=True)
+          # pylint: enable=W0212
+        else:
+          self_dict[key] = dict(value)
+      else:
+        self_dict[key] = value
+    return self_dict
+
   def _GetChildren(self, child_class, relation_field=None):
     """Returns all `child_class` objects related to this record.
 
@@ -274,6 +303,17 @@ class Record(dict):
     for child in children:
       yield child_class(self.connection, child)
 
+  def _Json(self, complete=False, recursive=False):
+    """Returns a JSON representation of the Record."""
+    #XXX(Elmer): This might be better as a function outside the Record.
+    def _Encode(obj):
+      if isinstance(obj, datetime.datetime):
+        return obj.strftime('%F %T')
+
+    return simplejson.dumps(
+        self._DictLike(complete=complete, recursive=recursive),
+        default=_Encode)
+
   def _RecordInsert(self, cursor):
     """Inserts the record's current values in the database as a new record.
 
@@ -282,14 +322,6 @@ class Record(dict):
     result = cursor.Insert(table=self.TableName(), values=self._SqlRecord())
     self.key = result.insertid
     self._record[self._PRIMARY_KEY] = result.insertid
-
-  def _Changes(self):
-    """Returns the differences of the current state vs the last stored state."""
-    sql_record = self._SqlRecord()
-    for key, value in sql_record.items():
-      if self._record.get(key) == value:
-        del sql_record[key]
-    return sql_record
 
   def _SaveForeign(self, cursor):
     """Recursively saves all nested Record instances."""
