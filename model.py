@@ -260,25 +260,6 @@ class Record(dict):
         del sql_record[key]
     return sql_record
 
-  def _DictLike(self, complete=False, recursive=False):
-    """Returns a dictionary representation of the Record."""
-    #XXX(Elmer): This might be better as a function outside the Record.
-    self_dict = {}
-    iteritems = self.iteritems if complete else super(Record, self).iteritems
-    for key, value in iteritems():
-      if isinstance(value, Record):
-        if complete and recursive:
-          # Recursively fetching a complete proper record requires calling this
-          # protected method on the retrieved object
-          # pylint: disable=W0212
-          self_dict[key] = value._DictLike(complete=True, recursive=True)
-          # pylint: enable=W0212
-        else:
-          self_dict[key] = dict(value)
-      else:
-        self_dict[key] = value
-    return self_dict
-
   def _GetChildren(self, child_class, relation_field=None):
     """Returns all `child_class` objects related to this record.
 
@@ -302,17 +283,6 @@ class Record(dict):
           conditions='`%s`=%s' % (relation_field, safe_key))
     for child in children:
       yield child_class(self.connection, child)
-
-  def _Json(self, complete=False, recursive=False):
-    """Returns a JSON representation of the Record."""
-    #XXX(Elmer): This might be better as a function outside the Record.
-    def _Encode(obj):
-      if isinstance(obj, datetime.datetime):
-        return obj.strftime('%F %T')
-
-    return simplejson.dumps(
-        self._DictLike(complete=complete, recursive=recursive),
-        default=_Encode)
 
   def _RecordInsert(self, cursor):
     """Inserts the record's current values in the database as a new record.
@@ -678,3 +648,55 @@ def RecordSubclasses():
     # Do not yield subclasses defined in this module
     if cls.__module__ != __name__:
       yield cls.TableName(), cls
+
+
+def RecordToDict(record, complete=False, recursive=False):
+  """Returns a dictionary representation of the Record.
+
+  Arguments:
+    @ record: Record
+      A record object that should be turned to a dictionary
+    % complete: bool ~~ False
+      Whether the foreign references on the object should all be resolved before
+      converting the Record to a dictionary. Either way, existing resolved
+      references will be represented as complete dictionaries.
+    % recursive: bool ~~ False
+      When this and `complete` are set True, foreign references will recursively
+      be resolved, resulting in the entire tree to be expanded before it is
+      converted to a dictionary.
+
+    Returns:
+      dict: dictionary representation of the record.
+    """
+  record_dict = {}
+  record = record if complete else dict(record)
+  for key, value in record.iteritems():
+    if isinstance(value, Record):
+      if complete and recursive:
+        record_dict[key] = RecordToDict(value, complete=True, recursive=True)
+      else:
+        record_dict[key] = dict(value)
+    else:
+      record_dict[key] = value
+  return record_dict
+
+
+def MakeJson(record_dict):
+  """Returns a JSON representation of the given `record_dict`.
+
+  The `record_dict` is the result of `RecordToDict(record)`.
+  Additional conversion will be done for types  such as datetime `datetime`,
+  `time`, and `date`.
+
+  Returns:
+    str: JSON representation of the given record dictionary.
+  """
+  def _Encode(obj):
+    if isinstance(obj, datetime.datetime):
+      return obj.strftime('%F %T')
+    if isinstance(obj, datetime.date):
+      return obj.strftime('%F')
+    if isinstance(obj, datetime.time):
+      return obj.strftime('%T')
+
+  return simplejson.dumps(record_dict, default=_Encode)
