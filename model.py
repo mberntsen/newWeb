@@ -699,4 +699,4 @@ def MakeJson(record_dict):
     if isinstance(obj, datetime.time):
       return obj.strftime('%T')
 
-  return simplejson.dumps(record_dict, default=_Encode)
+  return simplejson.dumps(record_dict, default=_Encode, sort_keys=True)
