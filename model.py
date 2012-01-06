@@ -369,6 +369,14 @@ class Record(dict):
       # pylint: enable=W0212
     return record
 
+  def Delete(self):
+    """Deletes a loaded record based on `self.TableName` and `self.key`.
+
+    For deleting an unloaded object, use the classmethod `DeleteKey`.
+    """
+    self.DeleteKey(self.connection, self.key)
+    self.clear()
+
   @classmethod
   def DeleteKey(cls, connection, pkey_value):
     """Deletes a database record based on the primary key value.
@@ -380,9 +388,8 @@ class Record(dict):
         The value for the primary key field
     """
     with connection as cursor:
-      safe_key = connection.EscapeValues(pkey_value)
-      cursor.Delete(table=cls.TableName(),
-                    conditions='`%s` = %s' % (cls._PRIMARY_KEY, safe_key))
+      cursor.Delete(table=cls.TableName(), conditions='`%s` = %s' % (
+          cls._PRIMARY_KEY, connection.EscapeValues(pkey_value)))
 
   @classmethod
   def FromPrimary(cls, connection, pkey_value):
@@ -411,15 +418,6 @@ class Record(dict):
           cls.__name__, pkey_value))
     return cls(connection, record[0])
 
-  def Delete(self):
-    """Deletes a loaded record based on `self.TableName` and `self.key`.
-
-    For deleting an unloaded object, use the classmethod `DeleteKey`.
-    """
-    with self.connection as cursor:
-      cursor.Delete(table=self.TableName(), conditions='`%s` = %s' % (
-          self._PRIMARY_KEY, self.connection.EscapeValues(self.key)))
-
   @classmethod
   def List(cls, connection):
     """Yields a Record object for every table entry.
@@ -432,9 +430,9 @@ class Record(dict):
       Record: Database record abstraction class.
     """
     with connection as cursor:
-      repositories = cursor.Select(table=cls.TableName())
-    for repository in repositories:
-      yield cls(connection, repository)
+      records = cursor.Select(table=cls.TableName())
+    for record in records:
+      yield cls(connection, record)
 
   def Save(self, save_foreign=False):
     """Saves the changes made to the record.
@@ -621,6 +619,94 @@ class VersionedRecord(Record):
     """Sets the value of the primary key."""
     self[self._RECORD_KEY] = value
   # pylint: enable=E0102, E0202, E1101
+
+
+class MongoRecord(Record):
+  """Abstraction of MongoDB collection records."""
+  _PRIMARY_KEY = '_id'
+
+  def __getitem__(self, field):
+    """MongoRecord's getitem behaves like a normal dictionary."""
+    return dict(self)[field]
+
+  @classmethod
+  def Create(cls, connection, record):
+    """Creates a proper record object and stores it to the database.
+
+    After storing it to the database, the live object is returned
+
+    Arguments:
+      @ connection: pymongo.connection
+        Database connection to use.
+      @ record: mapping
+        The record data to write to the database.
+
+    Returns:
+      MongoRecord: the record that was created from the initiation mapping.
+    """
+    record = cls(connection, record)
+    record.Save()
+    return record
+
+  @classmethod
+  def Collection(cls, connection):
+    """Returns the collection that the MongoRecord resides in."""
+    return getattr(connection, cls.TableName())
+
+  @classmethod
+  def DeleteKey(cls, connection, pkey_value):
+    """Deletes a database record based on the primary key value.
+
+    Arguments:
+      @ connection: pymongo.connection
+        Database connection to use.
+      @ pkey_value: obj
+        The value for the primary key field
+    """
+    collection = cls.Collection(connection)
+    collection.remove({cls._PRIMARY_KEY: pkey_value})
+
+  @classmethod
+  def FromPrimary(cls, connection, pkey_value):
+    """Returns the Record object that belongs to the given primary key value.
+
+    Arguments:
+      @ connection: pymongo.connection
+        Database connection to use.
+      @ pkey_value: obj
+        The value for the primary key field
+
+    Raises:
+      NotExistError:
+        There is no Record that matches the given primary key value.
+
+    Returns:
+      Record: Database record abstraction class.
+    """
+    collection = cls.Collection(connection)
+    record = collection.find({cls._PRIMARY_KEY: pkey_value})
+    if not record:
+      raise NotExistError('There is no %r for primary key %r' % (
+          cls.__name__, pkey_value))
+    return cls(connection, record[0])
+
+  @classmethod
+  def List(cls, connection):
+    """Yields a MongoRecord object for every table entry.
+
+    Arguments:
+      @ connection: pymongo.connection
+        Database connection to use.
+
+    Yields:
+      MongoRecord: Database record abstraction class.
+    """
+    for record in cls.Collection(connection).find():
+      yield cls(connection, record)
+
+  def Save(self):
+    if self._Changes():
+      self.Collection(self.connection).upsert(self._SqlRecord())
 
 
 def RecordSubclasses():
