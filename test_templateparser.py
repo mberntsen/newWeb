@@ -213,6 +213,7 @@ class TemplateTagIndexed(unittest.TestCase):
     self.assertEqual(result, self.tmpl(template).Parse(
         foo={'bar': {'zoink': 'World'}}))
 
+
 class TemplateTagFunctions(unittest.TestCase):
   """Tests the functions that are performed on replaced tags."""
   def setUp(self):
@@ -305,17 +306,16 @@ class TemplateUnicodeSupport(unittest.TestCase):
     self.assertEqual(template, self.parser.ParseString(template))
 
 
-class TemplateControlFunctions(unittest.TestCase):
+class TemplateInlining(unittest.TestCase):
   """TemplateParser properly handles the include statement."""
   def setUp(self):
     """Sets up a testbed."""
-    self.inline_template = 'This is a subtemplate by [name].'
     self.parser = templateparser.Parser()
     self.tmpl = templateparser.Template
 
   def testInlineExisting(self):
     """{{ inline }} Parser will inline an already existing template reference"""
-    self.parser['template'] = self.tmpl(self.inline_template)
+    self.parser['template'] = self.tmpl('This is a subtemplate by [name].')
     template = '{{ inline template }}'
     result = 'This is a subtemplate by Elmer.'
     self.assertEqual(result, self.parser.ParseString(template, name='Elmer'))
@@ -323,7 +323,7 @@ class TemplateControlFunctions(unittest.TestCase):
   def testInlineFile(self):
     """{{ inline }} Parser will load an inlined template from file if needed"""
     with file('tmp_template', 'w') as inline_file:
-      inline_file.write(self.inline_template)
+      inline_file.write('This is a subtemplate by [name].')
       inline_file.flush()
     try:
       template = '{{ inline tmp_template }}'
@@ -331,6 +331,108 @@ class TemplateControlFunctions(unittest.TestCase):
       self.assertEqual(result, self.parser.ParseString(template, name='Elmer'))
     finally:
       os.unlink('tmp_template')
+
+
+class TemplateConditionals(unittest.TestCase):
+  """TemplateParser properly handles if/elif/else statements."""
+  def setUp(self):
+    """Sets up a testbed."""
+    self.parser = templateparser.Parser()
+
+  def testBasicConditional(self):
+    """{{ if }} Basic boolean check works for relevant data types"""
+    template = '{{ if [variable] }} foo {{ endif }}'
+    # Boolean True inputs should return a SafeString object stating 'foo'.
+    self.assertTrue(self.parser.ParseString(template, variable=True))
+    self.assertTrue(self.parser.ParseString(template, variable='truth'))
+    self.assertTrue(self.parser.ParseString(template, variable=12))
+    self.assertTrue(self.parser.ParseString(template, variable=[1, 2]))
+    # Boolean False inputs should yield an empty SafeString object.
+    self.assertFalse(self.parser.ParseString(template, variable=None))
+    self.assertFalse(self.parser.ParseString(template, variable=0))
+    self.assertFalse(self.parser.ParseString(template, variable=''))
+
+  def testCompareTag(self):
+    """{{ if }} Basic tag value comparison"""
+    template = '{{ if [variable] == 5 }} foo {{ endif }}'
+    self.assertFalse(self.parser.ParseString(template, variable=0))
+    self.assertFalse(self.parser.ParseString(template, variable=12))
+    self.assertTrue(self.parser.ParseString(template, variable=5))
+
+  def testTagIsInstance(self):
+    """{{ if }} Basic tag value comparison"""
+    template = '{{ if isinstance([variable], int) }} foo {{ endif }}'
+    self.assertFalse(self.parser.ParseString(template, variable=[1]))
+    self.assertFalse(self.parser.ParseString(template, variable='number'))
+    self.assertTrue(self.parser.ParseString(template, variable=5))
+
+  def testDefaultElse(self):
+    """{{ if }} Else block will be parsed when `if` fails"""
+    template = '{{ if [var] }}foo {{ else }}bar {{ endif }}'
+    self.assertEqual('foo', self.parser.ParseString(template, var=True))
+    self.assertEqual('bar', self.parser.ParseString(template, var=False))
+
+  def testElif(self):
+    """{{ if }} Elif blocks will be parsed until one matches"""
+    template = """
+        {{ if [var] == 1 }}a
+        {{ elif [var] == 2 }}b
+        {{ elif [var] == 3 }}c
+        {{ elif [var] == 4 }}d
+        {{ endif }}"""
+    self.assertEqual('a', self.parser.ParseString(template, var=1))
+    self.assertEqual('b', self.parser.ParseString(template, var=2))
+    self.assertEqual('c', self.parser.ParseString(template, var=3))
+    self.assertEqual('d', self.parser.ParseString(template, var=4))
+    self.assertFalse(self.parser.ParseString(template, var=5))
+
+  def testIfElifElse(self):
+    """{{ if }} Full if/elif/else branch is functional all work"""
+    template = """
+        {{ if [var] == "a" }}1
+        {{ elif [var] == "b"}}2
+        {{ else }}3 {{ endif }}"""
+    self.assertEqual('1', self.parser.ParseString(template, var='a'))
+    self.assertEqual('2', self.parser.ParseString(template, var='b'))
+    self.assertEqual('3', self.parser.ParseString(template, var='c'))
+
+  def testSyntaxErrorNoEndif(self):
+    """{{ if }} Conditional without {{ endif }} raises TemplateSyntaxError"""
+    template = '{{ if [var] }} foo'
+    self.assertRaises(
+        templateparser.TemplateSyntaxError, self.parser.ParseString, template)
+
+  def testSyntaxErrorElifAfterElse(self):
+    """{{ if }} An `elif` clause following `else` raises TemplateSyntaxError"""
+    template = '{{ if [var] }} {{ else }} {{ elif [var] }} {{ endif }}'
+    self.assertRaises(
+        templateparser.TemplateSyntaxError, self.parser.ParseString, template)
+
+  def testSyntaxErrorDoubleElse(self):
+    """{{ if }} Starting a second `else` clause raises TemplateSyntaxError"""
+    template = '{{ if [var] }} {{ else }} {{ else }} {{ endif }}'
+    self.assertRaises(
+        templateparser.TemplateSyntaxError, self.parser.ParseString, template)
+
+  def testSyntaxErrorClauseWithoutIf(self):
+    """{{ if }} elif / else / endif without `if` raises TemplateSyntaxError"""
+    template = '{{ elif }}'
+    self.assertRaises(
+        templateparser.TemplateSyntaxError, self.parser.ParseString, template)
+    template = '{{ else }}'
+    self.assertRaises(
+        templateparser.TemplateSyntaxError, self.parser.ParseString, template)
+    template = '{{ endif }}'
+    self.assertRaises(
+        templateparser.TemplateSyntaxError, self.parser.ParseString, template)
+
+
+class TemplateLoops(unittest.TestCase):
+  """TemplateParser properly handles for-loops."""
+  def setUp(self):
+    """Sets up a testbed."""
+    self.parser = templateparser.Parser()
+    self.tmpl = templateparser.Template
 
   def testLoopCount(self):
     """{{ for }} Parser will loop once for each item in the for loop"""
@@ -366,8 +468,16 @@ class TemplateControlFunctions(unittest.TestCase):
     self.parser.RegisterFunction('upper', str.upper)
     self.assertEqual(result, self.parser.ParseString(template, bundles=bundles))
 
+
+class TemplateNestedScopes(unittest.TestCase):
+  """Test cases for nested function scopes."""
+  def setUp(self):
+    """Sets up a testbed."""
+    self.parser = templateparser.Parser()
+    self.tmpl = templateparser.Template
+
   def testLoopWithInline(self):
-    """{{ for }} Loops can contain an {{ inline }} section"""
+    """{{ nested }} Loops can contain an {{ inline }} section"""
     inline = '<li>Hello [name]</li>'
     self.parser['name'] = self.tmpl(inline)
     names = 'John', 'Eric'
@@ -376,13 +486,24 @@ class TemplateControlFunctions(unittest.TestCase):
     self.assertEqual(result, self.parser.ParseString(template, names=names))
 
   def testLoopWithInlineLoop(self):
-    """{{ for }} Loops can contain nested {{ for }} loops"""
+    """{{ nested }} Loops can contain {{ inline }} loops"""
     inline = '{{ for char in [name] }}[char].{{ endfor }}'
     self.parser['name'] = self.tmpl(inline)
     names = 'John', 'Eric'
     template = '{{ for name in [names] }}<li>{{ inline name }}</li>{{ endfor }}'
     result = '<li>J.o.h.n.</li><li>E.r.i.c.</li>'
     self.assertEqual(result, self.parser.ParseString(template, names=names))
+
+  def testInlineLoopsInConditional(self):
+    """{{ nested }} Inlined loop in a conditional without problems"""
+    self.parser['loop'] = self.tmpl('{{ for i in [loops] }}[i]{{ endfor }}')
+    self.parser['once'] = self.tmpl('value: [value]')
+    tmpl = '{{ if [x] }}{{ inline loop }}{{ else }}{{ inline once }}{{ endif }}'
+    self.assertEqual('12345', self.parser.ParseString(
+        tmpl, loops=range(1, 6), x=True))
+    self.assertEqual('value: foo', self.parser.ParseString(
+        tmpl, value='foo', x=False))
+
 
 if __name__ == '__main__':
   unittest.main(testRunner=unittest.TextTestRunner(verbosity=2))

@@ -258,6 +258,15 @@ class Template(list):
     """
     return SafeString(''.join(tag.Parse(**kwds) for tag in self))
 
+  @classmethod
+  def TagSplit(cls, template):
+    """Yields the TemplateTag and TemplateText nodes from a template string."""
+    for index, node in enumerate(cls.TAG.split(template)):
+      if index % 2:
+        yield TemplateTag.FromString(node)
+      elif node:
+        yield TemplateText(node)
+
   def _ExtendFunction(self, node):
     """Processes a function node and adds its results to the Template.
 
@@ -274,32 +283,126 @@ class Template(list):
     if name == 'inline':
       self.AddFile(data[0])
     elif name == 'for':
-      alias, _in, tag = data
-      if not Template.TAG.match(tag):
-        raise TemplateSyntaxError('Tag %r in {{ for }} loop is not valid' % tag)
-      loop = TemplateLoop(tag, alias)
-      self._AddPart(loop)
-      self.scopes.append(loop)
+      self._StartScope(TemplateLoop(data[2], data[0]))  # alias and tag
     elif name == 'endfor':
-      if isinstance(self.scopes[-1], TemplateLoop):
-        self.scopes.pop()
-      else:
-        raise TemplateSyntaxError('Unexpected {{ endfor }}')
+      self._CloseScope(TemplateLoop)
+    elif name == 'if':
+      self._StartScope(TemplateConditional(node.split(None, 1)[1]))
+    elif name == 'elif':
+      self._VerifyScope(TemplateConditional)
+      self.scopes[-1].Elif(node.split(None, 1)[1])
+    elif name == 'else':
+      self._VerifyScope(TemplateConditional)
+      self.scopes[-1].Else()
+    elif name == 'endif':
+      self._CloseScope(TemplateConditional)
     else:
-      raise TemplateSyntaxError('Unknown template function %r' % name)
+      raise TemplateSyntaxError('Unknown template function {{ %s }}' % name)
 
   def _ExtendText(self, node):
     """Processes a text node and adds its tags and texts to the Template."""
-    nodes = self.TAG.split(node)
-    for index, node in enumerate(nodes):
-      if index % 2:
-        self._AddPart(TemplateTag.FromString(node))
-      elif node:
-        self._AddPart(TemplateText(node))
+    for node in self.TagSplit(node):
+      self._AddPart(node)
 
   def _AddPart(self, item):
     """Adds a template part to the current open scope."""
     self.scopes[-1].append(item)
+
+  # ############################################################################
+  # Methods for scope management
+  #
+  def _CloseScope(self, scope_cls):
+    """Closes the current open scope, if it's of the given scope type.
+
+    If the open scope is not an instance of the given scope class,
+    TemplateSyntaxError is raised.
+    """
+    self._VerifyScope(scope_cls)
+    self.scopes.pop()
+
+  def _StartScope(self, scope):
+    """Adds the given part to the template and adds it as new current scope."""
+    self._AddPart(scope)
+    self.scopes.append(scope)
+
+  def _VerifyScope(self, scope_cls):
+    """Verifies the given `scope_cls` is the current open scope.
+
+    If this is not the case, TemplateSyntaxError is raised.
+    """
+    if not isinstance(self.scopes[-1], scope_cls):
+      raise TemplateSyntaxError('Expected open scope %s, but scope is %s' % (
+          scope_cls.__name__, type(self.scopes[-1]).__name__))
+
+
+class TemplateConditional(object):
+  """Template conditionals allow selective use of templates and the like."""
+  def __init__(self, expr):
+    self.branches = [(expr, [])]
+    self.default = None
+
+  def append(self, part):
+    """Appends a template part to the current open conditional clause.
+
+    Conditional clauses are not explicitly closed, a new one is simply stacked
+    on top. Whenever the {{ else }} statement is found, all append actions will
+    append to the else clause.
+    """
+    if self.default is not None:
+      self.default.append(part)
+    else:
+      self.branches[-1][1].append(part)
+
+  def Elif(self, expr):
+    """Starts an `elif` clause.
+
+    This raises TemplateSyntaxError if the `else` clause is already started.
+    """
+    if self.default is not None:
+      raise TemplateSyntaxError('{{ elif }} clause may not follow {{ else }}.')
+    self.branches.append((expr, []))
+
+  def Else(self):
+    """Starts the `else` clause.
+
+    This raises TemplateSyntaxError if the `else` clause is already started.
+    """
+    if self.default is not None:
+      raise TemplateSyntaxError('Only one {{ else }} clause is allowed.')
+    self.default = []
+
+  @staticmethod
+  def Expression(expr, **kwds):
+    """Returns the eval()'ed result of a tag expression."""
+    nodes = []
+    for node in Template.TagSplit(expr):
+      if isinstance(node, TemplateTag):
+        nodes.append(repr(node.GetValue(**kwds)))
+      else:
+        nodes.append(node)
+    expr = ''.join(nodes)
+    return eval(expr, kwds)
+
+  def Parse(self, **kwds):
+    """Returns the TemplateConditional parsed as string.
+
+    One by one, the `if` clause and optional `elif` clauses are evaluated.
+    Their strings are parsed (template tags replaced, though functions are NOT
+    processed) and then passed through `eval()`. Strings passed into the
+    templateparser will be strings for evaluation (not literal code), so this
+    is safe with regards to users executing code in the templateparser scope.
+
+    Whenever a boolean True value is returned from eval, the corresponding
+    branch is parsed and returned. When none of the `if` or `elif` clauses
+    is True, the `else` branch is parsed and returned (where available, if no
+    `else` branch exists '' is returned.
+    """
+    for expr, branch in self.branches:
+      if self.Expression(expr, **kwds):
+        return ''.join(part.Parse(**kwds) for part in branch)
+    if self.default:
+      return ''.join(part.Parse(**kwds) for part in self.default)
+    return ''
 
 
 class TemplateLoop(list):
@@ -318,9 +421,14 @@ class TemplateLoop(list):
       @ alias: str
         The alias under which the loop variable should be made available.
     """
+    try:
+      tag = TemplateTag.FromString(tag)
+    except TemplateSyntaxError:
+      raise TemplateSyntaxError('Tag %r in {{ for }} loop is not valid' % tag)
+
     super(TemplateLoop, self).__init__()
-    self.tag = TemplateTag.FromString(tag)
     self.alias = alias
+    self.tag = tag
 
   def __repr__(self):
     return '%s(%s)' % (type(self).__name__, list(self))
@@ -395,10 +503,13 @@ class TemplateTag(object):
       * In addition to the characters stated above, tags may contain only
         alphanumeric values, underscores and dashes. Spaces are _not_ allowed.
     """
-    name, indices, functions = cls.TAG.match(tag).groups()
-    indices = indices.split(cls.PFX_INDEX) if indices else ()
-    functions = functions.split(cls.PFX_FUNCT) if functions else ()
-    return cls(name, indices, functions)
+    try:
+      name, indices, functions = cls.TAG.match(tag).groups()
+      indices = indices.split(cls.PFX_INDEX) if indices else ()
+      functions = functions.split(cls.PFX_FUNCT) if functions else ()
+      return cls(name, indices, functions)
+    except AttributeError:
+      raise TemplateSyntaxError('Invalid Tag syntax: %r' % tag)
 
   def GetValue(self, **kwds):
     """Returns the value for the tag, after reducing indices.
