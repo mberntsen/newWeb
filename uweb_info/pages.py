@@ -142,7 +142,7 @@ class PageMaker(uweb.DebuggingPageMaker, login.OpenIdMixin):
       # Return our custom styled HTTP 500 handler instead, this is what you'll
       # want to serve during production; the debugging one gives too much info.
       path = self.req.env['PATH_INFO']
-      logging.LogError('Execution of %r triggered an exception', path)
+      logging.LogException('Execution of %r triggered an exception', path)
       return uweb.Response(
           httpcode=500,
           content=self.parser.Parse(
