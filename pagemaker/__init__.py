@@ -186,8 +186,15 @@ class BasePageMaker(object):
     directory is used as the working directory. Then, the module constants
     PUBLIC_DIR and TEMPLATE_DIR are used to define class constants from.
     """
-    cls_dir = os.path.dirname(sys.modules[cls.__module__].__file__)
-    cls.LOCAL_DIR = cls_dir
+    # Unfortunately, mod_python does not support our previous trick where we
+    # retrieve the caller filename using sys.modules, so we need the stack.
+    # pylint: disable=W0212
+    frame = sys._getframe()
+    # pylint: enable=W0212
+    initial = frame.f_code.co_filename
+    while initial == frame.f_code.co_filename:
+      frame = frame.f_back
+    cls.LOCAL_DIR = cls_dir = os.path.dirname(frame.f_code.co_filename)
     cls.PUBLIC_DIR = os.path.join(cls_dir, cls.PUBLIC_DIR)
     cls.TEMPLATE_DIR = os.path.join(cls_dir, cls.TEMPLATE_DIR)
 
@@ -340,6 +347,10 @@ class PageMakerDebuggerMixin(object):
 
   @property
   def debug_parser(self):
+    """Provides a templateparser.Parser instance for debugging output.
+
+    This uses a fixed directory 'error_templates' in this directory.
+    """
     if not '__debug_parser' in self.persistent:
       template_dir = os.path.join(os.path.dirname(__file__), 'error_templates')
       self.persistent.Set('__debug_parser',
