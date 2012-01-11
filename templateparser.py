@@ -338,7 +338,7 @@ class Template(list):
 class TemplateConditional(object):
   """Template conditionals allow selective use of templates and the like."""
   def __init__(self, expr):
-    self.branches = [(expr, [])]
+    self.branches = [(tuple(Template.TagSplit(expr)), [])]
     self.default = None
 
   def append(self, part):
@@ -360,7 +360,7 @@ class TemplateConditional(object):
     """
     if self.default is not None:
       raise TemplateSyntaxError('{{ elif }} clause may not follow {{ else }}.')
-    self.branches.append((expr, []))
+    self.branches.append((tuple(Template.TagSplit(expr)), []))
 
   def Else(self):
     """Starts the `else` clause.
@@ -375,13 +375,11 @@ class TemplateConditional(object):
   def Expression(expr, **kwds):
     """Returns the eval()'ed result of a tag expression."""
     nodes = []
-    for node in Template.TagSplit(expr):
+    for node in expr:
       if isinstance(node, TemplateTag):
-        nodes.append(repr(node.GetValue(**kwds)))
-      else:
-        nodes.append(node)
-    expr = ''.join(nodes)
-    return eval(expr, kwds)
+        node = repr(node.GetValue(**kwds))
+      nodes.append(node)
+    return eval(''.join(nodes), kwds)
 
   def Parse(self, **kwds):
     """Returns the TemplateConditional parsed as string.
