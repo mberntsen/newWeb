@@ -193,6 +193,8 @@ class BasePageMaker(object):
     # pylint: enable=W0212
     initial = frame.f_code.co_filename
     while initial == frame.f_code.co_filename:
+      if not frame.f_back:
+        break  # This happens during exception handling of DebuggingPageMaker
       frame = frame.f_back
     cls.LOCAL_DIR = cls_dir = os.path.dirname(frame.f_code.co_filename)
     cls.PUBLIC_DIR = os.path.join(cls_dir, cls.PUBLIC_DIR)
