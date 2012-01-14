@@ -3,7 +3,7 @@
 from __future__ import with_statement
 
 __author__ = 'Elmer de Looff <elmer@underdark.nl>'
-__version__ = '0.13'
+__version__ = '0.15'
 
 # Standard modules
 import datetime
@@ -29,47 +29,26 @@ class PermissionError(Error):
 
 # Record classes have many methods, this is not an actual problem.
 # pylint: disable=R0904
-class Record(dict):
-  """Basic class for database table/record abstraction."""
+class BaseRecord(dict):
   _PRIMARY_KEY = 'ID'
-  _FOREIGN_RELATIONS = {}
   _TABLE = None
 
   def __init__(self, connection, record):
-    """Initializes a Record instance.
+    """Initializes a BaseRecord instance.
 
     Arguments:
-      @ connection: sqltalk.connection
+      @ connection: object
         The database connection to use for further queries.
-      @ record: dict / sqltalk.ResultSet
-        A field-based mapping of the database record information.
+      @ record: mapping
+        A field:value mapping of the database record information.
     """
-    super(Record, self).__init__(record)
+    super(BaseRecord, self).__init__(record)
     self.connection = connection
-    self._record = self._SqlRecord()
-    if not hasattr(Record, '_SUBTYPES'):
+    self._record = self._DataRecord()
+    if not hasattr(BaseRecord, '_SUBTYPES'):
       # Adding classes at runtime is pretty rare, but fails this code.
-      Record._SUBTYPES = dict(RecordSubclasses())
+      BaseRecord._SUBTYPES = dict(RecordTableNames())
 
-  def __hash__(self):
-    """Returns the hashed value of the key."""
-    return hash(self.key)
-
-  def __int__(self):
-    """Returns the integer key value of the Record.
-
-    For record objects where the primary key value is not (always) an integer,
-    this function will raise an error in the situations where it is not.
-    """
-    if not isinstance(self.key, (int, long)):
-      # We should not truncate floating point numbers.
-      # Nor turn strings of numbers into an integer.
-      raise ValueError('The primary key is not an integral number.')
-    return self.key
-
-  # ############################################################################
-  # Methods enabling rich comparison
-  #
   def __eq__(self, other):
     """Simple equality comparison for database objects.
 
@@ -89,23 +68,202 @@ class Record(dict):
       return False  # Records should have the same non-None primary key value.
     elif len(self) != len(other):
       return False  # Records must contain the same number of objects.
-    for key, value in super(Record, self).items():
-      other_value = super(Record, other).__getitem__(key)
-      if (isinstance(value, Record) ^ isinstance(other_value, Record)):
-        if (isinstance(value, Record) and value.key != other_value or
-            isinstance(other_value, Record) and other_value.key != value):
+    for key, value in self.items():
+      other_value = other[key]
+      if isinstance(value, BaseRecord) != isinstance(other_value, BaseRecord):
+        # Only one of the two is a BaseRecord instance
+        if (isinstance(value, BaseRecord) and value.key != other_value or
+            isinstance(other_value, BaseRecord) and other_value.key != value):
           return False
       elif value != other_value:
         return False
     return True
 
-  def __ne__(self, other):
-    """Returns the proper inverse of __eq__.
+  def __hash__(self):
+    """Returns the hashed value of the key."""
+    return hash(self.key)
 
-    Without this, the non-equal checks used in __eq__ will not work, and the
-    `!=` operator will not be the logical inverse of `==`.
+  def __int__(self):
+    """Returns the integer key value of the Record.
+
+    For record objects where the primary key value is not (always) an integer,
+    this function will raise an error in the situations where it is not.
     """
+    if not isinstance(self.key, (int, long)):
+      # We should not truncate floating point numbers.
+      # Nor turn strings of numbers into an integer.
+      raise ValueError('The primary key is not an integral number.')
+    return self.key
+
+  def __ne__(self, other):
+    """Returns the proper inverse of __eq__."""
+    # Without this, the non-equal checks used in __eq__ will not work,
+    # and the  `!=` operator would not be the logical inverse of `==`.
     return not self == other
+
+  def __repr__(self):
+    return '%s(%s)' % (type(self).__name__, super(BaseRecord, self).__repr__())
+
+  def __str__(self):
+    return '%s({%s})' % (
+        self.__class__.__name__,
+        ', '.join('%r: %r' % item for item in self.iteritems()))
+
+  # ############################################################################
+  # Base record functionality methods, to be implemented by subclasses.
+  # Some methods have a generic implementation, but may need customization,
+  #
+  @classmethod
+  def Create(cls, connection, record):
+    """Creates a proper record object and stores it to the database.
+
+    After storing it to the database, the live object is returned
+
+    Arguments:
+      @ connection: object
+        Database connection to use for the created record..
+      @ record: mapping
+        The record data to write to the database.
+
+    Returns:
+      MongoRecord: the record that was created from the initiation mapping.
+    """
+    record = cls(connection, record)
+    record.Save(force_create=True)
+    return record
+
+  @classmethod
+  def DeleteKey(cls, connection, key):
+    """Deletes a database record based on the primary key value.
+
+    Arguments:
+      @ connection: object
+        Database connection to use.
+      @ pkey_value: obj
+        The value for the primary key field
+    """
+    raise NotImplementedError
+
+  def Delete(self):
+    """Deletes a loaded record based on `self.TableName` and `self.key`.
+
+    For deleting an unloaded object, use the classmethod `DeleteKey`.
+    """
+    self.DeleteKey(self.connection, self.key)
+    self._record.clear()
+    self.clear()
+
+  @classmethod
+  def FromPrimary(cls, connection, pkey_value):
+    """Returns the Record object that belongs to the given primary key value.
+
+    Arguments:
+      @ connection: object
+        Database connection to use.
+      @ pkey_value: obj
+        The value for the primary key field
+
+    Raises:
+      NotExistError:
+        There is no record that matches the given primary key value.
+
+    Returns:
+      Record: Database record abstraction class.
+    """
+    raise NotImplementedError
+
+  @classmethod
+  def List(cls, connection):
+    """Yields a Record object for every table entry.
+
+    Arguments:
+      @ connection: object
+        Database connection to use.
+
+    Yields:
+      Record: Database record abstraction class.
+    """
+    raise NotImplementedError
+
+  def Save(self, force_create=False):
+    """Saves the changes made to the record.
+
+    This performs an update to the record, except when `force_create` if set to
+    True, in which case the record is inserted.
+
+    Arguments:
+      % force_create: bool ~~ False
+        Forces the insertion of a new record in the database, this should be
+        used when Save is called by the Create() method.
+    """
+    raise NotImplementedError
+
+
+  # ############################################################################
+  # Functions for tracking table and primary key values
+  #
+  def _Changes(self):
+    """Returns the differences of the current state vs the last stored state."""
+    sql_record = self._DataRecord()
+    for key, value in sql_record.items():
+      if self._record.get(key) == value:
+        del sql_record[key]
+    return sql_record
+
+  def _DataRecord(self):
+    """Returns a dictionary of the record's database values
+
+    For any Record object present, its primary key value (`Record.key`) is used.
+    """
+    sql_record = {}
+    for key, value in self.iteritems():
+      if isinstance(value, BaseRecord):
+        sql_record[key] = value.key
+      else:
+        sql_record[key] = value
+    return sql_record
+
+  @classmethod
+  def TableName(cls):
+    """Returns the database table name for the Record class.
+
+    If this is not explicitly defined by the class constant `_TABLE`, the return
+    value will be the class name with the first letter lowercased.
+    """
+    if cls._TABLE:
+      return cls._TABLE
+    name = cls.__name__
+    return name[0].lower() + name[1:]
+
+  # Pylint falsely believes this property is overwritten by its setter later on.
+  # pylint: disable=E0202
+  @property
+  def key(self):
+    """Returns the primary key for the object.
+
+    This is used for the Save/Update methods, where foreign relations should be
+    stored by their primary key.
+    """
+    return self.get(self._PRIMARY_KEY)
+  # pylint: enable=E0202
+
+  # Pylint doesn't understand property setters at all.
+  # pylint: disable=E0102, E0202, E1101
+  @key.setter
+  def key(self, value):
+    """Sets the value of the primary key."""
+    self[self._PRIMARY_KEY] = value
+  # pylint: enable=E0102, E0202, E1101
+
+  Error = Error
+  AlreadyExistError = AlreadyExistError
+  NotExistError = NotExistError
+  PermissionError = PermissionError
+
+
+class Record(BaseRecord):
+  """Basic class for database table/record abstraction."""
+  _FOREIGN_RELATIONS = {}
 
   # ############################################################################
   # Methods enabling auto-loading
@@ -207,18 +365,7 @@ class Record(dict):
     return value
 
   # ############################################################################
-  # Methods for proper representation of the Record object
-  #
-  def __repr__(self):
-    return '%s(%s)' % (self.__class__.__name__, super(Record, self).__repr__())
-
-  def __str__(self):
-    return '%s({%s})' % (
-        self.__class__.__name__,
-        ', '.join('%r: %r' % item for item in self.iteritems()))
-
-  # ############################################################################
-  # Methods needed to create functional dictionary likeness for value lookups
+  # Override basic dict methods so that autoload mechanisms function on them.
   #
   def get(self, key, default=None):
     """Returns the value for `key` if its present, otherwise `default`."""
@@ -252,15 +399,7 @@ class Record(dict):
   # ############################################################################
   # Private methods to be used for development
   #
-  def _Changes(self):
-    """Returns the differences of the current state vs the last stored state."""
-    sql_record = self._SqlRecord()
-    for key, value in sql_record.items():
-      if self._record.get(key) == value:
-        del sql_record[key]
-    return sql_record
-
-  def _GetChildren(self, child_class, relation_field=None):
+  def _Children(self, child_class, relation_field=None):
     """Returns all `child_class` objects related to this record.
 
     The table for the given `child_class` will be queried for all fields where
@@ -289,7 +428,7 @@ class Record(dict):
 
     Upon success, the record's primary key is set to the result's insertid
     """
-    result = cursor.Insert(table=self.TableName(), values=self._SqlRecord())
+    result = cursor.Insert(table=self.TableName(), values=self._DataRecord())
     self.key = result.insertid
     self._record[self._PRIMARY_KEY] = result.insertid
 
@@ -313,101 +452,26 @@ class Record(dict):
     """
     difference = self._Changes()
     if not difference:
-      print 'no changes'
-      return
+      return  # Record hasn't changed so we don't have to update anything.
     try:
       primary = self.connection.EscapeValues(self._record[self._PRIMARY_KEY])
     except KeyError:
       raise Error('Cannot update record without pre-existing primary key.')
-    result = cursor.Update(
-        table=self.TableName(), values=difference,
-        conditions='`%s` = %s' % (self._PRIMARY_KEY, primary))
-    # (Elmer): This can probably be removed, but needs checking before doing so.
-    if not result.affected:
-      raise ValueError(
-          'No affected rows after applying calculated diff: %s' % difference)
-    else:
-      self._record.update(difference)
-
-  def _SqlRecord(self):
-    """Returns a dictionary of the record's database values
-
-    For any Record object present, its primary key value (`Record.key`) is used.
-    """
-    sql_record = {}
-    for key, value in super(Record, self).iteritems():
-      if isinstance(value, Record):
-        sql_record[key] = value.key
-      else:
-        sql_record[key] = value
-    return sql_record
+    cursor.Update(table=self.TableName(), values=difference,
+                  conditions='`%s` = %s' % (self._PRIMARY_KEY, primary))
+    self._record.update(difference)
 
   # ############################################################################
   # Public methods for creation, deletion and storing Record objects.
   #
   @classmethod
-  def Create(cls, connection, record):
-    """Creates a proper record object and stores it to the database.
-
-    After storing it to the database, the live object is returned
-
-    Arguments:
-      @ connection: sqltalk.connection
-        Database connection to use.
-      @ record: mapping
-        The record data to write to the database.
-
-    Returns:
-      Record: the record that was created from the initiation mapping.
-    """
-    with connection as cursor:
-      record = cls(connection, record)
-      # Accessing protected members of a foreign class. Seemt to be the only way
-      # to do this neatly without copying in the method or duplicating code.
-      # pylint: disable=W0212
-      record._RecordInsert(cursor)
-      # pylint: enable=W0212
-    return record
-
-  def Delete(self):
-    """Deletes a loaded record based on `self.TableName` and `self.key`.
-
-    For deleting an unloaded object, use the classmethod `DeleteKey`.
-    """
-    self.DeleteKey(self.connection, self.key)
-    self.clear()
-
-  @classmethod
   def DeleteKey(cls, connection, pkey_value):
-    """Deletes a database record based on the primary key value.
-
-    Arguments:
-      @ connection: sqltalk.connection
-        Database connection to use.
-      @ pkey_value: obj
-        The value for the primary key field
-    """
     with connection as cursor:
       cursor.Delete(table=cls.TableName(), conditions='`%s` = %s' % (
           cls._PRIMARY_KEY, connection.EscapeValues(pkey_value)))
 
   @classmethod
   def FromPrimary(cls, connection, pkey_value):
-    """Returns the Record object that belongs to the given primary key value.
-
-    Arguments:
-      @ connection: sqltalk.connection
-        Database connection to use.
-      @ pkey_value: obj
-        The value for the primary key field
-
-    Raises:
-      NotExistError:
-        There is no Record that matches the given primary key value.
-
-    Returns:
-      Record: Database record abstraction class.
-    """
     with connection as cursor:
       safe_key = connection.EscapeValues(pkey_value)
       record = cursor.Select(
@@ -420,27 +484,21 @@ class Record(dict):
 
   @classmethod
   def List(cls, connection):
-    """Yields a Record object for every table entry.
-
-    Arguments:
-      @ connection: sqltalk.connection
-        Database connection to use.
-
-    Yields:
-      Record: Database record abstraction class.
-    """
     with connection as cursor:
       records = cursor.Select(table=cls.TableName())
     for record in records:
       yield cls(connection, record)
 
-  def Save(self, save_foreign=False):
+  def Save(self, force_create=False, save_foreign=False):
     """Saves the changes made to the record.
 
-    This can mean updating an existing database entry, ot inserting a new one
-    for record that lack a primary key value (`self.key`).
+    This expands on the base Save method, providing a save_foreign that will
+    recursively update all nested records when set to True.
 
     Arguments:
+      % force_create: bool ~~ False
+        Forces the insertion of a new record in the database, this should be
+        used when Save is called by the Create() method.
       % save_foreign: bool ~~ False
         If set, each Record (subclass) contained by this one will be saved as
         well. This recursive saving triggers *before* this record itself will be
@@ -448,46 +506,11 @@ class Record(dict):
         that a failure to save this object will *not* roll back child saves.
     """
     with self.connection as cursor:
-      if save_foreign:
+      if force_create:
+        return self._RecordInsert(cursor)
+      elif save_foreign:
         self._SaveForeign(cursor)
       self._SaveSelf(cursor)
-
-  @classmethod
-  def TableName(cls):
-    """Returns the database table name for the Record class.
-
-    If this is not explicitly defined by the class constant `_TABLE`, the return
-    value will be the class name with the first letter lowercased.
-    """
-    if cls._TABLE:
-      return cls._TABLE
-    name = cls.__name__
-    return name[0].lower() + name[1:]
-
-  # Pylint falsely believes this property is overwritten by its setter later on.
-  # pylint: disable=E0202
-  @property
-  def key(self):
-    """Returns the primary key for the object.
-
-    This is used for the Save/Update methods, where foreign relations should be
-    stored by their primary key.
-    """
-    return self.get(self._PRIMARY_KEY)
-  # pylint: enable=E0202
-
-  # Pylint doesn't understand property setters at all.
-  # pylint: disable=E0102, E0202, E1101
-  @key.setter
-  def key(self, value):
-    """Sets the value of the primary key."""
-    self[self._PRIMARY_KEY] = value
-  # pylint: enable=E0102, E0202, E1101
-
-  Error = Error
-  AlreadyExistError = AlreadyExistError
-  NotExistError = NotExistError
-  PermissionError = PermissionError
 
 
 class VersionedRecord(Record):
@@ -621,32 +644,9 @@ class VersionedRecord(Record):
   # pylint: enable=E0102, E0202, E1101
 
 
-class MongoRecord(Record):
+class MongoRecord(BaseRecord):
   """Abstraction of MongoDB collection records."""
   _PRIMARY_KEY = '_id'
-
-  def __getitem__(self, field):
-    """MongoRecord's getitem behaves like a normal dictionary."""
-    return dict(self)[field]
-
-  @classmethod
-  def Create(cls, connection, record):
-    """Creates a proper record object and stores it to the database.
-
-    After storing it to the database, the live object is returned
-
-    Arguments:
-      @ connection: pymongo.connection
-        Database connection to use.
-      @ record: mapping
-        The record data to write to the database.
-
-    Returns:
-      MongoRecord: the record that was created from the initiation mapping.
-    """
-    record = cls(connection, record)
-    record.Save()
-    return record
 
   @classmethod
   def Collection(cls, connection):
@@ -655,34 +655,11 @@ class MongoRecord(Record):
 
   @classmethod
   def DeleteKey(cls, connection, pkey_value):
-    """Deletes a database record based on the primary key value.
-
-    Arguments:
-      @ connection: pymongo.connection
-        Database connection to use.
-      @ pkey_value: obj
-        The value for the primary key field
-    """
     collection = cls.Collection(connection)
     collection.remove({cls._PRIMARY_KEY: pkey_value})
 
   @classmethod
   def FromPrimary(cls, connection, pkey_value):
-    """Returns the Record object that belongs to the given primary key value.
-
-    Arguments:
-      @ connection: pymongo.connection
-        Database connection to use.
-      @ pkey_value: obj
-        The value for the primary key field
-
-    Raises:
-      NotExistError:
-        There is no Record that matches the given primary key value.
-
-    Returns:
-      Record: Database record abstraction class.
-    """
     collection = cls.Collection(connection)
     record = collection.find({cls._PRIMARY_KEY: pkey_value})
     if not record:
@@ -692,24 +669,15 @@ class MongoRecord(Record):
 
   @classmethod
   def List(cls, connection):
-    """Yields a MongoRecord object for every table entry.
-
-    Arguments:
-      @ connection: pymongo.connection
-        Database connection to use.
-
-    Yields:
-      MongoRecord: Database record abstraction class.
-    """
     for record in cls.Collection(connection).find():
       yield cls(connection, record)
 
-  def Save(self):
+  def Save(self, force_create=False):
     if self._Changes():
-      self.Collection(self.connection).upsert(self._SqlRecord())
+      self.Collection(self.connection).upsert(self._DataRecord())
 
 
-def RecordSubclasses():
+def RecordTableNames():
   """Yields Record subclasses that have been defined outside this module.
 
   This is necessary to accurately perform automatic loading of foreign elements.
@@ -730,7 +698,7 @@ def RecordSubclasses():
         for sub in GetSubTypes(sub, seen):
           yield sub
 
-  for cls in GetSubTypes(Record):
+  for cls in GetSubTypes(BaseRecord):
     # Do not yield subclasses defined in this module
     if cls.__module__ != __name__:
       yield cls.TableName(), cls
