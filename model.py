@@ -43,11 +43,11 @@ class BaseRecord(dict):
         A field:value mapping of the database record information.
     """
     super(BaseRecord, self).__init__(record)
-    self.connection = connection
-    self._record = self._DataRecord()
     if not hasattr(BaseRecord, '_SUBTYPES'):
       # Adding classes at runtime is pretty rare, but fails this code.
       BaseRecord._SUBTYPES = dict(RecordTableNames())
+    self.connection = connection
+    self._record = self._DataRecord()
 
   def __eq__(self, other):
     """Simple equality comparison for database objects.
@@ -126,7 +126,7 @@ class BaseRecord(dict):
         The record data to write to the database.
 
     Returns:
-      MongoRecord: the record that was created from the initiation mapping.
+      BaseRecord: the record that was created from the initiation mapping.
     """
     record = cls(connection, record)
     record.Save(force_create=True)
