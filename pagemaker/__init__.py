@@ -3,7 +3,7 @@
 from __future__ import with_statement
 
 __author__ = 'Elmer de Looff <elmer@underdark.nl>'
-__version__ = '0.6'
+__version__ = '0.7'
 
 # Standard modules
 import datetime
@@ -186,17 +186,21 @@ class BasePageMaker(object):
     directory is used as the working directory. Then, the module constants
     PUBLIC_DIR and TEMPLATE_DIR are used to define class constants from.
     """
-    # Unfortunately, mod_python does not support our previous trick where we
-    # retrieve the caller filename using sys.modules, so we need the stack.
-    # pylint: disable=W0212
-    frame = sys._getframe()
-    # pylint: enable=W0212
-    initial = frame.f_code.co_filename
-    while initial == frame.f_code.co_filename:
-      if not frame.f_back:
-        break  # This happens during exception handling of DebuggingPageMaker
-      frame = frame.f_back
-    cls.LOCAL_DIR = cls_dir = os.path.dirname(frame.f_code.co_filename)
+    try:
+      local_file = sys.modules[cls.__module__].__file__
+    except KeyError:
+      # Unfortunately, mod_python does not support our previous trick where we
+      # retrieve the caller filename using sys.modules, so we need the stack.
+      # pylint: disable=W0212
+      frame = sys._getframe()
+      # pylint: enable=W0212
+      initial = frame.f_code.co_filename
+      while initial == frame.f_code.co_filename:
+        if not frame.f_back:
+          break  # This happens during exception handling of DebuggingPageMaker
+        frame = frame.f_back
+      local_file = frame.f_code.co_filename
+    cls.LOCAL_DIR = cls_dir = os.path.dirname(local_file)
     cls.PUBLIC_DIR = os.path.join(cls_dir, cls.PUBLIC_DIR)
     cls.TEMPLATE_DIR = os.path.join(cls_dir, cls.TEMPLATE_DIR)
 
@@ -215,10 +219,10 @@ class BasePageMaker(object):
 
   def InternalServerError(self):
     """Returns a plain text notification about an internal server error."""
-    return Response(
-        content='INTERNAL SERVER ERROR (HTTP 500) DURING PROCESSING OF %r' % (
-            self.req.env['PATH_INFO']),
-        content_type='text/plain', httpcode=500)
+    error = 'INTERNAL SERVER ERROR (HTTP 500) DURING PROCESSING OF %r' % (
+                self.req.env['PATH_INFO'])
+    logging.LogException(error)
+    return Response(content=error, content_type='text/plain', httpcode=500)
 
   @staticmethod
   def Reload():
@@ -270,6 +274,8 @@ class PageMakerDebuggerMixin(object):
   lacks interactive functions.
   """
   CACHE_DURATION = MimeTypeDict({})
+  ERROR_TEMPLATE = templateparser.Template.FromFile(os.path.join(
+      os.path.dirname(__file__), 'http_500.xhtml'))
 
   def _ParseStackFrames(self, stack):
     """Generates list items for traceback information.
@@ -287,17 +293,16 @@ class PageMakerDebuggerMixin(object):
     Yields:
       str: Template-parsed HTML with frame information.
     """
+    frames = []
     while stack:
       frame = stack.tb_frame
-      yield self.debug_parser.Parse('stack_frame.xhtml', frame={
-          'file': frame.f_code.co_filename,
-          'scope': frame.f_code.co_name,
-          'locals': ''.join(
-              self.debug_parser.Parse('var_row.xhtml', var=(name, repr(value)))
-              for name, value in sorted(frame.f_locals.items())),
-          'source': ''.join(
-              self._SourceLines(frame.f_code.co_filename, frame.f_lineno))})
+      frames.append({'file': frame.f_code.co_filename,
+                     'scope': frame.f_code.co_name,
+                     'locals': sorted(frame.f_locals.items()),
+                     'source': self._SourceLines(
+                         frame.f_code.co_filename, frame.f_lineno)})
       stack = stack.tb_next
+    return reversed(frames)
 
   def _SourceLines(self, filename, line_num, context=3):
     """Yields the offending source line, and `context` lines of context.
@@ -315,49 +320,25 @@ class PageMakerDebuggerMixin(object):
     """
     import linecache
     for line_num in xrange(line_num - context, line_num + context + 1):
-      yield self.debug_parser.Parse('var_row.xhtml', var=(
-          line_num, linecache.getline(filename, line_num)))
+      yield line_num, linecache.getline(filename, line_num)
 
   def InternalServerError(self):
     """Returns a HTTP 500 response with detailed failure analysis."""
-    cookies = [
-        self.debug_parser.Parse(
-            'var_row.xhtml', var=(name, self.cookies[name].value))
-        for name in sorted(self.cookies)]
-    environ = [
-        self.debug_parser.Parse('var_row.xhtml', var=var)
-        for var in sorted(self.req.ExtendedEnvironment().items())]
-    post_data = [
-        self.debug_parser.Parse('var_row.xhtml', var=(var, self.post[var]))
-        for var in sorted(self.post)]
-    query_args = [
-        self.debug_parser.Parse('var_row.xhtml', var=(var, self.get[var]))
-        for var in sorted(self.get)]
-    nulldata = '<tr><td colspan="2"><em>NULL</em></td></tr>'
-    stack_trace = reversed(list(self._ParseStackFrames(sys.exc_traceback)))
+    logging.LogException(
+        'INTERNAL SERVER ERROR (HTTP 500) DURING PROCESSING OF %r',
+        self.req.env['PATH_INFO'])
     return Response(
-        httpcode=200,
-        content=self.debug_parser.Parse(
-            'http_500.xhtml',
-            cookies=''.join(cookies) or nulldata,
-            environ=''.join(environ) or nulldata,
-            query_args=''.join(query_args) or nulldata,
-            post_data=''.join(post_data) or nulldata,
+        httpcode=500,
+        content=self.ERROR_TEMPLATE.Parse(
+            cookies=[(cookie, self.cookies[cookie].value)
+                     for cookie in sorted(self.cookies)],
+            environ=sorted(self.req.ExtendedEnvironment().items()),
+            query_args=[(var, self.get[var]) for var in sorted(self.get)],
+            post_data=[(var, self.post.getlist(var))
+                       for var in sorted(self.post)],
             exc={'type': sys.exc_type.__name__,
                  'value': sys.exc_value,
-                 'traceback': ''.join(stack_trace)}))
-
-  @property
-  def debug_parser(self):
-    """Provides a templateparser.Parser instance for debugging output.
-
-    This uses a fixed directory 'error_templates' in this directory.
-    """
-    if not '__debug_parser' in self.persistent:
-      template_dir = os.path.join(os.path.dirname(__file__), 'error_templates')
-      self.persistent.Set('__debug_parser',
-                          templateparser.Parser(os.path.abspath(template_dir)))
-    return self.persistent.Get('__debug_parser')
+                 'traceback': self._ParseStackFrames(sys.exc_traceback)}))
 
 
 class PageMakerMongodbMixin(object):

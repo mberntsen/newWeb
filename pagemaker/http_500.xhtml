@@ -86,27 +86,89 @@
   </head>
   <body>
     <h1>Internal Server Error (HTTP 500)</h1>
-    <p>Wow, no idea what you did there, but the server sure choked on it</p>
+    <p>We're not sure what you did, but it definitely tripped up the server.</p>
+    <p>Here's what we know went wrong, though we still have to figure out why:</p>
     <h2>[exc:type]</h2>
     <p>[exc:value]</p>
     <h2>Traceback<small> (most recent call first)</small></h2>
-    <ol class="traceback">[exc:traceback|raw]</ol>
+    <ol class="traceback">
+      {{ for frame in [exc:traceback] }}
+      <li>
+        <ul class="frame">
+          <li><strong>File:</strong> &quot;[frame:file]&quot;</li>
+          <li><strong>Scope:</strong> [frame:scope]</li>
+          <li>
+            <table class="source">
+              <thead><tr><td colspan="2">Source code</td></tr></thead>
+              <tbody>
+                {{ for line in [frame:source] }}
+                <tr><td>[line:0]</td><td>[line:1]</td></tr>
+                {{ endfor }}
+              </tbody>
+            </table>
+          </li>
+          <li>
+            <table>
+              <thead><tr><td colspan="2">Frame locals</td></tr></thead>
+              <tbody>
+                {{ for var in [frame:locals] }}
+                <tr><td>[var:0]</td><td>[var:1]</td></tr>
+                {{ endfor }}
+              </tbody>
+            </table>
+          </li>
+        </ul>
+      </li>
+      {{ endfor }}
+    </ol>
     <h2>Environment information</h2>
     <table>
       <thead><tr><td colspan="2">Cookies</td></tr></thead>
-      <tbody>[cookies|raw]</tbody>
+      <tbody>
+        {{ if cookies }}
+          {{ for var in [cookies] }}
+          <tr><td>[var:0]</td><td>[var:1]</td></tr>
+          {{ endfor }}
+        {{ else }}
+          <tr><td colspan="2"><em>NULL</em></td></tr>
+        {{ endif }}
+      </tbody>
     </table>
     <table>
       <thead><tr><td colspan="2">Query arguments (GET)</td></tr></thead>
-      <tbody>[query_args|raw]</tbody>
+      <tbody>
+        {{ if query_args }}
+          {{ for var in [query_args] }}
+          <tr><td>[var:0]</td><td>[var:1]</td></tr>
+          {{ endfor }}
+        {{ else }}
+          <tr><td colspan="2"><em>NULL</em></td></tr>
+        {{ endif }}
+      </tbody>
     </table>
     <table>
       <thead><tr><td colspan="2">POST data</td></tr></thead>
-      <tbody>[post_data|raw]</tbody>
+      <tbody>
+        {{ if post_data }}
+          {{ for var in [post_data] }}
+          <tr><td>[var:0]</td><td>[var:1]</td></tr>
+          {{ endfor }}
+        {{ else }}
+          <tr><td colspan="2"><em>NULL</em></td></tr>
+        {{ endif }}
+      </tbody>
     </table>
     <table>
       <thead><tr><td colspan="2">Full environment</td></tr></thead>
-      <tbody>[environ|raw]</tbody>
+      <tbody>
+        {{ if environ }}
+          {{ for var in [environ] }}
+          <tr><td>[var:0]</td><td>[var:1]</td></tr>
+          {{ endfor }}
+        {{ else }}
+          <tr><td colspan="2"><em>NULL</em></td></tr>
+        {{ endif }}
+      </tbody>
     </table>
   </body>
 </html>
