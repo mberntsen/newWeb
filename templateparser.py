@@ -9,7 +9,7 @@ Error classes:
   TemplateReadError: Template file could not be read or found.
 """
 __author__ = 'Elmer de Looff <elmer@underdark.nl'
-__version__ = '1.1'
+__version__ = '1.2'
 
 # Standard modules
 import os
@@ -289,10 +289,10 @@ class Template(list):
     elif name == 'if':
       self._StartScope(TemplateConditional(node.split(None, 1)[1]))
     elif name == 'elif':
-      self._VerifyScope(TemplateConditional)
+      self._VerifyOpenScope(TemplateConditional)
       self.scopes[-1].Elif(node.split(None, 1)[1])
     elif name == 'else':
-      self._VerifyScope(TemplateConditional)
+      self._VerifyOpenScope(TemplateConditional)
       self.scopes[-1].Else()
     elif name == 'endif':
       self._CloseScope(TemplateConditional)
@@ -317,7 +317,7 @@ class Template(list):
     If the open scope is not an instance of the given scope class,
     TemplateSyntaxError is raised.
     """
-    self._VerifyScope(scope_cls)
+    self._VerifyOpenScope(scope_cls)
     self.scopes.pop()
 
   def _StartScope(self, scope):
@@ -325,7 +325,7 @@ class Template(list):
     self._AddPart(scope)
     self.scopes.append(scope)
 
-  def _VerifyScope(self, scope_cls):
+  def _VerifyOpenScope(self, scope_cls):
     """Verifies the given `scope_cls` is the current open scope.
 
     If this is not the case, TemplateSyntaxError is raised.
