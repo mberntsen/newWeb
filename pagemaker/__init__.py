@@ -3,7 +3,7 @@
 from __future__ import with_statement
 
 __author__ = 'Elmer de Looff <elmer@underdark.nl>'
-__version__ = '0.7'
+__version__ = '0.8'
 
 # Standard modules
 import datetime
@@ -217,11 +217,11 @@ class BasePageMaker(object):
           self.options.get('templates', {}).get('path', self.TEMPLATE_DIR)))
     return self.persistent.Get('__parser')
 
-  def InternalServerError(self):
+  def InternalServerError(self, exc_type, exc_value, traceback):
     """Returns a plain text notification about an internal server error."""
     error = 'INTERNAL SERVER ERROR (HTTP 500) DURING PROCESSING OF %r' % (
                 self.req.env['PATH_INFO'])
-    logging.LogException(error)
+    logging.LogError(error, exc_info=(exc_type, exc_value, traceback))
     return Response(content=error, content_type='text/plain', httpcode=500)
 
   @staticmethod
@@ -304,7 +304,8 @@ class PageMakerDebuggerMixin(object):
       stack = stack.tb_next
     return reversed(frames)
 
-  def _SourceLines(self, filename, line_num, context=3):
+  @staticmethod
+  def _SourceLines(filename, line_num, context=3):
     """Yields the offending source line, and `context` lines of context.
 
     Arguments:
@@ -322,11 +323,11 @@ class PageMakerDebuggerMixin(object):
     for line_num in xrange(line_num - context, line_num + context + 1):
       yield line_num, linecache.getline(filename, line_num)
 
-  def InternalServerError(self):
+  def InternalServerError(self, exc_type, exc_value, traceback):
     """Returns a HTTP 500 response with detailed failure analysis."""
-    logging.LogException(
+    logging.LogError(
         'INTERNAL SERVER ERROR (HTTP 500) DURING PROCESSING OF %r',
-        self.req.env['PATH_INFO'])
+        self.req.env['PATH_INFO'], exc_info=(exc_type, exc_value, traceback))
     return Response(
         httpcode=500,
         content=self.ERROR_TEMPLATE.Parse(
@@ -336,9 +337,8 @@ class PageMakerDebuggerMixin(object):
             query_args=[(var, self.get[var]) for var in sorted(self.get)],
             post_data=[(var, self.post.getlist(var))
                        for var in sorted(self.post)],
-            exc={'type': sys.exc_type.__name__,
-                 'value': sys.exc_value,
-                 'traceback': self._ParseStackFrames(sys.exc_traceback)}))
+            exc={'type': exc_type, 'value': exc_value,
+                 'traceback': self._ParseStackFrames(traceback)}))
 
 
 class PageMakerMongodbMixin(object):

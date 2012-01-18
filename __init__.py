@@ -114,7 +114,7 @@ def Handler(page_class, routes, config=None):
     except ImmediateResponse, response:
       response = response[0]
     except (NoRouteError, Exception):
-      response = pages.InternalServerError()
+      response = pages.InternalServerError(*sys.exc_info())
 
     if not isinstance(response, Response):
       response = Response(content=response)
