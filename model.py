@@ -129,7 +129,7 @@ class BaseRecord(dict):
       BaseRecord: the record that was created from the initiation mapping.
     """
     record = cls(connection, record)
-    record.Save(force_create=True)
+    record.Save(create_new=True)
     return record
 
   @classmethod
@@ -185,16 +185,16 @@ class BaseRecord(dict):
     """
     raise NotImplementedError
 
-  def Save(self, force_create=False):
+  def Save(self, create_new=False):
     """Saves the changes made to the record.
 
-    This performs an update to the record, except when `force_create` if set to
+    This performs an update to the record, except when `create_new` if set to
     True, in which case the record is inserted.
 
     Arguments:
-      % force_create: bool ~~ False
-        Forces the insertion of a new record in the database, this should be
-        used when Save is called by the Create() method.
+      % create_new: bool ~~ False
+        Tells the method to create a new record instead of updating a current.
+        This should be used when Save is called by the Create() method.
     """
     raise NotImplementedError
 
@@ -489,16 +489,16 @@ class Record(BaseRecord):
     for record in records:
       yield cls(connection, record)
 
-  def Save(self, force_create=False, save_foreign=False):
+  def Save(self, create_new=False, save_foreign=False):
     """Saves the changes made to the record.
 
     This expands on the base Save method, providing a save_foreign that will
     recursively update all nested records when set to True.
 
     Arguments:
-      % force_create: bool ~~ False
-        Forces the insertion of a new record in the database, this should be
-        used when Save is called by the Create() method.
+      % create_new: bool ~~ False
+        Tells the method to create a new record instead of updating a current.
+        This should be used when Save is called by the Create() method.
       % save_foreign: bool ~~ False
         If set, each Record (subclass) contained by this one will be saved as
         well. This recursive saving triggers *before* this record itself will be
@@ -506,7 +506,7 @@ class Record(BaseRecord):
         that a failure to save this object will *not* roll back child saves.
     """
     with self.connection as cursor:
-      if force_create:
+      if create_new:
         return self._RecordInsert(cursor)
       elif save_foreign:
         self._SaveForeign(cursor)
@@ -672,9 +672,68 @@ class MongoRecord(BaseRecord):
     for record in cls.Collection(connection).find():
       yield cls(connection, record)
 
-  def Save(self, force_create=False):
+  def Save(self, create_new=False):
     if self._Changes():
       self.Collection(self.connection).upsert(self._DataRecord())
+
+
+class Smorgasbord(object):
+  """A connection tracker for uWeb Record classes.
+
+  The idea is that you can set up a Smorgasbord with various different
+  connection types, and have the 'bord figure out which one to hand to the
+  Record that wants to use the connection.
+
+  This is highly beta and debugging is going to be at the very least interesting
+  because of __getattribute__ overriding that is necessary for this type of
+  behavior.
+  """
+  CONNECTION_TYPES = 'mongo', 'relational'
+
+  def __init__(self):
+    self.connections = {}
+
+  def AddConnection(self, connection, con_type):
+    """Adds a connection and its type to the Smorgasbord.
+
+    The connection type should be one of the strings defined in the class
+    constant `CONNECTION_TYPES`.
+    """
+    if con_type not in self.CONNECTION_MAPPING.values():
+      raise ValueError('Unknown connection type %r' % con_type)
+    self.connections[con_type] = connection
+
+  def RelevantConnection(self):
+    """Returns the relevant database connection dependant on the caller model.
+
+    If the caller model cannot be determined, the 'relational' database
+    connection is returned as a fallback method.
+    """
+    try:
+      # Figure out calling instance
+      # pylint: disable=W0212
+      caller_instance = sys._getframe(2).f_locals['self']
+      # pylint: enable=W0212
+      if isinstance(caller_instance, MongoRecord):
+        con_type = 'mongo'
+      else:
+        con_type = 'relational' # This is the default connection to return.
+    except KeyError:
+      # In case the requester for a connection is not a proper class.
+      con_type = 'relational'
+    try:
+      return self.connections[con_type]
+    except KeyError:
+      raise TypeError('There is no connection for type %r' % con_type)
+
+  def __getattribute__(self, attribute):
+    print 'Got request for %r' % attribute
+    try:
+      return super(Smorgasbord, self).__getattribute__(attribute)
+    except AttributeError:
+      print 'AttributeError, picking this from the connection!'
+      # Pray to God we don't override anything in these connection classes.
+      return getattr(self.RelevantConnection(), attribute)
 
 
 def RecordTableNames():
