@@ -122,53 +122,45 @@
       {{ endfor }}
     </ol>
     <h2>Environment information</h2>
+    {{ if cookies }}
     <table>
       <thead><tr><td colspan="2">Cookies</td></tr></thead>
       <tbody>
-        {{ if cookies }}
           {{ for var in [cookies] }}
           <tr><td>[var:0]</td><td>[var:1]</td></tr>
           {{ endfor }}
-        {{ else }}
-          <tr><td colspan="2"><em>NULL</em></td></tr>
-        {{ endif }}
       </tbody>
     </table>
+    {{ endif }}
+    {{ if query_args }}
     <table>
       <thead><tr><td colspan="2">Query arguments (GET)</td></tr></thead>
       <tbody>
-        {{ if query_args }}
           {{ for var in [query_args] }}
           <tr><td>[var:0]</td><td>[var:1]</td></tr>
           {{ endfor }}
-        {{ else }}
-          <tr><td colspan="2"><em>NULL</em></td></tr>
-        {{ endif }}
       </tbody>
     </table>
+    {{ endif }}
+    {{ if post_data }}
     <table>
       <thead><tr><td colspan="2">POST data</td></tr></thead>
       <tbody>
-        {{ if post_data }}
           {{ for var in [post_data] }}
           <tr><td>[var:0]</td><td>[var:1]</td></tr>
           {{ endfor }}
-        {{ else }}
-          <tr><td colspan="2"><em>NULL</em></td></tr>
-        {{ endif }}
       </tbody>
     </table>
+    {{ endif }}
+    {{ if environ }}
     <table>
       <thead><tr><td colspan="2">Full environment</td></tr></thead>
       <tbody>
-        {{ if environ }}
           {{ for var in [environ] }}
           <tr><td>[var:0]</td><td>[var:1]</td></tr>
           {{ endfor }}
-        {{ else }}
-          <tr><td colspan="2"><em>NULL</em></td></tr>
-        {{ endif }}
       </tbody>
     </table>
+    {{ endif }}
   </body>
 </html>

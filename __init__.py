@@ -28,6 +28,7 @@ from underdark.libs import app
 from underdark.libs import udders
 from underdark.libs.uweb import pagemaker
 from underdark.libs.uweb import request
+from underdark.libs.uweb.pagemaker import Response
 
 # Regex to match HTML entities and character references with.
 HTML_ENTITY_SEARCH = re.compile('&#?\w+;')
