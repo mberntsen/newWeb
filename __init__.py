@@ -3,7 +3,7 @@
 from __future__ import with_statement
 
 __author__ = 'Elmer de Looff <elmer@underdark.nl>'
-__version__ = '0.9'
+__version__ = '0.10'
 
 # Standard modules
 import htmlentitydefs
@@ -26,7 +26,7 @@ except ImportError:
 # Custom modules
 from underdark.libs import app
 from underdark.libs import udders
-from underdark.libs.uweb.pagemaker import *
+from underdark.libs.uweb import pagemaker
 from underdark.libs.uweb import request
 
 # Regex to match HTML entities and character references with.
@@ -44,11 +44,13 @@ class NoRouteError(Error):
   """The server does not know how to route this request"""
 
 
-class PageMaker(PageMakerMysqlMixin, PageMakerSessionMixin, BasePageMaker):
+class PageMaker(pagemaker.MysqlMixin,
+                pagemaker.SessionMixin,
+                pagemaker.BasePageMaker):
   """The basic PageMaker class, providing MySQL and Pysession support."""
 
 
-class DebuggingPageMaker(PageMakerDebuggerMixin, PageMaker):
+class DebuggingPageMaker(pagemaker.DebuggerMixin, PageMaker):
   """The same basic PageMaker, with added debugging on HTTP 500."""
 
 
@@ -108,16 +110,17 @@ def Handler(page_class, routes, config=None):
       pages._PostInit()
       method, args = router(req.env['PATH_INFO'])
       response = getattr(pages, method)(*args)
-    except ReloadModules, message:
+    except pagemaker.ReloadModules, message:
       reload_message = reload(sys.modules[page_class.__module__])
-      response = Response(content='%s\n%s' % (message, reload_message))
+      response = pagemaker.Response(
+          content='%s\n%s' % (message, reload_message))
     except ImmediateResponse, response:
       response = response[0]
     except (NoRouteError, Exception):
       response = pages.InternalServerError(*sys.exc_info())
 
-    if not isinstance(response, Response):
-      response = Response(content=response)
+    if not isinstance(response, pagemaker.Response):
+      response = pagemaker.Response(content=response)
     req.SetHttpStatus(response.httpcode)
     req.SetContentType(response.content_type)
     for header_pair in response.headers.iteritems():

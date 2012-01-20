@@ -3,7 +3,7 @@
 from __future__ import with_statement
 
 __author__ = 'Elmer de Looff <elmer@underdark.nl>'
-__version__ = '0.8'
+__version__ = '0.9'
 
 # Standard modules
 import datetime
@@ -19,11 +19,6 @@ from underdark.libs import pysession
 from underdark.libs.uweb import templateparser
 
 RFC_1123_DATE = '%a, %d %b %Y %T GMT'
-
-__all__ = (
-    'DatabaseError', 'ReloadModules', 'BasePageMaker', 'PageMakerDebuggerMixin',
-    'PageMakerMongodbMixin', 'PageMakerMysqlMixin', 'PageMakerSqliteMixin',
-    'PageMakerSessionMixin', 'Response')
 
 
 class DatabaseError(Exception):
@@ -267,7 +262,7 @@ class BasePageMaker(object):
                       httpcode=404)
 
 
-class PageMakerDebuggerMixin(object):
+class DebuggerMixin(object):
   """Replaces the default handler for Internal Server Errors.
 
   This one prints a host of debugging and request information, though it still
@@ -341,10 +336,10 @@ class PageMakerDebuggerMixin(object):
                  'traceback': self._ParseStackFrames(traceback)}))
 
 
-class PageMakerMongodbMixin(object):
+class MongoMixin(object):
   """Adds MongoDB support to PageMaker."""
   @property
-  def connection(self):
+  def mongo(self):
     """Returns a MongoDB database connection."""
     if '__mongo' not in self.persistent:
       import pymongo
@@ -352,14 +347,12 @@ class PageMakerMongodbMixin(object):
         self.persistent.Set('__mongo', pymongo.connection.Connection(
             host=self.options['mongodb'].get('host', 'localhost'),
             port=self.options['mongodb'].get('port', None)))
-      except pymongo.errors.AutoReconnect:
-        raise DatabaseError('MongoDb is unavailable')
-      except pymongo.errors.ConnectionFailure:
-        raise DatabaseError('MongoDb is unavailable')
+      except pymongo.errors.PyMongoError:
+        raise DatabaseError('MongoDB is unavailable')
     return self.persistent.Get('__mongo')
 
 
-class PageMakerMysqlMixin(object):
+class MysqlMixin(object):
   """Adds MySQL support to PageMaker."""
   @property
   def connection(self):
@@ -373,11 +366,11 @@ class PageMakerMysqlMixin(object):
           passwd=mysqlopts.get('password'),
           db=mysqlopts.get('database'),
           charset=mysqlopts.get('charset', 'utf8'),
-          debug=PageMakerDebuggerMixin in self.__class__.__mro__))
+          debug=DebuggerMixin in self.__class__.__mro__))
     return self.persistent.Get('__mysql')
 
 
-class PageMakerSqliteMixin(object):
+class SqliteMixin(object):
   """Adds SQLite support to PageMaker."""
   @property
   def connection(self):
@@ -386,13 +379,13 @@ class PageMakerSqliteMixin(object):
       from underdark.libs.sqltalk import sqlite
       self.persistent.Set('__sqlite', sqlite.Connect(
           self.options['sqlite']['database']))
-    return self._connection
+    return self.persistent.Get('__sqlite')
 
 
-class PageMakerSessionMixin(object):
+class SessionMixin(object):
   """Adds pysession support to PageMaker."""
   def __init__(self, *args, **kwds):
-    super(PageMakerSessionMixin, self).__init__(*args, **kwds)
+    super(SessionMixin, self).__init__(*args, **kwds)
     self._userid = None
 
   @property
@@ -439,6 +432,49 @@ class PageMakerSessionMixin(object):
       return session_handler.userid
     except (pysession.SessionError, ValueError):
       return False
+
+
+class SmorgasbordMixin(object):
+  """Provides multiple-database connectivity.
+
+  This enables a developer to use a single 'connection' property (`bord`) which
+  can be used for regular relation database and MongoDB access. The caller will
+  be given the relation database connection, unless Smorgasbord is aware of
+  the caller's needs for another database connection.
+  """
+  class Connections(dict):
+    """Connection autoloading class for Smorgasbord."""
+    def __init__(self, pagemaker):
+      super(SmorgasbordMixin.Connections, self).__init__()
+      self.pagemaker = pagemaker
+
+    def __getitem__(self, key):
+      """Returns the requested database connection type.
+
+      If the database connection type isn't locally available, it is retrieved
+      using one of the _Load* methods.
+      """
+      try:
+        return super(SmorgasbordMixin.Connections, self).__getitem__(key)
+      except KeyError:
+        return getattr(self, '_Load%s' % key.title())()
+
+    def _LoadMongo(self):
+      """Returns the PageMaker's MongoDB connection."""
+      return self.pagemaker.mongo
+
+    def _LoadRelational(self):
+      """Returns the PageMaker's relational database connection."""
+      return self.pagemaker.connection
+
+  @property
+  def bord(self):
+    """Returns a Smorgasbord of autoloading database connections."""
+    if '__bord' not in self.persistent:
+      from underdark.libs.uweb import model
+      self.persistent.Set('__bord', model.Smorgasbord(
+          connections=SmorgasbordMixin.Connections(self)))
+    return self.persistent.Get('__bord')
 
 
 class Response(object):
