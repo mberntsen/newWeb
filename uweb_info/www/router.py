@@ -36,4 +36,4 @@ ROUTES = (
     ('/(.*)', 'Index'))
 
 
-uweb.ServerSetup(apache_logging=False)
+uweb.ServerSetup(apache_logging=True)
