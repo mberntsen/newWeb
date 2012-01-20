@@ -681,8 +681,10 @@ class Smorgasbord(object):
   """A connection tracker for uWeb Record classes.
 
   The idea is that you can set up a Smorgasbord with various different
-  connection types, and have the 'bord figure out which one to hand to the
-  Record that wants to use the connection.
+  connection types (Mongo and relational), and have the smorgasbord provide the
+  correct connection for the caller's needs. MongoReceord would be given the
+  MongoDB connection as expected, and all other users will be given a relational
+  datbaase connection.
 
   This is highly beta and debugging is going to be at the very least interesting
   because of __getattribute__ overriding that is necessary for this type of
@@ -690,8 +692,8 @@ class Smorgasbord(object):
   """
   CONNECTION_TYPES = 'mongo', 'relational'
 
-  def __init__(self):
-    self.connections = {}
+  def __init__(self, connections=None):
+    self.connections = {} if connections is None else connections
 
   def AddConnection(self, connection, con_type):
     """Adds a connection and its type to the Smorgasbord.
@@ -719,7 +721,7 @@ class Smorgasbord(object):
       else:
         con_type = 'relational' # This is the default connection to return.
     except KeyError:
-      # In case the requester for a connection is not a proper class.
+      # In case the requester for a connection isn't an instance.
       con_type = 'relational'
     try:
       return self.connections[con_type]
@@ -729,10 +731,9 @@ class Smorgasbord(object):
   def __getattribute__(self, attribute):
     print 'Got request for %r' % attribute
     try:
+      # Pray to God we haven't overloaded anything from our connection classes.
       return super(Smorgasbord, self).__getattribute__(attribute)
     except AttributeError:
-      print 'AttributeError, picking this from the connection!'
-      # Pray to God we don't override anything in these connection classes.
       return getattr(self.RelevantConnection(), attribute)
 
 
