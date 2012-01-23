@@ -3,7 +3,7 @@
 from __future__ import with_statement
 
 __author__ = 'Elmer de Looff <elmer@underdark.nl>'
-__version__ = '0.9'
+__version__ = '0.10'
 
 # Standard modules
 import datetime
@@ -18,15 +18,8 @@ from underdark.libs import logging
 from underdark.libs import pysession
 from underdark.libs.uweb import templateparser
 
+__all__ = 'PageMaker', 'DebuggingPageMaker', 'Response', 'ReloadModules'
 RFC_1123_DATE = '%a, %d %b %Y %T GMT'
-
-
-class DatabaseError(Exception):
-  """The database server has gone away"""
-
-
-class ReloadModules(Exception):
-  """Communicates the handler that it should reload the pageclass"""
 
 
 class CacheStorage(object):
@@ -181,15 +174,15 @@ class BasePageMaker(object):
     directory is used as the working directory. Then, the module constants
     PUBLIC_DIR and TEMPLATE_DIR are used to define class constants from.
     """
+    # Unfortunately, mod_python does not always support retrieving the caller
+    # filename using sys.modules. In those cases we need to query the stack.
+    # pylint: disable=W0212
     try:
       local_file = sys.modules[cls.__module__].__file__
     except KeyError:
-      # Unfortunately, mod_python does not support our previous trick where we
-      # retrieve the caller filename using sys.modules, so we need the stack.
-      # pylint: disable=W0212
       frame = sys._getframe()
-      # pylint: enable=W0212
       initial = frame.f_code.co_filename
+      # pylint: enable=W0212
       while initial == frame.f_code.co_filename:
         if not frame.f_back:
           break  # This happens during exception handling of DebuggingPageMaker
@@ -343,12 +336,9 @@ class MongoMixin(object):
     """Returns a MongoDB database connection."""
     if '__mongo' not in self.persistent:
       import pymongo
-      try:
-        self.persistent.Set('__mongo', pymongo.connection.Connection(
-            host=self.options['mongodb'].get('host', 'localhost'),
-            port=self.options['mongodb'].get('port', None)))
-      except pymongo.errors.PyMongoError:
-        raise DatabaseError('MongoDB is unavailable')
+      self.persistent.Set('__mongo', pymongo.connection.Connection(
+          host=self.options['mongodb'].get('host', 'localhost'),
+          port=self.options['mongodb'].get('port', None)))
     return self.persistent.Get('__mongo')
 
 
@@ -475,6 +465,21 @@ class SmorgasbordMixin(object):
       self.persistent.Set('__bord', model.Smorgasbord(
           connections=SmorgasbordMixin.Connections(self)))
     return self.persistent.Get('__bord')
+
+
+# ##############################################################################
+# Classes for public use (wildcard import)
+#
+class ReloadModules(Exception):
+  """Communicates the handler that it should reload the pageclass"""
+
+
+class PageMaker(MysqlMixin, SessionMixin, BasePageMaker):
+  """The basic PageMaker class, providing MySQL and Pysession support."""
+
+
+class DebuggingPageMaker(DebuggerMixin, PageMaker):
+  """The same basic PageMaker, with added debugging on HTTP 500."""
 
 
 class Response(object):
