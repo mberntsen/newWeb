@@ -216,7 +216,7 @@ class BaseRecord(dict):
     For any Record object present, its primary key value (`Record.key`) is used.
     """
     sql_record = {}
-    for key, value in self.iteritems():
+    for key, value in super(BaseRecord, self).iteritems():
       if isinstance(value, BaseRecord):
         sql_record[key] = value.key
       else:
@@ -701,7 +701,7 @@ class Smorgasbord(object):
     The connection type should be one of the strings defined in the class
     constant `CONNECTION_TYPES`.
     """
-    if con_type not in self.CONNECTION_MAPPING.values():
+    if con_type not in self.CONNECTION_TYPES:
       raise ValueError('Unknown connection type %r' % con_type)
     self.connections[con_type] = connection
 
