@@ -336,9 +336,10 @@ class MongoMixin(object):
     """Returns a MongoDB database connection."""
     if '__mongo' not in self.persistent:
       import pymongo
+      mongo_config = self.options.get('mongo', {})
       self.persistent.Set('__mongo', pymongo.connection.Connection(
-          host=self.options['mongodb'].get('host', 'localhost'),
-          port=self.options['mongodb'].get('port', None)))
+          host=mongo_config.get('host'),
+          port=mongo_config.get('port')))
     return self.persistent.Get('__mongo')
 
 
@@ -349,13 +350,13 @@ class MysqlMixin(object):
     """Returns a MySQL database connection."""
     if '__mysql' not in self.persistent:
       from underdark.libs.sqltalk import mysql
-      mysqlopts = self.options['mysql']
+      mysql_config = self.options['mysql']
       self.persistent.Set('__mysql', mysql.Connect(
-          host=mysqlopts.get('host', 'localhost'),
-          user=mysqlopts.get('user'),
-          passwd=mysqlopts.get('password'),
-          db=mysqlopts.get('database'),
-          charset=mysqlopts.get('charset', 'utf8'),
+          host=mysql_config.get('host', 'localhost'),
+          user=mysql_config.get('user'),
+          passwd=mysql_config.get('password'),
+          db=mysql_config.get('database'),
+          charset=mysql_config.get('charset', 'utf8'),
           debug=DebuggerMixin in self.__class__.__mro__))
     return self.persistent.Get('__mysql')
 
