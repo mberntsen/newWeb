@@ -309,7 +309,7 @@ class Record(BaseRecord):
       obj: The value belonging to the given `field`. In case of resolved foreign
            references, this will be the referenced object. Else it's unchanged.
     """
-    if not isinstance(value, Record):
+    if not isinstance(value, BaseRecord):
       if field in self._FOREIGN_RELATIONS:
         return self._LoadUsingForeignRelations(
             self._FOREIGN_RELATIONS[field], field, value)
@@ -660,6 +660,9 @@ class MongoRecord(BaseRecord):
 
   @classmethod
   def FromPrimary(cls, connection, pkey_value):
+    from pymongo import objectid
+    if not isinstance(pkey_value, objectid.ObjectId):
+      pkey_value = objectid.ObjectId(pkey_value)
     collection = cls.Collection(connection)
     record = collection.find({cls._PRIMARY_KEY: pkey_value})
     if not record:
@@ -673,8 +676,8 @@ class MongoRecord(BaseRecord):
       yield cls(connection, record)
 
   def Save(self, create_new=False):
-    if self._Changes():
-      self.Collection(self.connection).upsert(self._DataRecord())
+    if create_new or self._Changes():
+      self.key = self.Collection(self.connection).save(self._DataRecord())
 
 
 class Smorgasbord(object):
@@ -711,25 +714,25 @@ class Smorgasbord(object):
     If the caller model cannot be determined, the 'relational' database
     connection is returned as a fallback method.
     """
-    try:
-      # Figure out calling instance
-      # pylint: disable=W0212
-      caller_instance = sys._getframe(2).f_locals['self']
-      # pylint: enable=W0212
-      if isinstance(caller_instance, MongoRecord):
-        con_type = 'mongo'
-      else:
-        con_type = 'relational' # This is the default connection to return.
-    except KeyError:
-      # In case the requester for a connection isn't an instance.
-      con_type = 'relational'
+    # Figure out caller type or instance
+    # pylint: disable=W0212
+    caller_locals = sys._getframe(2).f_locals
+    # pylint: enable=W0212
+    if 'self' in caller_locals:
+      caller_cls = type(caller_locals['self'])
+    else:
+      caller_cls = caller_locals.get('cls', type)
+    # Decide the type of connection to return for this caller
+    if issubclass(caller_cls, MongoRecord):
+      con_type = 'mongo'
+    else:
+      con_type = 'relational' # This is the default connection to return.
     try:
       return self.connections[con_type]
     except KeyError:
       raise TypeError('There is no connection for type %r' % con_type)
 
   def __getattribute__(self, attribute):
-    print 'Got request for %r' % attribute
     try:
       # Pray to God we haven't overloaded anything from our connection classes.
       return super(Smorgasbord, self).__getattribute__(attribute)
