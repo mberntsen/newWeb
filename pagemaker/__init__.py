@@ -337,9 +337,13 @@ class MongoMixin(object):
     if '__mongo' not in self.persistent:
       import pymongo
       mongo_config = self.options.get('mongo', {})
-      self.persistent.Set('__mongo', pymongo.connection.Connection(
+      connection = pymongo.connection.Connection(
           host=mongo_config.get('host'),
-          port=mongo_config.get('port')))
+          port=mongo_config.get('port'))
+      if 'database' in mongo_config:
+        self.persistent.Set('__mongo', connection[mongo_config['database']])
+      else:
+        self.persistent.Set('__mongo', connection)
     return self.persistent.Get('__mongo')
 
 
