@@ -9,7 +9,7 @@ Error classes:
   TemplateReadError: Template file could not be read or found.
 """
 __author__ = 'Elmer de Looff <elmer@underdark.nl'
-__version__ = '1.2'
+__version__ = '1.3'
 
 # Standard modules
 import os
@@ -23,6 +23,10 @@ class Error(Exception):
 
 class TemplateKeyError(Error):
   """There is no replacement with the requested key."""
+
+
+class TemplateNameError(Error):
+  """The template conditional contains a reference that cannot be resolved."""
 
 
 class TemplateSyntaxError(Error):
@@ -375,11 +379,17 @@ class TemplateConditional(object):
   def Expression(expr, **kwds):
     """Returns the eval()'ed result of a tag expression."""
     nodes = []
-    for node in expr:
+    local_vars = {}
+    for num, node in enumerate(expr):
       if isinstance(node, TemplateTag):
-        node = repr(node.GetValue(**kwds))
+        value = node.GetValue(**kwds)
+        node = '__tmpl_var_%d' % num
+        local_vars[node] = value
       nodes.append(node)
-    return eval(''.join(nodes), kwds)
+    try:
+      return eval(''.join(nodes), local_vars)
+    except NameError:
+      raise TemplateNameError('Name %r is not defined. Try it as a tagname?')
 
   def Parse(self, **kwds):
     """Returns the TemplateConditional parsed as string.

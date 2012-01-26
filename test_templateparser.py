@@ -1,10 +1,10 @@
 #!/usr/bin/python2.5
 """Tests for the templateparser module."""
 __author__ = 'Elmer de Looff <elmer@underdark.nl>'
-__version__ = '1.1'
+__version__ = '1.2'
 
 # Too many public methods
-# pylint: disable-msg=R0904
+# pylint: disable=R0904
 
 # Standard modules
 import os
@@ -425,6 +425,15 @@ class TemplateConditionals(unittest.TestCase):
     template = '{{ endif }}'
     self.assertRaises(
         templateparser.TemplateSyntaxError, self.parser.ParseString, template)
+
+  def testVariableMustBeTag(self):
+    """{{ if }} clauses must reference variables using a tag, not a name"""
+    good_template = '{{ if [var] }} x {{ else }} x {{ endif }}'
+    self.assertTrue(self.parser.ParseString(good_template, var='foo'))
+    bad_template = '{{ if var }} x {{ else }} x {{ endif }}'
+    self.assertRaises(templateparser.TemplateNameError,
+                      self.parser.ParseString,
+                      bad_template, var='foo')
 
 
 class TemplateLoops(unittest.TestCase):
