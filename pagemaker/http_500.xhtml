@@ -112,7 +112,7 @@
               <thead><tr><td colspan="2">Frame locals</td></tr></thead>
               <tbody>
                 {{ for var in [frame:locals] }}
-                <tr><td>[var:0]</td><td>[var:1]</td></tr>
+                <tr><td>[var:0]</td><td>[var:1|html]</td></tr>
                 {{ endfor }}
               </tbody>
             </table>
@@ -122,42 +122,42 @@
       {{ endfor }}
     </ol>
     <h2>Environment information</h2>
-    {{ if cookies }}
+    {{ if [cookies] }}
     <table>
       <thead><tr><td colspan="2">Cookies</td></tr></thead>
       <tbody>
           {{ for var in [cookies] }}
-          <tr><td>[var:0]</td><td>[var:1]</td></tr>
+          <tr><td>[var:0]</td><td>[var:1|html]</td></tr>
           {{ endfor }}
       </tbody>
     </table>
     {{ endif }}
-    {{ if query_args }}
+    {{ if [query_args] }}
     <table>
       <thead><tr><td colspan="2">Query arguments (GET)</td></tr></thead>
       <tbody>
           {{ for var in [query_args] }}
-          <tr><td>[var:0]</td><td>[var:1]</td></tr>
+          <tr><td>[var:0]</td><td>[var:1|html]</td></tr>
           {{ endfor }}
       </tbody>
     </table>
     {{ endif }}
-    {{ if post_data }}
+    {{ if [post_data] }}
     <table>
       <thead><tr><td colspan="2">POST data</td></tr></thead>
       <tbody>
           {{ for var in [post_data] }}
-          <tr><td>[var:0]</td><td>[var:1]</td></tr>
+          <tr><td>[var:0]</td><td>[var:1|html]</td></tr>
           {{ endfor }}
       </tbody>
     </table>
     {{ endif }}
-    {{ if environ }}
+    {{ if [environ] }}
     <table>
       <thead><tr><td colspan="2">Full environment</td></tr></thead>
       <tbody>
           {{ for var in [environ] }}
-          <tr><td>[var:0]</td><td>[var:1]</td></tr>
+          <tr><td>[var:0]</td><td>[var:1|html]</td></tr>
           {{ endfor }}
       </tbody>
     </table>
