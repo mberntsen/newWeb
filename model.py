@@ -451,15 +451,14 @@ class Record(BaseRecord):
     the Record's primary key (`self._PRIMARY_KEY` and `self.key` resp.)
     """
     difference = self._Changes()
-    if not difference:
-      return  # Record hasn't changed so we don't have to update anything.
-    try:
-      primary = self.connection.EscapeValues(self._record[self._PRIMARY_KEY])
-    except KeyError:
-      raise Error('Cannot update record without pre-existing primary key.')
-    cursor.Update(table=self.TableName(), values=difference,
-                  conditions='`%s` = %s' % (self._PRIMARY_KEY, primary))
-    self._record.update(difference)
+    if difference:
+      try:
+        primary = self.connection.EscapeValues(self._record[self._PRIMARY_KEY])
+      except KeyError:
+        raise Error('Cannot update record without pre-existing primary key.')
+      cursor.Update(table=self.TableName(), values=difference,
+                    conditions='`%s` = %s' % (self._PRIMARY_KEY, primary))
+      self._record.update(difference)
 
   # ############################################################################
   # Public methods for creation, deletion and storing Record objects.
