@@ -399,6 +399,22 @@ class Record(BaseRecord):
   # ############################################################################
   # Private methods to be used for development
   #
+  @classmethod
+  def _FromParent(cls, parent, relation_field=None):
+    """Returns all `cls` objects that are a child of the given parent.
+
+    This utilized the parent's _Children method, with either this class'
+    TableName or the filled out `relation_field`.
+
+    Arguments:
+      @ parent: Record
+        The parent for who children should be found in this class
+      % relation_field: str ~~ cls.TableName()
+        The fieldname in this class' table which relates to the parent's primary
+        key. If not given, parent.TableName() will be used.
+    """
+    return parent._Children(cls, relation_field=relation_field)
+
   def _Children(self, child_class, relation_field=None):
     """Returns all `child_class` objects related to this record.
 
@@ -408,10 +424,10 @@ class Record(BaseRecord):
     These records will then be yielded as instances of the child class.
 
     Arguments:
-      @ child_class: Record
+      @ child_class: type (Record subclass)
         The child class whose objects should be found.
       % relation_field: str ~~ self.TableName()
-        The fieldname in the `child_class` table which related that table to
+        The fieldname in the `child_class` table which relates that table to
         the table for this record.
     """
     relation_field = relation_field or self.TableName()
@@ -421,6 +437,7 @@ class Record(BaseRecord):
           table=child_class.TableName(),
           conditions='`%s`=%s' % (relation_field, safe_key))
     for child in children:
+      child[relation_field] = self
       yield child_class(self.connection, child)
 
   def _RecordInsert(self, cursor):
