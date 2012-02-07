@@ -30,6 +30,16 @@ class PermissionError(Error):
 # Record classes have many methods, this is not an actual problem.
 # pylint: disable=R0904
 class BaseRecord(dict):
+  """Basic database record wrapping class.
+
+  This allows structured database manipulation for applications. Supported
+  features include:
+  * Loading a record from Primary Key;
+  * Deleting a record by Primary Key;
+  * Deleting an existing open record;
+  * Listing all records of the current type;
+  * Calculating the minimum changed set and storing this to the database.
+  """
   _PRIMARY_KEY = 'ID'
   _TABLE = None
 
@@ -262,7 +272,7 @@ class BaseRecord(dict):
 
 
 class Record(BaseRecord):
-  """Basic class for database table/record abstraction."""
+  """Extensions to the Record abstraction for relational database use."""
   _FOREIGN_RELATIONS = {}
 
   # ############################################################################
@@ -413,7 +423,12 @@ class Record(BaseRecord):
         The fieldname in this class' table which relates to the parent's primary
         key. If not given, parent.TableName() will be used.
     """
+    if not isinstance(parent, Record):
+      raise TypeError('parent argument should be a Record type.')
+    # Accessing a protected member of a similar class, this is okay.
+    # pylint: disable=W0212
     return parent._Children(cls, relation_field=relation_field)
+    # pylint: enable=W0212
 
   def _Children(self, child_class, relation_field=None):
     """Returns all `child_class` objects related to this record.
@@ -439,6 +454,25 @@ class Record(BaseRecord):
     for child in children:
       child[relation_field] = self
       yield child_class(self.connection, child)
+
+  def _DeleteChildren(self, child_class, relation_field=None):
+    """Deletes all `child_class` objects related to this record.
+
+    The table for the given `child_class` will be queried for all fields where
+    the `relation_field` is the same as this record's primary key (`self.key`).
+
+    Arguments:
+      @ child_class: type (Record subclass)
+        The child class whose objects should be deleted.
+      % relation_field: str ~~ self.TableName()
+        The fieldname in the `child_class` table which relates that table to
+        the table for this record.
+    """
+    relation_field = relation_field or self.TableName()
+    with self.connection as cursor:
+      safe_key = self.connection.EscapeValues(self.key)
+      cursor.Delete(table=child_class.TableName(),
+                    conditions='`%s`=%s' % (relation_field, safe_key))
 
   def _RecordInsert(self, cursor):
     """Inserts the record's current values in the database as a new record.
