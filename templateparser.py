@@ -37,6 +37,24 @@ class TemplateReadError(Error, IOError):
   """Template file could not be read or found."""
 
 
+class LazyTagValueRetrieval(object):
+  """Provides a means for lazy tag value retrieval.
+
+  This is necessary for instance for TemplateConditional.Expression, where
+  lazy retrieval of tag values means that shortcircuit conditional expressions
+  become possible.
+  """
+  def __init__(self, values):
+    self.values = values
+    self.tags = {}
+
+  def __getitem__(self, key):
+    return self.tags[key].GetValue(self.values)
+
+  def __setitem__(self, key, value):
+    self.tags[key] = value
+
+
 class Parser(dict):
   """A template parser that loads and caches templates and parses them by name.
 
@@ -379,15 +397,16 @@ class TemplateConditional(object):
   def Expression(expr, **kwds):
     """Returns the eval()'ed result of a tag expression."""
     nodes = []
-    local_vars = {}
+    local_vars = LazyTagValueRetrieval(kwds)
     for num, node in enumerate(expr):
       if isinstance(node, TemplateTag):
-        value = node.GetValue(**kwds)
-        node = '__tmpl_var_%d' % num
-        local_vars[node] = value
-      nodes.append(node)
+        node_name = '__tmpl_var_%d' % num
+        local_vars[node_name] = node
+        nodes.append(node_name)
+      else:
+        nodes.append(node)
     try:
-      return eval(''.join(nodes), local_vars)
+      return eval(''.join(nodes), None, local_vars)
     except NameError:
       raise TemplateNameError('Name %r is not defined. Try it as a tagname?')
 
@@ -454,7 +473,7 @@ class TemplateLoop(list):
     """
     output = []
     replacements = kwds.copy()
-    for alias in self.tag.GetValue(**kwds):
+    for alias in self.tag.GetValue(kwds):
       replacements[self.alias] = alias
       output.append(''.join(tag.Parse(**replacements) for tag in self))
     return ''.join(output)
@@ -519,7 +538,7 @@ class TemplateTag(object):
     except AttributeError:
       raise TemplateSyntaxError('Invalid Tag syntax: %r' % tag)
 
-  def GetValue(self, **kwds):
+  def GetValue(self, replacements):
     """Returns the value for the tag, after reducing indices.
 
     For a tag with indices, these are looked up one after the other, each index
@@ -527,7 +546,7 @@ class TemplateTag(object):
     would given 'foo' as the value for the tag.
     """
     try:
-      value = kwds[self.name]
+      value = replacements[self.name]
       for index in self.indices:
         value = self._GetIndex(value, index)
       return value
@@ -554,7 +573,7 @@ class TemplateTag(object):
     the template has been created, the new function will be used instead.
     """
     try:
-      value = self.GetValue(**kwds)
+      value = self.GetValue(kwds)
     except TemplateKeyError:
       # On any failure to get the given index, return the unmodified tag.
       return str(self)

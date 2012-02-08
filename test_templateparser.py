@@ -427,13 +427,23 @@ class TemplateConditionals(unittest.TestCase):
         templateparser.TemplateSyntaxError, self.parser.ParseString, template)
 
   def testVariableMustBeTag(self):
-    """{{ if }} clauses must reference variables using a tag, not a name"""
+    """{{ if }} Clauses must reference variables using a tag, not a name"""
     good_template = '{{ if [var] }} x {{ else }} x {{ endif }}'
     self.assertTrue(self.parser.ParseString(good_template, var='foo'))
     bad_template = '{{ if var }} x {{ else }} x {{ endif }}'
     self.assertRaises(templateparser.TemplateNameError,
                       self.parser.ParseString,
                       bad_template, var='foo')
+
+  def testLazyEvaluation(self):
+    """{{ if }} Variables are retrieved in lazy fashion, not before needed"""
+    # Tags are looked up lazily
+    template = '{{ if [present] or [absent] }}~ {{ endif }}'
+    self.assertEqual('~', self.parser.ParseString(template, present=True))
+
+    # Indices are looked up lazily
+    template = '{{ if [var:present] or [var:absent] }}~ {{ endif }}'
+    self.assertEqual('~', self.parser.ParseString(template, var={'present': 1}))
 
 
 class TemplateLoops(unittest.TestCase):
