@@ -45,14 +45,47 @@ class LazyTagValueRetrieval(object):
   become possible.
   """
   def __init__(self, values):
-    self.values = values
-    self.tags = {}
+    self._values = values
+    self._tags = {}
 
+  # ############################################################################
+  # Methods for delayed tag value retrieval
+  #
   def __getitem__(self, key):
-    return self.tags[key].GetValue(self.values)
+    return self._tags[key].GetValue(self._values)
 
   def __setitem__(self, key, value):
-    self.tags[key] = value
+    self._tags[key] = value
+
+  # ############################################################################
+  # Methods for minimum dictionary likeness
+  #
+  def __iter__(self):
+    return iter(self.values)
+
+  def iteritems(self):
+    """Returns an iterator for the items of the LazyTagValueRetrieval dict."""
+    return ((key, self[key]) for key in self)
+
+  def iterkeys(self):
+    """Returns an iterator for the keys of the LazyTagValueRetrieval dict."""
+    return iter(self)
+
+  def itervalues(self):
+    """Returns an iterator for the values of the LazyTagValueRetrieval dict."""
+    return (self[key] for key in self)
+
+  def items(self):
+    """Returns a list with the items of the LazyTagValueRetrieval dict."""
+    return list(self.iteritems())
+
+  def keys(self):
+    """Returns a list with the keys of the LazyTagValueRetrieval dict."""
+    return list(self)
+
+  def values(self):
+    """Returns a list with the values of the LazyTagValueRetrieval dict."""
+    return list(self.itervalues())
 
 
 class Parser(dict):
