@@ -430,7 +430,7 @@ class Record(BaseRecord):
     return parent._Children(cls, relation_field=relation_field)
     # pylint: enable=W0212
 
-  def _Children(self, child_class, relation_field=None):
+  def _Children(self, child_class, relation_field=None, conditions=None):
     """Returns all `child_class` objects related to this record.
 
     The table for the given `child_class` will be queried for all fields where
@@ -444,13 +444,21 @@ class Record(BaseRecord):
       % relation_field: str ~~ self.TableName()
         The fieldname in the `child_class` table which relates that table to
         the table for this record.
+      % conditions: str / iterable ~~ 
+        The extra condition(s) that need to be applied when querying for child 
+        records.
     """
     relation_field = relation_field or self.TableName()
     with self.connection as cursor:
       safe_key = self.connection.EscapeValues(self.key)
+      qry_conditions = ['`%s`=%s' % (relation_field, safe_key)]
+      if isinstance(conditions, basestring):
+        qry_conditions.append(conditions)
+      elif conditions:
+        qry_conditions.extend(conditions)
       children = cursor.Select(
           table=child_class.TableName(),
-          conditions='`%s`=%s' % (relation_field, safe_key))
+          conditions=qry_conditions)
     for child in children:
       child[relation_field] = self
       yield child_class(self.connection, child)
