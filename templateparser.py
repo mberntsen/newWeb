@@ -61,7 +61,7 @@ class LazyTagValueRetrieval(object):
   # Methods for minimum dictionary likeness
   #
   def __iter__(self):
-    return iter(self.values)
+    return iter(self._tags)
 
   def iteritems(self):
     """Returns an iterator for the items of the LazyTagValueRetrieval dict."""
