@@ -114,20 +114,26 @@ class Parser(dict):
       self.AddTemplate(template)
     return super(Parser, self).__getitem__(template)
 
-  def AddTemplate(self, template):
-    """Reads the given `template` file and adds it to the cache.
+  def AddTemplate(self, template, name=None):
+    """Reads the given `template` filename and adds it to the cache.
 
-    The `template` given is a path that is then resolved against the configured
-    `template_dir` instance attribute. The resulting filename is used to load
-    a Template object, which is then stored in the Parser cache under the given
-    `template` name.
+    The `template` argument should be a path/filename. This will be resolved
+    against the configured template directory. The file is parsed and placed in
+    the cache using the `template` filename, or the provided `name`.
+
+    Arguments:
+      @ template: str
+        Location of the template file that should be loaded
+      % name: str ~~ None
+        Optional name to store the the file as in the cache, instead of the
+        template name itself.
 
     Raises:
       TemplateReadError: When the template file cannot be read
     """
     try:
       template_path = os.path.join(self.template_dir, template)
-      self[template] = Template.FromFile(template_path, parser=self)
+      self[name or template] = Template.FromFile(template_path, parser=self)
     except IOError:
       raise TemplateReadError('Could not load template %r' % template_path)
 
@@ -339,7 +345,9 @@ class Template(list):
     If the open scope is not an instance of the given scope class,
     TemplateSyntaxError is raised.
     """
-    self._VerifyOpenScope(scope_cls)
+    if not isinstance(self.scopes[-1], scope_cls):
+      raise TemplateSyntaxError('Tried to close %s, but open scope is %s' % (
+          scope_cls.__name__, type(self.scopes[-1]).__name__))
     self.scopes.pop()
 
   def _StartScope(self, scope):
