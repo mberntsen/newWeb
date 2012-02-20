@@ -281,15 +281,27 @@ class TemplateUnicodeSupport(unittest.TestCase):
     """Sets up a parser instance, as it never changes."""
     self.parser = templateparser.Parser()
 
+  def testTemplateUnicode(self):
+    """[Unicode] Templates may contain raw Unicode codepoints"""
+    # And they will be converted to UTF8 eventually
+    template = u'We \u2665 Python'
+    self.assertEqual(template.encode('UTF8'), self.parser.ParseString(template))
+
+  def testTemplateUTF8(self):
+    """[Unicode] Templates may contain UTF8 encoded text"""
+    # That is, input bytes will be left untouched
+    template = u'We \u2665 Python'.encode('UTF8')
+    self.assertEqual(template, self.parser.ParseString(template))
+
   def testUnicodeReplacements(self):
-    """[Unicode] Unicode in tag replacements is converted to utf8"""
+    """[Unicode] Unicode in tag replacements is converted to UTF8"""
     template = 'Underdark Web framework, also known as [name].'
-    result = u'Underdark Web framework, also known as \xb5Web.'.encode('utf8')
+    result = u'Underdark Web framework, also known as \xb5Web.'.encode('UTF8')
     name = u'\xb5Web'
     self.assertEqual(result, self.parser.ParseString(template, name=name))
 
   def testUnicodeTagFunction(self):
-    """[Unicode] Template functions returning unicode are converted to utf8"""
+    """[Unicode] Template functions returning unicode are converted to UTF8"""
     function_result = u'No more \N{BLACK HEART SUIT}'
     def StaticReturn(_fragment):
       """Returns a static string, for any input fragment."""
@@ -297,12 +309,12 @@ class TemplateUnicodeSupport(unittest.TestCase):
 
     self.parser.RegisterFunction('nolove', StaticReturn)
     template = '[love|nolove]'
-    result = function_result.encode('utf8')
+    result = function_result.encode('UTF8')
     self.assertEqual(result, self.parser.ParseString(template, love='love'))
 
-  def testUnicodeTemplate(self):
-    """[Unicode] Templates may contain utf8"""
-    template = u'We \u2665 \xb5Web!'.encode('utf8')
+  def testTemplateTagUTF8(self):
+    """[Unicode] Template tags may contain UTF8"""
+    template = u'We \u2665 \xb5Web!'.encode('UTF8')
     self.assertEqual(template, self.parser.ParseString(template))
 
 

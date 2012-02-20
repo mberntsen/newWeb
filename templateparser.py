@@ -667,6 +667,11 @@ class TemplateTag(object):
 
 class TemplateText(str):
   """A raw piece of template text, upon which no replacements will be done."""
+  def __new__(cls, string):
+    if isinstance(string, unicode):
+      return super(TemplateText, cls).__new__(cls, string.encode('utf8'))
+    return super(TemplateText, cls).__new__(cls, string)
+
   def __repr__(self):
     """Returns the object representation of the TemplateText."""
     return '%s(%r)' % (type(self).__name__, str(self))
@@ -695,7 +700,6 @@ def HtmlEscape(text):
   html = html.replace("'", '&#39;')  # &apos; is valid, but poorly supported.
   html = html.replace('>', '&gt;')
   return html.replace('<', '&lt;')
-
 
 TAG_FUNCTIONS = {
     'default': HtmlEscape,
