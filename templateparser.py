@@ -404,6 +404,26 @@ class TemplateConditional(object):
     self.branches = [(tuple(Template.TagSplit(expr)), [])]
     self.default = None
 
+  def __repr__(self):
+    repr_branches = []
+    for expr, branch in self.branches:
+      clause = 'IF' if not repr_branches else 'ELIF'
+      repr_branches.append('%s %r { %r }' % (clause, expr, branch))
+    if self.default:
+      repr_branches.append('ELSE { %r }' % self.default)
+    return '%s(%s)' % (type(self).__name__, ''.join(repr_branches))
+
+  def __str__(self):
+    repr_branches = []
+    for expr, branch in self.branches:
+      clause = 'if' if not repr_branches else 'elif'
+      repr_branches.append('{{ %s %s }}%s' % (
+          clause, ''.join(map(str, expr)), ''.join(map(str, branch))))
+    if self.default:
+      repr_branches.append('{{ else }}%s' % self.default)
+    repr_branches.append('{{ endif }}')
+    return '\n' + '\n'.join(repr_branches)
+
   def append(self, part):
     """Appends a template part to the current open conditional clause.
 
@@ -502,7 +522,7 @@ class TemplateLoop(list):
     return '%s(%s)' % (type(self).__name__, list(self))
 
   def __str__(self):
-    return '{{ for %s in %s }}%s{{ endfor }}' % (
+    return '\n{{ for %s in %s }}%s\n{{ endfor }}' % (
         self.alias, self.tag, ''.join(map(str, self)))
 
   def Parse(self, **kwds):
