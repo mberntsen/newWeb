@@ -2,7 +2,7 @@
 """Underdark micro-Web framework, uWeb, Request module."""
 
 __author__ = 'Elmer de Looff <elmer@underdark.nl>'
-__version__ = '0.7'
+__version__ = '0.8'
 
 # Standard modules
 import cgi
@@ -12,9 +12,6 @@ import os
 import re
 import socket
 import urllib
-
-# Custom modules
-#from underdark.libs import logging
 
 
 class Cookie(cookie.SimpleCookie):

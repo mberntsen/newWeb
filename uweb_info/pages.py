@@ -2,7 +2,7 @@
 """Html generators for the minimal uweb server"""
 
 __author__ = 'Elmer de Looff <elmer@underdark.nl>'
-__version__ = '0.4'
+__version__ = '0.5'
 
 # Standard modules
 import base64
@@ -10,9 +10,10 @@ import os
 import time
 
 # Custom modules
+import uweb
+from uweb.pagemaker import login
 from underdark.libs import logging
-from underdark.libs import uweb
-from underdark.libs.uweb.pagemaker import login
+
 
 class PageMaker(login.OpenIdMixin, uweb.DebuggingPageMaker):
   """Holds all the html generators for the webapp

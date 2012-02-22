@@ -3,7 +3,7 @@
 from __future__ import with_statement
 
 __author__ = 'Elmer de Looff <elmer@underdark.nl>'
-__version__ = '0.10'
+__version__ = '0.11'
 
 # Standard modules
 import datetime
@@ -16,7 +16,9 @@ import warnings
 # Custom modules
 from underdark.libs import logging
 from underdark.libs import pysession
-from underdark.libs.uweb import templateparser
+
+# Package modules
+from .. import templateparser
 
 __all__ = 'PageMaker', 'DebuggingPageMaker', 'Response', 'ReloadModules'
 RFC_1123_DATE = '%a, %d %b %Y %T GMT'
@@ -466,7 +468,7 @@ class SmorgasbordMixin(object):
   def bord(self):
     """Returns a Smorgasbord of autoloading database connections."""
     if '__bord' not in self.persistent:
-      from underdark.libs.uweb import model
+      from .. import model
       self.persistent.Set('__bord', model.Smorgasbord(
           connections=SmorgasbordMixin.Connections(self)))
     return self.persistent.Get('__bord')

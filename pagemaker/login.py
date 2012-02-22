@@ -3,10 +3,10 @@
 from __future__ import with_statement
 
 __author__ = 'Elmer de Looff <elmer@underdark.nl>'
-__version__ = '0.3'
+__version__ = '0.4'
 
-# Custom modules
-from underdark.libs.uweb import uwebopenid
+# Package modules
+from .. import uwebopenid
 
 OPENID_PROVIDERS = {'google': 'https://www.google.com/accounts/o8/id',
                     'yahoo': 'http://yahoo.com/',

@@ -2,7 +2,7 @@
 """module to support OpenID login in uWeb"""
 
 __author__ = 'Jan Klopper <jan@underdark.nl>'
-__version__ = '0.3'
+__version__ = '0.4'
 
 # Standard modules
 import base64
@@ -11,8 +11,8 @@ from openid.consumer import consumer
 from openid.extensions import pape
 from openid.extensions import sreg
 
-# Custom modules
-from underdark.libs.uweb import request as uwebrequest
+# Package modules
+from . import request as uwebrequest
 
 # Constants used for OpenID provider services.
 OPENID_PROVIDER_NAME = 'uweb OpenID'

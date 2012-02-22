@@ -3,7 +3,7 @@
 from __future__ import with_statement
 
 __author__ = 'Elmer de Looff <elmer@underdark.nl>'
-__version__ = '0.11'
+__version__ = '0.12'
 
 # Standard modules
 import htmlentitydefs
@@ -26,8 +26,10 @@ except ImportError:
 # Custom modules
 from underdark.libs import app
 from underdark.libs import udders
-from underdark.libs.uweb import request
-from underdark.libs.uweb.pagemaker import *
+
+# Package modules
+from . import request
+from .pagemaker import *
 
 # Regex to match HTML entities and character references with.
 HTML_ENTITY_SEARCH = re.compile('&#?\w+;')
