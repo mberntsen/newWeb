@@ -3,7 +3,7 @@
 from __future__ import with_statement
 
 __author__ = 'Elmer de Looff <elmer@underdark.nl>'
-__version__ = '0.12'
+__version__ = '0.13'
 
 # Standard modules
 import htmlentitydefs
@@ -18,9 +18,13 @@ try:
 except ImportError:
   # Not running on mod_python. We'll assume uWeb needs to run standalone.
   import standalone
+  class _MockApache(object):
+    DONE = True
+    def __nonzero__(self):
+      return False
   # Make sure we have a global `apache` we can test for truthness later on.
   # pylint: disable=C0103
-  apache = False
+  apache = _MockApache()
   # pylint: enable=C0103
 
 # Custom modules
@@ -99,7 +103,10 @@ def Handler(page_class, routes, config=None):
     req = request.Request(req)
     pages = page_class(req, config=config)
     try:
+      # We're specifically calling _PostInit here as promised in documentation.
+      # pylint: disable=W0212
       pages._PostInit()
+      # pylint: enable=W0212
       method, args = router(req.env['PATH_INFO'])
       response = getattr(pages, method)(*args)
     except ReloadModules, message:
