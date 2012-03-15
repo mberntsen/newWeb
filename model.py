@@ -444,8 +444,8 @@ class Record(BaseRecord):
       % relation_field: str ~~ self.TableName()
         The fieldname in the `child_class` table which relates that table to
         the table for this record.
-      % conditions: str / iterable ~~ 
-        The extra condition(s) that need to be applied when querying for child 
+      % conditions: str / iterable ~~
+        The extra condition(s) that need to be applied when querying for child
         records.
     """
     relation_field = relation_field or self.TableName()
@@ -789,6 +789,22 @@ class Smorgasbord(object):
       return self.connections[con_type]
     except KeyError:
       raise TypeError('There is no connection for type %r' % con_type)
+
+  def __enter__(self):
+    """Proxies the transaction to the underlying relevant connection.
+
+    This is not quite as transparent a passthrough as using __getattribute__,
+    but it necessary due to performance optimizations done in Python2.7
+    """
+    return self.RelevantConnection().__enter__()
+
+  def __exit__(self, *args):
+    """Proxies the transaction to the underlying relevant connection.
+
+    This is not quite as transparent a passthrough as using __getattribute__,
+    but it necessary due to performance optimizations done in Python2.7
+    """
+    return self.RelevantConnection().__exit__(*args)
 
   def __getattribute__(self, attribute):
     try:

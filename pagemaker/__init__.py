@@ -454,7 +454,7 @@ class SmorgasbordMixin(object):
       try:
         return super(SmorgasbordMixin.Connections, self).__getitem__(key)
       except KeyError:
-        return getattr(self, '_Load%s' % key.title())()
+        return self.setdefault(key, getattr(self, '_Load%s' % key.title())())
 
     def _LoadMongo(self):
       """Returns the PageMaker's MongoDB connection."""
