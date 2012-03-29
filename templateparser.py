@@ -468,8 +468,8 @@ class TemplateConditional(object):
         nodes.append(node)
     try:
       return eval(''.join(nodes), None, local_vars)
-    except NameError:
-      raise TemplateNameError('Name %r is not defined. Try it as a tagname?')
+    except NameError, error:
+      raise TemplateNameError(str(error).capitalize() + '. Try it as tagname?')
 
   def Parse(self, **kwds):
     """Returns the TemplateConditional parsed as string.
