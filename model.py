@@ -254,6 +254,9 @@ class BaseRecord(dict):
     This is used for the Save/Update methods, where foreign relations should be
     stored by their primary key.
     """
+    if isinstance(self._PRIMARY_KEY, tuple):
+      record = self._DataRecord()
+      return tuple(record[key] for key in self._PRIMARY_KEY)
     return self.get(self._PRIMARY_KEY)
   # pylint: enable=E0202
 
@@ -262,7 +265,13 @@ class BaseRecord(dict):
   @key.setter
   def key(self, value):
     """Sets the value of the primary key."""
-    self[self._PRIMARY_KEY] = value
+    if isinstance(value, tuple):
+      if len(value) != len(self._PRIMARY_KEY):
+        raise ValueError('Not enough values for compound key.')
+      for key, key_val in zip(self._PRIMARY_KEY, value):
+        self[key] = key_val
+    else:
+      self[self._PRIMARY_KEY] = value
   # pylint: enable=E0102, E0202, E1101
 
   Error = Error
@@ -451,7 +460,7 @@ class Record(BaseRecord):
     relation_field = relation_field or self.TableName()
     with self.connection as cursor:
       safe_key = self.connection.EscapeValues(self.key)
-      qry_conditions = ['`%s`=%s' % (relation_field, safe_key)]
+      qry_conditions = ['`%s` = %s' % (relation_field, safe_key)]
       if isinstance(conditions, basestring):
         qry_conditions.append(conditions)
       elif conditions:
@@ -482,14 +491,34 @@ class Record(BaseRecord):
       cursor.Delete(table=child_class.TableName(),
                     conditions='`%s`=%s' % (relation_field, safe_key))
 
+  @classmethod
+  def _PrimaryKeyCondition(cls, connection, value):
+    """Returns the MySQL primary key condition to be used."""
+    if isinstance(value, tuple):
+      if len(value) != len(cls._PRIMARY_KEY):
+        raise ValueError('Not enough values for compound key.')
+      return ' AND '.join('`%s` = %s' % (field, value) for field, value
+                   in zip(cls._PRIMARY_KEY, connection.EscapeValues(value)))
+    else:
+      return '`%s` = %s' % (cls._PRIMARY_KEY, connection.EscapeValues(value))
+
   def _RecordInsert(self, cursor):
     """Inserts the record's current values in the database as a new record.
 
     Upon success, the record's primary key is set to the result's insertid
     """
-    result = cursor.Insert(table=self.TableName(), values=self._DataRecord())
-    self.key = result.insertid
-    self._record[self._PRIMARY_KEY] = result.insertid
+    if isinstance(self._PRIMARY_KEY, tuple):
+      values = self._DataRecord()
+      auto_inc_field = set(self._PRIMARY_KEY) - set(values)
+      if auto_inc_field:
+        raise ValueError('No value for compound key field(s): %s' % (
+            ', '.join(map(repr, auto_inc_field))))
+      result = cursor.Insert(table=self.TableName(), values=self._DataRecord())
+    else:
+      result = cursor.Insert(table=self.TableName(), values=self._DataRecord())
+      if result:
+        self.key = result.insertid
+        self._record[self._PRIMARY_KEY] = result.insertid
 
   def _SaveForeign(self, cursor):
     """Recursively saves all nested Record instances."""
@@ -512,11 +541,15 @@ class Record(BaseRecord):
     difference = self._Changes()
     if difference:
       try:
-        primary = self.connection.EscapeValues(self._record[self._PRIMARY_KEY])
+        if isinstance(self._PRIMARY_KEY, tuple):
+          primary = tuple(self._record[key] for key in self._PRIMARY_KEY)
+        else:
+          primary = self._record[self._PRIMARY_KEY]
       except KeyError:
         raise Error('Cannot update record without pre-existing primary key.')
-      cursor.Update(table=self.TableName(), values=difference,
-                    conditions='`%s` = %s' % (self._PRIMARY_KEY, primary))
+      cursor.Update(
+          table=self.TableName(), values=difference,
+          conditions=self._PrimaryKeyCondition(self.connection, primary))
       self._record.update(difference)
 
   # ############################################################################
@@ -524,17 +557,17 @@ class Record(BaseRecord):
   #
   @classmethod
   def DeleteKey(cls, connection, pkey_value):
+    print 'DELETING RECORD FOR PRIMARY: %r' % (pkey_value, )
     with connection as cursor:
-      cursor.Delete(table=cls.TableName(), conditions='`%s` = %s' % (
-          cls._PRIMARY_KEY, connection.EscapeValues(pkey_value)))
+      cursor.Delete(table=cls.TableName(),
+                    conditions=cls._PrimaryKeyCondition(connection, pkey_value))
 
   @classmethod
   def FromPrimary(cls, connection, pkey_value):
     with connection as cursor:
-      safe_key = connection.EscapeValues(pkey_value)
       record = cursor.Select(
           table=cls.TableName(),
-          conditions='`%s` = %s' % (cls._PRIMARY_KEY, safe_key))
+          conditions=cls._PrimaryKeyCondition(connection, pkey_value))
     if not record:
       raise NotExistError('There is no %r for primary key %r' % (
           cls.__name__, pkey_value))
@@ -645,8 +678,9 @@ class VersionedRecord(Record):
     """
     safe_id = connection.EscapeValues(identifier)
     with connection as cursor:
-      records = cursor.Select(table=cls.TableName(),
-                              conditions='`%s`=%s' % (cls._RECORD_KEY, safe_id))
+      records = cursor.Select(
+          table=cls.TableName(),
+          conditions='`%s` = %s' % (cls._RECORD_KEY, safe_id))
     for record in records:
       yield cls(connection, record)
 
