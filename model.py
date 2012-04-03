@@ -3,7 +3,7 @@
 from __future__ import with_statement
 
 __author__ = 'Elmer de Looff <elmer@underdark.nl>'
-__version__ = '0.15'
+__version__ = '0.16'
 
 # Standard modules
 import datetime
@@ -227,11 +227,13 @@ class BaseRecord(dict):
     """
     sql_record = {}
     for key, value in super(BaseRecord, self).iteritems():
-      if isinstance(value, BaseRecord):
-        sql_record[key] = value.key
-      else:
-        sql_record[key] = value
+      sql_record[key] = self._ValueOrPrimary(value)
     return sql_record
+
+  @staticmethod
+  def _ValueOrPrimary(value):
+    """Returns the value, or its primary key value if it's a Record."""
+    return value.key if isinstance(value, BaseRecord) else value
 
   @classmethod
   def TableName(cls):
@@ -497,10 +499,12 @@ class Record(BaseRecord):
     if isinstance(value, tuple):
       if len(value) != len(cls._PRIMARY_KEY):
         raise ValueError('Not enough values for compound key.')
+      values = map(cls._ValueOrPrimary, value)
       return ' AND '.join('`%s` = %s' % (field, value) for field, value
-                   in zip(cls._PRIMARY_KEY, connection.EscapeValues(value)))
+                   in zip(cls._PRIMARY_KEY, connection.EscapeValues(values)))
     else:
-      return '`%s` = %s' % (cls._PRIMARY_KEY, connection.EscapeValues(value))
+      return '`%s` = %s' % (cls._PRIMARY_KEY,
+                            connection.EscapeValues(cls._ValueOrPrimary(value)))
 
   def _RecordInsert(self, cursor):
     """Inserts the record's current values in the database as a new record.
