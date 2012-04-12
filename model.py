@@ -517,12 +517,10 @@ class Record(BaseRecord):
       if auto_inc_field:
         raise ValueError('No value for compound key field(s): %s' % (
             ', '.join(map(repr, auto_inc_field))))
-      result = cursor.Insert(table=self.TableName(), values=self._DataRecord())
+      cursor.Insert(table=self.TableName(), values=self._DataRecord())
     else:
       result = cursor.Insert(table=self.TableName(), values=self._DataRecord())
-      if result:
-        self.key = result.insertid
-        self._record[self._PRIMARY_KEY] = result.insertid
+      self._record[self._PRIMARY_KEY] = self.key = result.insertid
 
   def _SaveForeign(self, cursor):
     """Recursively saves all nested Record instances."""
