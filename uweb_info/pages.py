@@ -15,7 +15,7 @@ from uweb.pagemaker import login
 from underdark.libs import logging
 
 
-class PageMaker(login.OpenIdMixin, uweb.DebuggingPageMaker):
+class PageMaker(login.LoginMixin, login.OpenIdMixin, uweb.DebuggingPageMaker):
   """Holds all the html generators for the webapp
 
   Each page as a separate method.
@@ -187,6 +187,20 @@ class PageMaker(login.OpenIdMixin, uweb.DebuggingPageMaker):
     self.req.AddCookie('OpenIDSession', session_id, max_age=3600)
     return self.parser.Parse(
         'freetext.html',
-        title='OpenID Authentication successful',
+        title='OpenID Authentication successful!',
         message=message,
+        **self.CommonBlocks('uweb'))
+
+  def _ULF_Failure(self, secure):
+    return self.parser.Parse(
+        'freetext.html',
+        title='ULF authentication failed',
+        message='The secure mode was %r.' % secure,
+        **self.CommonBlocks('uweb'))
+
+  def _ULF_Success(self, secure):
+    return self.parser.Parse(
+        'freetext.html',
+        title='ULF authentication successful!',
+        message='The secure mode was %r.' % secure,
         **self.CommonBlocks('uweb'))

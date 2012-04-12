@@ -127,7 +127,7 @@ class LoginMixin(object):
         return self._ULF_VerifyChallenge()
       return self._ULF_VerifyPlain()
     except model.NotExistError:
-      return self._ULF_Failure()
+      return self._ULF_Failure('baduser')
 
   def _ULF_VerifyPlain(self):
     """Verifies the given password (after hashing) matches the salted password.
@@ -135,9 +135,11 @@ class LoginMixin(object):
     If they match, self._ULF_Success is called and returned. If they do not
     match self.ULF_Failure is called and returned instead.
     """
-    user = self.ULF_USER.FromName(self.connection, self.post.getfirst('username'))
-    plaintext = str(self.post.getfirst('password', ''))
-    if user['password'] == hashlib.sha1(plaintext + user['salt']).digest():
+    user = self.ULF_USER.FromName(
+        self.connection, self.post.getfirst('username'))
+    password = str(self.post.getfirst('password', ''))
+    hashed = hashlib.sha1(password + binascii.hexlify(user['salt'])).digest()
+    if user['password'] == hashed:
       return self._ULF_Success(False)
     return self._ULF_Failure(False)
 

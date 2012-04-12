@@ -33,6 +33,8 @@ ROUTES = (
     ('/redirect/(.*)', 'Redirect'),
     ('/OpenIDLogin', '_OpenIdInitiate'),
     ('/OpenIDValidate', '_OpenIdValidate'),
+    ('/ULF-Challenge', '_ULF_Challenge'),
+    ('/ULF-Login', '_ULF_Verify'),
     ('/(.*)', 'Index'))
 
 
