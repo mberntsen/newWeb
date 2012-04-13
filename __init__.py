@@ -32,8 +32,13 @@ from underdark.libs import app
 from underdark.libs import udders
 
 # Package modules
+from . import pagemaker
 from . import request
-from .pagemaker import *
+
+# Package classes
+from .response import Response
+from .pagemaker import BasePageMaker
+from .pagemaker import DebuggingPageMaker
 
 # Regex to match HTML entities and character references with.
 HTML_ENTITY_SEARCH = re.compile('&#?\w+;')
@@ -109,7 +114,7 @@ def Handler(page_class, routes, config=None):
       # pylint: enable=W0212
       method, args = router(req.env['PATH_INFO'])
       response = getattr(pages, method)(*args)
-    except ReloadModules, message:
+    except pagemaker.ReloadModules, message:
       reload_message = reload(sys.modules[page_class.__module__])
       response = Response(
           content='%s\n%s' % (message, reload_message))
