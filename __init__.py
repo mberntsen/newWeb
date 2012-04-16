@@ -37,7 +37,7 @@ from . import request
 
 # Package classes
 from .response import Response
-from .pagemaker import BasePageMaker
+from .pagemaker import PageMaker
 from .pagemaker import DebuggingPageMaker
 
 # Regex to match HTML entities and character references with.
