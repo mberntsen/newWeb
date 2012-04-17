@@ -141,8 +141,8 @@
     <script type="text/javascript">
       // <<![CDATA[
       $(document).ready(function() {
-        InitLoginFields(new Array('user':'#secure_user',
-                                  'pass':'#secure_pass'));
+        InitLoginFields({user:'#secure_user',
+                         pass:'#secure_pass'});
         $('#uploadbox').each( function(){
           new uploader($(this), $(this).find('.status'));
         });
