@@ -96,7 +96,7 @@ class PageMaker(login.LoginMixin, login.OpenIdMixin, uweb.DebuggingPageMaker):
         Linebreaks and leading whitespace are honored.
         <strong>HTML tags do nothing, as demonstrated above<strong>.
         """
-    return uweb.Response(content=text, content_type='text/plain')
+    return uweb.Response(text, content_type='text/plain')
 
   @staticmethod
   def Redirect(location):
@@ -135,10 +135,9 @@ class PageMaker(login.LoginMixin, login.OpenIdMixin, uweb.DebuggingPageMaker):
   def FourOhFour(self, path):
     """The request could not be fulfilled, this returns a 404."""
     logging.LogWarning('Bad page %r requested', path)
-    return uweb.Response(
-        httpcode=404,
-        content=self.parser.Parse(
-            '404.html', path=path, **self.CommonBlocks('http404')))
+    return uweb.Response(self.parser.Parse('404.html', path=path,
+                                           **self.CommonBlocks('http404')),
+                         httpcode=404)
 
   def InternalServerError(self, *exc_info):
     """Returns a HTTP 500 page, since the request failed elsewhere."""
@@ -153,10 +152,9 @@ class PageMaker(login.LoginMixin, login.OpenIdMixin, uweb.DebuggingPageMaker):
       path = self.req.env['PATH_INFO']
       logging.LogError('Execution of %r triggered an exception',
                        path, exc_info=exc_info)
-      return uweb.Response(
-          httpcode=500,
-          content=self.parser.Parse(
-              '500.html', path=path, **self.CommonBlocks('http500')))
+      return uweb.Response(self.parser.Parse('500.html', path=path,
+                                             **self.CommonBlocks('http500')),
+                           httpcode=500)
 
   def OpenIdProviderBadLink(self, err_obj):
     return self.parser.Parse(

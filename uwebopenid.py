@@ -12,7 +12,7 @@ from openid.extensions import pape
 from openid.extensions import sreg
 
 # Package modules
-from . import request as uwebrequest
+from . import response
 
 # Constants used for OpenID provider services.
 OPENID_PROVIDER_NAME = 'uweb OpenID'
@@ -109,8 +109,7 @@ class OpenId(object):
       raise InvalidOpenIdService()
     if request.shouldSendRedirect():
       redirect_url = request.redirectURL(trustroot, returnurl)
-      return uwebrequest.Response(headers={'Location': redirect_url},
-                                  httpcode=302)
+      return response.Redirect(redirect_url)
     else:
       return request.htmlMarkup(trustroot, returnurl,
                                 form_tag_attrs={'id': 'openid_message'})
