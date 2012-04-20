@@ -122,7 +122,7 @@ class PageMaker(login.LoginMixin, login.OpenIdMixin, uweb.DebuggingPageMaker):
       @ location: str
         The full URL the client should be redirected to, including schema.
     """
-    return uweb.Response(headers={'Location': location}, httpcode=307)
+    return uweb.Redirect(location)
 
   def FourOhFour(self, path):
     """The request could not be fulfilled, this returns a 404."""

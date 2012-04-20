@@ -1,9 +1,8 @@
 #!/usr/bin/python
 """Underdark uWeb Response object."""
-from __future__ import with_statement
 
 __author__ = 'Elmer de Looff <elmer@underdark.nl>'
-__version__ = '0.1'
+__version__ = '0.2'
 
 
 class Response(object):
@@ -16,7 +15,7 @@ class Response(object):
   CONTENT_TYPE = 'text/html'
 
   def __init__(self, content='', content_type=CONTENT_TYPE,
-               cookies=(), headers=None,  httpcode=200):
+               httpcode=200, headers=None):
     """Initializes a Page object.
 
     Arguments:
@@ -25,21 +24,15 @@ class Response(object):
         or the contents of a file (images for example).
       % content_type: str ~~ CONTENT_TYPE ('text/html' by default)
         The content type of the response. This should NOT be set in headers.
-      % cookies: dict ~~ None
-        Cookies are expected to be dictionaries, made up of the following keys:
-        * Keys they MUST contain: `key`, `value`
-        * Keys they MAY contain:  `expires`, `path`, `comment`, `domain`,
-                                  `max-age`, `secure`, `version`, `httponly`
-      % headers: dictionary ~~ None
-        A dictionary mappging the header name to its value.
       % httpcode: int ~~ 200
         The HTTP response code to attach to the response.
+      % headers: dict ~~ None
+        A dictionary with header names and their associated values.
     """
     if isinstance(content, unicode):
       self.content = content.encode('utf8')
     else:
       self.content = str(content)
-    self.cookies = cookies
     self.httpcode = httpcode
     self.headers = headers or {}
     self.content_type = content_type
@@ -49,3 +42,15 @@ class Response(object):
 
   def __str__(self):
     return self.content
+
+
+class Redirect(Response):
+  """A response tailored to do redirects."""
+  REDIRECT_PAGE = ('<!DOCTYPE html><html><head><title>Page moved</title></head>'
+                   '<body>Page moved, please follow <a href="%s">this link</a>'
+                   '</body></html>')
+
+  def __init__(self, location, httpcode=307):
+    super(Redirect, self).__init__(
+        content=self.REDIRECT_PAGE % location, content_type='text/html',
+        headers={'Location': location}, httpcode=httpcode)

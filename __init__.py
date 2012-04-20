@@ -37,6 +37,7 @@ from . import request
 
 # Package classes
 from .response import Response
+from .response import Redirect
 from .pagemaker import PageMaker
 from .pagemaker import DebuggingPageMaker
 
@@ -129,8 +130,6 @@ def Handler(page_class, routes, config=None):
     req.SetContentType(response.content_type)
     for header_pair in response.headers.iteritems():
       req.AddHeader(*header_pair)
-    for cookie in response.cookies:
-      req.AddCookie(**cookie)
     req.Write(response.content)
     if apache:
       return apache.DONE
