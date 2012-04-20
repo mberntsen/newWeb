@@ -6,7 +6,7 @@ import uweb
 from uweb.uweb_info import pages
 
 __author__ = 'Elmer de Looff <elmer@underdark.nl>'
-__version__ = '0.2'
+__version__ = '0.3'
 
 CONFIG = 'example.conf'
 PACKAGE = 'uweb_info'
@@ -29,6 +29,7 @@ ROUTES = (
     ('/static/(.*)', 'Static'),
     ('/(broken.*)', 'FourOhFour'),
     ('/haltandcatchfire', 'MakeFail'),
+    ('/json', 'Json'),
     ('/text', 'Text'),
     ('/redirect/(.*)', 'Redirect'),
     ('/OpenIDLogin', '_OpenIdInitiate'),

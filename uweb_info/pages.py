@@ -2,10 +2,11 @@
 """Html generators for the minimal uweb server"""
 
 __author__ = 'Elmer de Looff <elmer@underdark.nl>'
-__version__ = '0.5'
+__version__ = '0.6'
 
 # Standard modules
 import base64
+import json
 import os
 import time
 
@@ -54,6 +55,13 @@ class PageMaker(login.LoginMixin, login.OpenIdMixin, uweb.DebuggingPageMaker):
         env=sorted(self.req.env.items()),
         ext_env=sorted(self.req.ExtendedEnvironment().items()),
         **self.CommonBlocks('main'))
+
+  @staticmethod
+  def Json():
+    return uweb.Response(json.dumps({'name': u'\N{micro sign}Web'}),
+                         content_type='application/json',
+                         headers={'Access-Control-Allow-Origin': '*',
+                                  'Cache-Control': 'no-cache, must-revalidate'})
 
   @staticmethod
   def MakeFail():

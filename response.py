@@ -14,7 +14,7 @@ class Response(object):
   # Default content-type for Page objects
   CONTENT_TYPE = 'text/html'
 
-  def __init__(self, content='', content_type=CONTENT_TYPE,
+  def __init__(self, content, content_type=CONTENT_TYPE,
                httpcode=200, headers=None):
     """Initializes a Page object.
 
@@ -52,5 +52,5 @@ class Redirect(Response):
 
   def __init__(self, location, httpcode=307):
     super(Redirect, self).__init__(
-        content=self.REDIRECT_PAGE % location, content_type='text/html',
-        headers={'Location': location}, httpcode=httpcode)
+        self.REDIRECT_PAGE % location, content_type='text/html',
+        httpcode=httpcode, headers={'Location': location})
