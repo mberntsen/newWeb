@@ -648,7 +648,7 @@ class TemplateTag(object):
 
     if isinstance(value, unicode):
       return value.encode('utf8')
-    return value
+    return str(value)
 
   @staticmethod
   def _GetIndex(haystack, needle):

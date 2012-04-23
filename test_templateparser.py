@@ -227,6 +227,16 @@ class TemplateTagFunctions(unittest.TestCase):
     self.assertEqual(result, self.parser.ParseString(
         template, none='"nothing"'))
 
+  def testAlwaysString(self):
+    """[TagFunctions] Tag function return is always converted to string."""
+    template = '[number]'
+    self.assertEqual('1', self.parser.ParseString(template, number=1))
+    template = '[number|raw]'
+    self.assertEqual('2', self.parser.ParseString(template, number=2))
+    template = '[number|int]'
+    self.parser.RegisterFunction('int', int)
+    self.assertEqual('3', self.parser.ParseString(template, number=3))
+
   def testDefaultHtmlSafe(self):
     """[TagFunctions] The default function escapes HTML entities"""
     default = 'This function does [none].'
