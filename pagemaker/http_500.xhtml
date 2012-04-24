@@ -11,11 +11,14 @@
       margin:1.5em 0 .5em;
       line-height:.7em;
     }
+    ol + h2 {
+      margin-top: 0;
+    }
     p{
       margin:0.5em;
     }
     .traceback{
-      margin:0 0 -2em;
+      margin:0;
       padding:.3em 0 .3em 2em;
       list-style:none;
       counter-reset:item;
@@ -86,8 +89,14 @@
   </head>
   <body>
     <h1>Internal Server Error (HTTP 500)</h1>
-    <p>We're not sure what you did, but it definitely tripped up the server.</p>
-    <p>Here's what we know went wrong, though we still have to figure out why:</p>
+    {{ if [error_for_error] }}
+      <h2>Error page for error page</h2>
+      <p>An error occurred on the server during the processing of your request</p>
+      <p>Additionally, another error was encountered trying to render a helpful error page. Below are both the error we encountered, and the original one we tried to tell you about.</p>
+    {{ else }}
+      <p>An error occurred on the server during the processing of your request</p>
+      <p>Here's what we know went wrong, though we still have to figure out why:</p>
+    {{ endif }}
     <h2>[exc:type]</h2>
     <p>[exc:value]</p>
     <h2>Traceback<small> (most recent call first)</small></h2>
@@ -107,12 +116,39 @@
               </tbody>
             </table>
           </li>
+          {{ if not [error_for_error] }}
           <li>
             <table>
               <thead><tr><td colspan="2">Frame locals</td></tr></thead>
               <tbody>
                 {{ for var in [frame:locals] }}
-                <tr><td>[var:0]</td><td>[var:1|html]</td></tr>
+                <tr><td>[var:0]</td><td>[var:1]</td></tr>
+                {{ endfor }}
+              </tbody>
+            </table>
+          </li>
+          {{ endif }}
+        </ul>
+      </li>
+      {{ endfor }}
+    </ol>
+    {{ if [error_for_error] }}
+    <h1>Original error (that the error page broke on)</h1>
+    <h2>[orig_exc:type]</h2>
+    <p>[orig_exc:value]</p>
+    <h2>Traceback<small> (most recent call first)</small></h2>
+    <ol class="traceback">
+      {{ for frame in [orig_exc:traceback] }}
+      <li>
+        <ul class="frame">
+          <li><strong>File:</strong> &quot;[frame:file]&quot;</li>
+          <li><strong>Scope:</strong> [frame:scope]</li>
+          <li>
+            <table class="source">
+              <thead><tr><td colspan="2">Source code</td></tr></thead>
+              <tbody>
+                {{ for line in [frame:source] }}
+                <tr><td>[line:0]</td><td>[line:1]</td></tr>
                 {{ endfor }}
               </tbody>
             </table>
@@ -121,13 +157,14 @@
       </li>
       {{ endfor }}
     </ol>
+    {{ endif }}
     <h2>Environment information</h2>
     {{ if [cookies] }}
     <table>
       <thead><tr><td colspan="2">Cookies</td></tr></thead>
       <tbody>
           {{ for var in [cookies] }}
-          <tr><td>[var:0]</td><td>[var:1|html]</td></tr>
+          <tr><td>[var:0]</td><td>[var:1]</td></tr>
           {{ endfor }}
       </tbody>
     </table>
@@ -137,7 +174,7 @@
       <thead><tr><td colspan="2">Query arguments (GET)</td></tr></thead>
       <tbody>
           {{ for var in [query_args] }}
-          <tr><td>[var:0]</td><td>[var:1|html]</td></tr>
+          <tr><td>[var:0]</td><td>[var:1]</td></tr>
           {{ endfor }}
       </tbody>
     </table>
@@ -147,7 +184,7 @@
       <thead><tr><td colspan="2">POST data</td></tr></thead>
       <tbody>
           {{ for var in [post_data] }}
-          <tr><td>[var:0]</td><td>[var:1|html]</td></tr>
+          <tr><td>[var:0]</td><td>[var:1]</td></tr>
           {{ endfor }}
       </tbody>
     </table>
@@ -157,7 +194,7 @@
       <thead><tr><td colspan="2">Full environment</td></tr></thead>
       <tbody>
           {{ for var in [environ] }}
-          <tr><td>[var:0]</td><td>[var:1|html]</td></tr>
+          <tr><td>[var:0]</td><td>[var:1]</td></tr>
           {{ endfor }}
       </tbody>
     </table>

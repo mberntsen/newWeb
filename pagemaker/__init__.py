@@ -29,7 +29,7 @@ class ReloadModules(Exception):
 
 
 class CacheStorage(object):
-  """A semi-persistent storage with dict-like interface."""
+  """A (semi) persistent storage for the PageMaker."""
   def __init__(self):
     super(CacheStorage, self).__init__()
     self._dict = {}
@@ -37,6 +37,17 @@ class CacheStorage(object):
 
   def __contains__(self, key):
     return key in self._dict
+
+  def Del(self, key):
+    """Removes the given key from the persistent storage.
+
+    N.B. if the key was not in the persistent storage, no error is raised.
+    """
+    with self._lock:
+      try:
+        del self._dict[key]
+      except KeyError:
+        pass  # If a key is not in the storage, consider this a success
 
   def Get(self, key, *default):
     """Returns the current value for `key`, or the `default` if it doesn't."""
@@ -322,17 +333,30 @@ class DebuggerMixin(object):
     logging.LogError(
         'INTERNAL SERVER ERROR (HTTP 500) DURING PROCESSING OF %r',
         self.req.env['PATH_INFO'], exc_info=(exc_type, exc_value, traceback))
-    return response.Response(
-        httpcode=500,
-        content=self.ERROR_TEMPLATE.Parse(
-            cookies=[(cookie, self.cookies[cookie].value)
-                     for cookie in sorted(self.cookies)],
-            environ=sorted(self.req.ExtendedEnvironment().items()),
-            query_args=[(var, self.get[var]) for var in sorted(self.get)],
-            post_data=[(var, self.post.getlist(var))
-                       for var in sorted(self.post)],
-            exc={'type': exc_type, 'value': exc_value,
-                 'traceback': self._ParseStackFrames(traceback)}))
+    exception_data = {
+        'cookies': [(cookie, self.cookies[cookie].value)
+                    for cookie in sorted(self.cookies)],
+        'environ': sorted(self.req.ExtendedEnvironment().items()),
+        'query_args': [(var, self.get[var]) for var in sorted(self.get)],
+        'post_data': [(var, self.post.getlist(var))
+                      for var in sorted(self.post)],
+        'error_for_error': False,
+        'exc': {'type': exc_type, 'value': exc_value,
+                'traceback': self._ParseStackFrames(traceback)}}
+    try:
+      return response.Response(
+          self.ERROR_TEMPLATE.Parse(**exception_data), httpcode=500)
+    except Exception:
+      exc_type, exc_value, traceback = sys.exc_info()
+      logging.LogCritical(
+          'INTERNAL SERVER ERROR (HTTP 500) DURING PROCESSING OF ERROR PAGE',
+          exc_info=(exc_type, exc_value, traceback))
+      exception_data['error_for_error'] = True
+      exception_data['orig_exc'] = exception_data['exc']
+      exception_data['exc'] = {'type': exc_type, 'value': exc_value,
+                               'traceback': self._ParseStackFrames(traceback)}
+      return response.Response(
+          self.ERROR_TEMPLATE.Parse(**exception_data), httpcode=500)
 
 
 class MongoMixin(object):
