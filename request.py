@@ -59,7 +59,8 @@ class Request(object):
       post_data_fp = request
 
     # `self.vars` setup, will contain keys 'cookie', 'get' and 'post'
-    self.vars = {'cookie': Cookie(self.env.get('HTTP_COOKIE')),
+    self.vars = {'cookie': dict((name, value.value) for name, value in
+                                Cookie(self.env.get('HTTP_COOKIE')).items()),
                  'get': QueryArgsDict(cgi.parse_qs(self.env['QUERY_STRING']))}
     if self.env['REQUEST_METHOD'] == 'POST':
       self.vars['post'] = ParseForm(post_data_fp, self.env)
@@ -90,10 +91,10 @@ class Request(object):
         The number of seconds this cookie should be used for. After this period,
         the cookie should be deleted by the client.
         N.B. Specifying both this and `expires` leads to undefined behavior.
-      % secure: any
-        When specified, the cookie is only used on https connections.
-      % httponly
-        When specified, the cookie is only used for http(s) requests, and is not
+      % secure: boolean
+        When True, the cookie is only used on https connections.
+      % httponly: boolean
+        When True, the cookie is only used for http(s) requests, and is not
         accessible through Javascript (DOM).
     """
     new_cookie = Cookie({key.encode('ascii'): value})

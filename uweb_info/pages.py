@@ -55,8 +55,7 @@ class PageMaker(login.LoginMixin, login.OpenIdMixin, uweb.DebuggingPageMaker):
         conn_id=self.persistent.Get('conn_id'),
         getvars=[(var, self.get[var]) for var in sorted(self.get)],
         postvars=[(var, self.post.getlist(var)) for var in sorted(self.post)],
-        cookies=[(cookie, self.cookies[cookie].value)
-                 for cookie in sorted(self.cookies)],
+        cookies=sorted(self.cookies.items()),
         headers=sorted(self.req.headers.items()),
         env=sorted(self.req.env.items()),
         ext_env=sorted(self.req.ExtendedEnvironment().items()),
