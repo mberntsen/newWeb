@@ -30,11 +30,17 @@ class PageMaker(login.LoginMixin, login.OpenIdMixin, uweb.DebuggingPageMaker):
                 version=uweb.__version__)}
 
   def CustomCookie(self):
-    """Adds a user-generated cookie to the outgoing headers if requested."""
+    """Sets a cookie, and redirects the user to the index page.
+
+    This way, the cookie will be visible when the user posts the form.
+    """
     self.req.AddCookie(self.post.getfirst('uweb_cookie_name'),
                        self.post.getfirst('uweb_cookie_value', 'default'),
                        path=self.post.getfirst('uweb_cookie_path'),
-                       max_age=self.post.getfirst('uweb_cookie_max_age', 600))
+                       max_age=self.post.getfirst('uweb_cookie_max_age', 60))
+    # We send a 303 instead of a 307 because the latter would repeat the POST.
+    # This would trigger a redirect loop, which is a bad bad thing :-)
+    raise uweb.ImmediateResponse(uweb.Redirect('/', httpcode=303))
 
   def Index(self, _path):
     """Returns the index.html template"""
