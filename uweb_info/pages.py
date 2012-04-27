@@ -62,8 +62,12 @@ class PageMaker(login.LoginMixin, login.OpenIdMixin, uweb.DebuggingPageMaker):
         ext_env=sorted(self.req.ExtendedEnvironment().items()),
         **self.CommonBlocks('main'))
 
-  @staticmethod
-  def Json():
+  def Json(self):
+    """Returns a JSON response with the form data, or just the project name."""
+    if self.post:
+      form = dict((key, self.post.getfirst(key)) for key in self.post)
+      return uweb.Response(json.dumps(form, sort_keys=True, indent=4),
+                           content_type='application/json')
     return uweb.Response(json.dumps({'name': u'\N{micro sign}Web'}),
                          content_type='application/json',
                          headers={'Access-Control-Allow-Origin': '*',
