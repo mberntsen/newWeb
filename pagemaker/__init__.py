@@ -334,8 +334,7 @@ class DebuggerMixin(object):
         'INTERNAL SERVER ERROR (HTTP 500) DURING PROCESSING OF %r',
         self.req.env['PATH_INFO'], exc_info=(exc_type, exc_value, traceback))
     exception_data = {
-        'cookies': [(cookie, self.cookies[cookie].value)
-                    for cookie in sorted(self.cookies)],
+        'cookies': sorted(self.cookies.items()),
         'environ': sorted(self.req.ExtendedEnvironment().items()),
         'query_args': [(var, self.get[var]) for var in sorted(self.get)],
         'post_data': [(var, self.post.getlist(var))

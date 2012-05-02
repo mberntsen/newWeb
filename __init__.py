@@ -126,7 +126,7 @@ def Handler(page_class, routes, config=None):
 
     if not isinstance(response, Response):
       response = Response(content=response)
-    req.SetHttpStatus(response.httpcode)
+    req.SetHttpCode(response.httpcode)
     req.SetContentType(response.content_type)
     for header_pair in response.headers.iteritems():
       req.AddHeader(*header_pair)

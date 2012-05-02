@@ -122,7 +122,7 @@ class Request(object):
     else:
       self.AddHeader('content-type', '%s; charset=utf-8' % content_type)
 
-  def SetHttpStatus(self, http_status_code):
+  def SetHttpCode(self, http_status_code):
     if self._modpython:
       self._request.status = http_status_code
     else:
