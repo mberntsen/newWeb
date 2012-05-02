@@ -15,8 +15,9 @@ def ParseArguments():
                       help='Displays this help description.')
 
   arguments = parser.parse_args()[0]
-  if arguments.help:
+  if arguments.help or (not arguments.router or not arguments.host):
     parser.print_help()
+    return False
 
   return arguments
 
@@ -42,7 +43,7 @@ def GenerateConfig(document_root, server_name, router_file, uweb_path):
 def main():
   """Create apache config file based on given arguments"""
   arguments = ParseArguments()
-  if not arguments.help:
+  if arguments:
     uweb_path = os.path.split(os.path.abspath(os.path.dirname(__file__)))[0]
     document_root, router_file = os.path.split(arguments.router)
 
