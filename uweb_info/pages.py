@@ -163,6 +163,9 @@ class PageMaker(login.LoginMixin, login.OpenIdMixin, uweb.DebuggingPageMaker):
                                              **self.CommonBlocks('http500')),
                            httpcode=500)
 
+  # ############################################################################
+  # OpenID result handlers.
+  #
   def OpenIdProviderBadLink(self, err_obj):
     return self.parser.Parse(
         'freetext.html',
@@ -204,6 +207,9 @@ class PageMaker(login.LoginMixin, login.OpenIdMixin, uweb.DebuggingPageMaker):
         message=message,
         **self.CommonBlocks('uweb'))
 
+  # ############################################################################
+  # Underdark Login Framework result handlers.
+  #
   def _ULF_Failure(self, secure):
     return self.parser.Parse(
         'freetext.html',
