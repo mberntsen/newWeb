@@ -44,7 +44,6 @@ class PageMaker(login.LoginMixin, login.OpenIdMixin, uweb.DebuggingPageMaker):
 
   def Index(self, _path):
     """Returns the index.html template"""
-    logging.LogInfo('Index page requested')
     self.persistent.Set('conn_id', self.persistent.Get('conn_id', 0) + 1)
 
     if 'uweb_cookie_name' in self.post:
@@ -98,7 +97,6 @@ class PageMaker(login.LoginMixin, login.OpenIdMixin, uweb.DebuggingPageMaker):
     To return a different content type, the returned object must be a Page,
     where the `content_type` argument can be set to any desired mimetype.
     """
-    logging.LogInfo('Text page requested')
     text = """
         <h1>This is a text-only page.</h1>
 
