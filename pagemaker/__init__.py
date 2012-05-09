@@ -268,11 +268,11 @@ class BasePageMaker(object):
     except IOError:
       return self._StaticNotFound(rel_path)
 
-  def _StaticNotFound(self, path):
-      message = 'This is not the path you\'re looking for. No such file %r' % (
-          self.req.env['PATH_INFO'])
-      return response.Response(
-          content=message, content_type='text/plain', httpcode=404)
+  def _StaticNotFound(self, _path):
+    message = 'This is not the path you\'re looking for. No such file %r' % (
+      self.req.env['PATH_INFO'])
+    return response.Response(
+      content=message, content_type='text/plain', httpcode=404)
 
 
 class DebuggerMixin(object):
