@@ -156,7 +156,7 @@ class BasePageMaker(object):
   PERSISTENT = CacheStorage()
   # Base paths for templates and public data. These are used in the PageMaker
   # classmethods that set up paths specific for that pagemaker.
-  PUBLIC_DIR = 'www'
+  PUBLIC_DIR = 'static'
   TEMPLATE_DIR = 'templates'
 
   # Default Static() handler cache durations, per MIMEtype, in days
@@ -266,6 +266,9 @@ class BasePageMaker(object):
                         content_type=content_type,
                         headers={'Expires': expires.strftime(RFC_1123_DATE)})
     except IOError:
+      return self._StaticNotFound(rel_path)
+
+  def _StaticNotFound(self, path):
       message = 'This is not the path you\'re looking for. No such file %r' % (
           self.req.env['PATH_INFO'])
       return response.Response(
