@@ -29,7 +29,6 @@ except ImportError:
 
 # Custom modules
 from underdark.libs import app
-from underdark.libs import udders
 
 # Package modules
 from . import pagemaker
@@ -259,7 +258,7 @@ def ServerSetup(apache_logging=True):
   router_routes = router.f_globals['ROUTES']
   config_file = router.f_globals.get('CONFIG')
   if config_file:
-    router_config = udders.ParseConfig(os.path.join(
+    router_config = app.ParseConfig(os.path.join(
         os.path.dirname(router_file), config_file))
   else:
     router_config = {}

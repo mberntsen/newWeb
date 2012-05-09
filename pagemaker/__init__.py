@@ -15,7 +15,6 @@ import warnings
 
 # Custom modules
 from underdark.libs import logging
-from underdark.libs import pysession
 
 # Package modules
 from .. import response
@@ -271,8 +270,7 @@ class BasePageMaker(object):
   def _StaticNotFound(self, _path):
     message = 'This is not the path you\'re looking for. No such file %r' % (
       self.req.env['PATH_INFO'])
-    return response.Response(
-      content=message, content_type='text/plain', httpcode=404)
+    return response.Response(message, content_type='text/plain', httpcode=404)
 
 
 class DebuggerMixin(object):
@@ -409,58 +407,6 @@ class SqliteMixin(object):
     return self.persistent.Get('__sqlite')
 
 
-class SessionMixin(object):
-  """Adds pysession support to PageMaker."""
-  def __init__(self, *args, **kwds):
-    super(SessionMixin, self).__init__(*args, **kwds)
-    self._userid = None
-
-  @property
-  def userid(self):
-    """Provides the ID of the logged in user, if a valid session is available"""
-    if self._userid is None:
-      self._userid = self._GetSessionUserId()
-    return self._userid
-
-  def _GetSessionHandler(self):
-    """Creates a session handler used to check sessions"""
-    return pysession.Session(
-        connection=self.connection,
-        usertable='users',
-        sessiontable='sessions',
-        domain='true',
-        remoteip=self.req['remote_addr'],
-        columns={'user': 'emailaddress',
-                 'password': 'password',
-                 'useractive': 'status'},
-        activestates='valid')
-
-  def _GetSessionUserId(self):
-    """Tries to validate a session by its cookiestring and IP address
-
-    sets:
-      self.options['login']: to True if logged in
-      self.session['id']:    session id
-      self.session['key']:   session password
-
-    returns:
-      True if logged in
-      False if session is invalid
-    """
-    if 'session' not in self.cookies:
-      return False
-    raw_session = self.cookies.get['session'].value
-    session_id, _sep, session_key = raw_session.partition(':')
-    if not (session_id and session_key):
-      return False
-    try:
-      session_handler = self._GetSessionHandler()
-      session_handler.ResumeSession(session_id, session_key)
-      return session_handler.userid
-    except (pysession.SessionError, ValueError):
-      return False
-
-
 class SmorgasbordMixin(object):
   """Provides multiple-database connectivity.
 
@@ -507,8 +453,8 @@ class SmorgasbordMixin(object):
 # ##############################################################################
 # Classes for public use (wildcard import)
 #
-class PageMaker(MysqlMixin, SessionMixin, BasePageMaker):
-  """The basic PageMaker class, providing MySQL and Pysession support."""
+class PageMaker(MysqlMixin, BasePageMaker):
+  """The basic PageMaker class, providing MySQL support."""
 
 
 class DebuggingPageMaker(DebuggerMixin, PageMaker):
