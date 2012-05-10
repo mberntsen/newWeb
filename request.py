@@ -134,13 +134,15 @@ class Request(object):
     N.B. For the BaseHTTP variant, this is where status and headers are written.
     """
     if self._modpython:
-      self._request.write(data)
+      if self.env['REQUEST_METHOD'] != 'HEAD':
+        self._request.write(data)
     else:
       self._request.send_response(self._out_status)
       for name, value in self._out_headers:
         self._request.send_header(name, value)
       self._request.end_headers()
-      self._request.wfile.write(data)
+      if self.env['REQUEST_METHOD'] != 'HEAD':
+        self._request.wfile.write(data)
 
 
 class IndexedFieldStorage(cgi.FieldStorage):

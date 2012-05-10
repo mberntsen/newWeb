@@ -19,7 +19,6 @@ except ImportError:
   # Not running on mod_python. We'll assume uWeb needs to run standalone.
   import standalone
   class _MockApache(object):
-    DONE = True
     def __nonzero__(self):
       return False
   # Make sure we have a global `apache` we can test for truthness later on.
@@ -130,8 +129,7 @@ def Handler(page_class, routes, config=None):
     for header_pair in response.headers.iteritems():
       req.AddHeader(*header_pair)
     req.Write(response.content)
-    if apache:
-      return apache.DONE
+    return True
   return RequestHandler
 
 
@@ -251,6 +249,7 @@ def ServerSetup(apache_logging=True):
   router = sys._getframe(1)
   # pylint: enable=W0212
   router_file = router.f_code.co_filename
+  router_name = os.path.splitext(os.path.basename(router_file))[0]
 
   # Configuration based on constants provided
   package_name = router.f_globals.get('PACKAGE')
@@ -264,7 +263,6 @@ def ServerSetup(apache_logging=True):
     router_config = {}
   handler = Handler(router_pages, router_routes, config=router_config)
   if not apache:
-    router_name = os.path.splitext(os.path.basename(router_file))[0]
     package_dir = os.path.abspath(os.path.join(
         os.path.dirname(router_file), os.path.pardir))
     package_name = package_name or os.path.basename(package_dir)
@@ -281,4 +279,4 @@ def ServerSetup(apache_logging=True):
     if apache_logging:
       package = package_name or 'uweb_project'
       log_dir = app.FirstWritablePath(app.MakePaths(app.LOGGING_PATHS, package))
-      app.SetUpLogging(os.path.join(log_dir, 'apache.sqlite'))
+      app.SetUpLogging(os.path.join(log_dir, '%s.sqlite' % router_name))
