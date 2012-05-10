@@ -141,7 +141,6 @@ class PageMaker(login.LoginMixin, login.OpenIdMixin, uweb.DebuggingPageMaker):
 
   def FourOhFour(self, path):
     """The request could not be fulfilled, this returns a 404."""
-    logging.LogWarning('Bad page %r requested', path)
     return uweb.Response(self.parser.Parse('404.html', path=path,
                                            **self.CommonBlocks('http404')),
                          httpcode=404)
