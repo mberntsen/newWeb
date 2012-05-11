@@ -9,7 +9,7 @@ import errno
 import sys
 
 # Custom modules
-from underdark.libs import logging
+from underdark.libs.app import logging
 
 
 class ServerRunningError(Exception):

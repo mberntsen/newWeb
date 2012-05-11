@@ -13,7 +13,6 @@ import time
 # Custom modules
 import uweb
 from uweb.pagemaker import login
-from underdark.libs import logging
 
 
 class PageMaker(login.LoginMixin, login.OpenIdMixin, uweb.DebuggingPageMaker):
@@ -156,7 +155,7 @@ class PageMaker(login.LoginMixin, login.OpenIdMixin, uweb.DebuggingPageMaker):
       # Return our custom styled HTTP 500 handler instead, this is what you'll
       # want to serve during production; the debugging one gives too much info.
       path = self.req.env['PATH_INFO']
-      logging.LogError('Execution of %r triggered an exception',
+      uweb.logging.LogError('Execution of %r triggered an exception',
                        path, exc_info=exc_info)
       return uweb.Response(self.parser.Parse('500.html', path=path,
                                              **self.CommonBlocks('http500')),

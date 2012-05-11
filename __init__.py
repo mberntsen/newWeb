@@ -1,9 +1,9 @@
 #!/usr/bin/python
-"""Underdark web interface, or uWeb interface"""
-from __future__ import with_statement
+"""Underdark Web Framework -- uWeb"""
 
 __author__ = 'Elmer de Looff <elmer@underdark.nl>'
-__version__ = '0.13'
+__version__ = '0.14'
+
 
 # Standard modules
 import htmlentitydefs
@@ -12,12 +12,24 @@ import re
 import sys
 import warnings
 
+# Underdark package module
+#
+# If the underdark package is not directly available, add the 'ud_lib'
+# directory to the module path.
 try:
-  # We mostly need to import this module to detect we're running on mod_python
+  import underdark
+except ImportError:
+  sys.path.append(
+      os.path.abspath(os.path.join(os.path.dirname(__file__), 'ext_lib')))
+# Underdark modules
+from underdark.libs import app
+from underdark.libs.app import logging
+
+try:
+  # Import this module to check uWeb runmode (success means MOD_PYTHON)
   from mod_python import apache
 except ImportError:
-  # Not running on mod_python. We'll assume uWeb needs to run standalone.
-  import standalone
+  # uWeb will run in STANDALONE mode
   class _MockApache(object):
     def __nonzero__(self):
       return False
@@ -26,12 +38,10 @@ except ImportError:
   apache = _MockApache()
   # pylint: enable=C0103
 
-# Custom modules
-from underdark.libs import app
-
 # Package modules
 from . import pagemaker
 from . import request
+from . import standalone
 
 # Package classes
 from .response import Response
