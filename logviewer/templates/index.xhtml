@@ -1,0 +1,17 @@
+[header]
+  <div id="content">
+    <div>
+      <h2>Choose a log file:</h2>
+      {{ for directory in [logfiles] }}
+        {{ if [directory:files] }}
+        <h3>Directory [directory:name]:</h3>
+        <ul>
+          {{ for file in [directory:files] }}
+          <li><a href="/db/[directory:name]/[file]" title="View logs for [file]">[file]</a></li>
+          {{ endfor }}
+        </ul>
+        {{ endif }}
+      {{ endfor }}
+    </div>
+  </div>
+[footer]

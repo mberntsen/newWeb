@@ -1,0 +1,175 @@
+/* ********************
+ * Generic block layout
+ * ******************** */
+#content.sidebar > li {
+  width: 75.5%
+}
+#content.sidebar > li:last-child{
+  width: 18%;
+}
+.side_menu h3{
+  margin:0;
+}
+.side_menu h4{
+  margin: .6em 0 .25em;
+  font-weight:normal;
+  font-style:italic;
+  color:#ddd;
+}
+.side_menu ul{
+  overflow:hidden;
+  list-style:disc;
+}
+#events{
+  margin:10px 0 0;
+  padding:0;
+  list-style:none;
+}
+#events > li{
+  margin: 6px 0;
+}
+p{
+  margin:0;
+  white-space:pre-wrap;
+}
+/* ****************
+ * Event box styles
+ * **************** */
+table{
+  border-collapse:collapse;
+  color:#fff;
+}
+thead{
+  cursor:hand;
+  cursor:pointer;
+}
+td:last-child{
+  width:100%;
+}
+thead td{
+  font-size:.9em;
+  height:1em;
+  padding:4px 6px;
+  border:0 ! important; /* override from default Underdark styles */
+}
+tbody td{
+  background:rgba(180, 180, 180, .75);
+  vertical-align:top;
+}
+.log_level{
+  float:right;
+  font-weight:bold;
+}
+ul.metadata{
+  padding:0;
+  list-style:none;
+}
+ul.metadata li{
+  white-space:pre;
+}
+ul.metadata span{
+  color:#555;
+}
+.traceback h3{
+  display:inline-block;
+  margin: 10px 0 0 12px;
+  padding:.5em 1em;
+  border-radius:.5em .5em 0 0;
+  background:rgba(0, 0, 0, .75);
+  color:#fff;
+}
+.traceback pre{
+  margin: 0 12px 12px;
+  padding:.5em .8em;
+  border-radius:0 .5em .5em;
+  background:rgba(0, 0, 0, .75);
+  font:bold .9em/1.4 courier;
+  white-space:pre-wrap;
+}
+/* ************************************************
+ * Log level colors for option box and event blocks
+ * ************************************************ */
+option.DEBUG,
+li.DEBUG thead td,
+li.DEBUG tbody tr{
+  background-color: rgba(23, 152, 105, .75);
+}
+option.INFO,
+li.INFO thead td,
+li.INFO tbody tr{
+  background-color: rgba(50, 124, 182, .75);
+}
+option.WARNING,
+li.WARNING thead td,
+li.WARNING tbody tr{
+  background-color: rgba(240, 218, 14, .75);
+}
+option.ERROR,
+li.ERROR thead td,
+li.ERROR tbody tr{
+  background-color: rgba(246, 153, 43, .75);
+}
+option.CRITICAL,
+li.CRITICAL thead td,
+li.CRITICAL tbody tr{
+  background-color: rgba(236, 63, 65, .75);
+}
+/* *******************************************************
+ * Log event displaying and rounded edges for event blocks
+ * ******************************************************* */
+li.open tr.closed_row,
+li.closed tr.open_row,
+li.closed tbody{
+  display:none;
+}
+#events thead td:first-child{
+  border-top-left-radius:.5em;
+}
+#events thead td:last-child{
+  border-top-right-radius:.5em;
+}
+#events thead tr.closed_row td:first-child,
+#events tbody tr:last-child td:first-child{
+  border-bottom-left-radius:.5em;
+}
+#events thead tr.closed_row td:last-child,
+#events tbody tr:last-child td:last-child{
+  border-bottom-right-radius:.5em;
+}
+li.closed tr{
+  white-space:nowrap;
+}
+/* *****************
+ * Search box styles
+ * ***************** */
+option:hover{
+  background:#fff;
+}
+fieldset{
+  border:2px groove #a2c837;  /* default is groove. Firefox bungs this up :( */
+}
+select, option, input, input[type="text"]{
+  background:#444;
+  color:#fff;
+  border-color:#a2c837;
+}
+input[type="submit"],
+input[type="reset"]{
+  border-radius:.5em;
+  -moz-border-radius:.5em;
+}
+select:hover,
+option:hover,
+input:hover,
+intput[type="text"]:hover{
+  background:#1b282e;
+}
+form li{
+  list-style:none;
+  margin:0 1em 0 0;
+  float:left;
+}
+form li:last-child{
+  float:right;
+  margin:1em 2em 0;
+}
