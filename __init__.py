@@ -140,7 +140,6 @@ def Handler(page_class, routes, config=None):
       req.AddHeader(*header_pair)
     req.Write(response.content)
     if apache:
-      logging.LogWarning(apache.DONE)
       return apache.DONE
   return RequestHandler
 
