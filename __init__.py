@@ -139,7 +139,9 @@ def Handler(page_class, routes, config=None):
     for header_pair in response.headers.iteritems():
       req.AddHeader(*header_pair)
     req.Write(response.content)
-    return True
+    if apache:
+      logging.LogWarning(apache.DONE)
+      return apache.DONE
   return RequestHandler
 
 
