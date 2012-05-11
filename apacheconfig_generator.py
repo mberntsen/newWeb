@@ -22,23 +22,23 @@ def ParseArguments():
   return arguments
 
 def GenerateConfig(document_root, server_name, router_file, uweb_path):
-  print """NameVirtualHost *:80
-  <VirtualHost *:80>
-    document_root %(document_root)s
-    server_name %(server_name)s
-  </VirtualHost>
+  print """
+<VirtualHost *:80>
+  documentroot %(document_root)s
+  servername %(server_name)s
+</VirtualHost>
 
-  <Directory "%(document_root)s/">
-    SetHandler mod_python
-    PythonHandler %(router_name)s
-    PythonPath "['%(uweb_path)s'] + sys.path"
-    PythonAutoReload on
-    PythonDebug on
-  </Directory>
-  """ % {'document_root':document_root,
-         'server_name':server_name,
-         'router_name':router_file,
-         'uweb_path':uweb_path}
+<Directory "%(document_root)s/">
+  SetHandler mod_python
+  PythonHandler %(router_name)s
+  PythonPath "['%(uweb_path)s'] + sys.path"
+  PythonAutoReload on
+  PythonDebug on
+</Directory>
+""" % {'document_root':document_root,
+       'server_name':server_name,
+       'router_name':router_file,
+       'uweb_path':uweb_path}
 
 def main():
   """Create apache config file based on given arguments"""
