@@ -721,8 +721,19 @@ def HtmlEscape(text):
   html = html.replace('>', '&gt;')
   return html.replace('<', '&lt;')
 
+
+def UrlQuote(text):
+  """URL escapes a string, making it safe for usage in query arguments.
+
+  Any unicode found in the text will be encoded to UTF8 before escaping.
+  """
+  if isinstance(text, unicode):
+    return urllib.quote_plus(text.encode('utf8'))
+  return urllib.quote_plus(text)
+
+
 TAG_FUNCTIONS = {
     'default': HtmlEscape,
     'html': HtmlEscape,
     'raw': lambda x: x,
-    'url': urllib.quote_plus}
+    'url': UrlQuote}
