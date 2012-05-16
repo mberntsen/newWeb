@@ -3,7 +3,7 @@
 from __future__ import with_statement
 
 __author__ = 'Elmer de Looff <elmer@underdark.nl>'
-__version__ = '0.16'
+__version__ = '0.17'
 
 # Standard modules
 import datetime
@@ -120,6 +120,41 @@ class BaseRecord(dict):
         ', '.join('%r: %r' % item for item in self.iteritems()))
 
   # ############################################################################
+  # Rich comparators
+  #
+  def __gt__(self, other):
+    """Index of this record is greater than the other record's.
+
+    This requires both records to be of the same record class."""
+    if type(self) == type(other):
+      return self.key > other.key
+    return NotImplemented
+
+  def __ge__(self, other):
+    """Index of this record is greater than, or equal to, the other record's.
+
+    This requires both records to be of the same record class."""
+    if type(self) == type(other):
+      return self.key >= other.key
+    return NotImplemented
+
+  def __lt__(self, other):
+    """Index of this record is smaller than the other record's.
+
+    This requires both records to be of the same record class."""
+    if type(self) == type(other):
+      return self.key < other.key
+    return NotImplemented
+
+  def __le__(self, other):
+    """Index of this record is smaller than, or equal to, the other record's.
+
+    This requires both records to be of the same record class."""
+    if type(self) == type(other):
+      return self.key <= other.key
+    return NotImplemented
+
+  # ############################################################################
   # Base record functionality methods, to be implemented by subclasses.
   # Some methods have a generic implementation, but may need customization,
   #
@@ -143,7 +178,7 @@ class BaseRecord(dict):
     return record
 
   @classmethod
-  def DeleteKey(cls, connection, key):
+  def DeletePrimary(cls, connection, key):
     """Deletes a database record based on the primary key value.
 
     Arguments:
@@ -157,9 +192,9 @@ class BaseRecord(dict):
   def Delete(self):
     """Deletes a loaded record based on `self.TableName` and `self.key`.
 
-    For deleting an unloaded object, use the classmethod `DeleteKey`.
+    For deleting an unloaded object, use the classmethod `DeletePrimary`.
     """
-    self.DeleteKey(self.connection, self.key)
+    self.DeletePrimary(self.connection, self.key)
     self._record.clear()
     self.clear()
 
@@ -520,7 +555,8 @@ class Record(BaseRecord):
       cursor.Insert(table=self.TableName(), values=self._DataRecord())
     else:
       result = cursor.Insert(table=self.TableName(), values=self._DataRecord())
-      self._record[self._PRIMARY_KEY] = self.key = result.insertid
+      if result.insertid:
+        self._record[self._PRIMARY_KEY] = self.key = result.insertid
 
   def _SaveForeign(self, cursor):
     """Recursively saves all nested Record instances."""
@@ -558,7 +594,7 @@ class Record(BaseRecord):
   # Public methods for creation, deletion and storing Record objects.
   #
   @classmethod
-  def DeleteKey(cls, connection, pkey_value):
+  def DeletePrimary(cls, connection, pkey_value):
     print 'DELETING RECORD FOR PRIMARY: %r' % (pkey_value, )
     with connection as cursor:
       cursor.Delete(table=cls.TableName(),
@@ -748,7 +784,7 @@ class MongoRecord(BaseRecord):
     return getattr(connection, cls.TableName())
 
   @classmethod
-  def DeleteKey(cls, connection, pkey_value):
+  def DeletePrimary(cls, connection, pkey_value):
     collection = cls.Collection(connection)
     collection.remove({cls._PRIMARY_KEY: pkey_value})
 
