@@ -89,6 +89,21 @@ class PageMaker(login.LoginMixin, login.OpenIdMixin, uweb.DebuggingPageMaker):
 
     return _Processor(_MakeInteger)
 
+  def NonWordCatchall(self, path):
+    """Returns a simple page with a byte-view of the sent request.
+
+    This result is triggered when the path contained non-word Unicode characters
+    or a byte-stream that could not be converted to Unicode.
+    """
+    text = ('You tried to open a page with either invalid UTF8 in it, or'
+            'another sequence that did not match the route regex (word chars + '
+            'dashes, underscores and slashes. Your request path: %r' % path)
+    return self.parser.Parse(
+        'freetext.html',
+        title=u'Underdark \u2665 Unicode',
+        message=text,
+        **self.CommonBlocks('uweb'))
+
   @staticmethod
   def Text():
     """Returns a page with data in text/plain.

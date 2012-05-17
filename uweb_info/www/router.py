@@ -36,7 +36,8 @@ ROUTES = (
     ('/OpenIDValidate', '_OpenIdValidate'),
     ('/ULF-Challenge', '_ULF_Challenge'),
     ('/ULF-Login', '_ULF_Verify'),
-    ('/(.*)', 'Index'))
+    ('/([\w\-_/]*)', 'Index'),
+    ('/(.*)', 'NonWordCatchall'))
 
 
 uweb.ServerSetup(apache_logging=True)
