@@ -58,6 +58,11 @@ class Request(object):
       self.headers = request.headers_in
       post_data_fp = request
 
+    try:
+      self.env['PATH_INFO'] = self.env['PATH_INFO'].decode('UTF8')
+    except UnicodeDecodeError:
+      pass # Work with possibly borky encoding on PATH_INFO
+
     # `self.vars` setup, will contain keys 'cookie', 'get' and 'post'
     self.vars = {'cookie': dict((name, value.value) for name, value in
                                 Cookie(self.env.get('HTTP_COOKIE')).items()),

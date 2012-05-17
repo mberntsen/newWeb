@@ -162,7 +162,7 @@ def Router(routes):
   """
   req_routes = []
   for pattern, method in routes:
-    req_routes.append((re.compile(pattern + '$'), method))
+    req_routes.append((re.compile(pattern + '$', re.UNICODE), method))
 
   def RequestRouter(url):
     """Returns the appropriate handler and arguments for the given `url`.
