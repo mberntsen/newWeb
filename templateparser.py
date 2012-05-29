@@ -225,7 +225,7 @@ class Template(list):
   """Contained for template parts, allowing for rich content construction."""
   FUNCTION = re.compile(r'\s*\{\{\s*(.*?)\s*\}\}')
   # For a full tag syntax exlanation, refer to the TAG regex in TemplateTag.
-  TAG = re.compile('(\[\w+(?::[\w:]+)?(?:\|[\w|]+)?\])')
+  TAG = re.compile('(\[\w+(?::[\w:-]+)?(?:\|[\w|-]+)?\])')
 
   def __init__(self, raw_template, parser=None):
     """Initializes a Template
@@ -549,11 +549,11 @@ class TemplateTag(object):
   PFX_INDEX = ':'
   PFX_FUNCT = '|'
   TAG = re.compile(r"""
-      \[               # Tags start with a opening square bracket.
-      (\w+?)           # Tagname of at least 1 alphanum (incl underscores).
-      (?:\:([\w:]+))?  # Zero or more indices (alphanum), prefixed by a colon.
-      (?:\|([\w|]+))?  # Zero or more functions (alphanum), prefixed by a pipe.
-      \]               # Tags end with a closing square bracket.
+      \[                # Tags start with a opening square bracket.
+      (\w+?)            # Tagname of at least 1 alphanum (incl underscores).
+      (?:\:([\w:-]+))?  # Zero or more indices (alphanum), prefixed by a colon.
+      (?:\|([\w|-]+))?  # Zero or more functions (alphanum), prefixed by a pipe.
+      \]                # Tags end with a closing square bracket.
       """, re.VERBOSE)
 
   def __init__(self, name, indices=(), functions=()):

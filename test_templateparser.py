@@ -195,6 +195,19 @@ class TemplateTagIndexed(unittest.TestCase):
     mapp['NAME'] = 'key (mapping)'
     self.assertEqual(lookup_dict, self.tmpl(template).Parse(tag=mapp))
 
+  def testTemplateIndexingCharacters(self):
+    """[IndexedTag] Tags indexes may be made of word chars and dashes only"""
+    good_chars = "aAzZ0123-_"
+    bad_chars = """ :~!@#$%^&*()+={}\|;':",./<>? """
+    for index in good_chars:
+      tag = {index: 'SUCCESS'}
+      template = '[tag:%s]' % index
+      self.assertEqual('SUCCESS', self.tmpl(template).Parse(tag=tag))
+    for index in bad_chars:
+      tag = {index: 'FAIL'}
+      template = '[tag:%s]' % index
+      self.assertEqual(template, self.tmpl(template).Parse(tag=tag))
+
   def testTemplateMissingIndexes(self):
     """[IndexedTag] Tags with bad indexes will be returned verbatim"""
     class Object(object):
@@ -236,6 +249,23 @@ class TemplateTagFunctions(unittest.TestCase):
     template = '[number|int]'
     self.parser.RegisterFunction('int', int)
     self.assertEqual('3', self.parser.ParseString(template, number=3))
+
+  def testFunctionCharacters(self):
+    """[TagFunctions] Tags functions may contain word chars and dashes only"""
+    good_funcs = "aAzZ0123-_"
+    good_func = lambda tag: 'SUCCESS'
+    bad_funcs = """ :~!@#$%^&*()+={}\;':",./<>? """
+    bad_func = lambda tag: 'FAIL'
+    for index in good_funcs:
+      template = '[tag|%s]' % index
+      self.parser.RegisterFunction(index, good_func)
+      self.assertEqual('SUCCESS', self.parser.ParseString(template, tag='foo'))
+    for index in bad_funcs:
+      template = '[tag|%s]' % index
+      self.parser.RegisterFunction(index, bad_func)
+      self.assertEqual(template, self.parser.ParseString(template, tag='foo'))
+    self.parser.RegisterFunction('|', bad_func)
+    self.assertRaises(KeyError, self.parser.ParseString, '[tag||]', tag='foo')
 
   def testDefaultHtmlSafe(self):
     """[TagFunctions] The default function escapes HTML entities"""
