@@ -66,9 +66,39 @@ class User(model.Record):
     return cls(connection, user[0])
 
   @classmethod
+  def HashPassword(cls, password, salt=None):
+    if not salt:
+      salt = cls.SaltBytes()
+    if len(salt) != cls.SALT_BYTES:
+      raise ValueError('Salt is of incorrect length. Expected %d, got: %d' % (
+          cls.SALT_BYTES, len(salt)))
+    password = hashlib.sha1(password + binascii.hexlify(salt)).digest()
+    return {'password': password, 'salt': salt}
+
+  @classmethod
   def SaltBytes(cls):
     """Returns the configured number of random bytes for the salt."""
     return os.urandom(cls.SALT_BYTES)
+
+  def UpdatePassword(self, plaintext):
+    """Stores a new password hash and salt, from the given plaintext."""
+    self.update(self.HashPassword(plaintext))
+    self.Save()
+
+  def VerifyChallenge(self, attempt, challenge):
+    """Verifies the password hash against the stored hash.
+
+    Both the password hash (attempt) and the challenge should be provided
+    as raw bytes.
+    """
+    password = binascii.hexlify(self['password'])
+    actual_pass = hashlib.sha1(password + binascii.hexlify(challenge)).digest()
+    return attempt == actual_pass
+
+  def VerifyPlaintext(self, plaintext):
+    """Verifies a given plaintext password."""
+    salted = hashlib.sha1(plaintext + binascii.hexlify(self['salt'])).digest()
+    return salted == self['password']
 # pylint: enable=R0904
 
 
@@ -137,9 +167,7 @@ class LoginMixin(object):
     """
     user = self.ULF_USER.FromName(
         self.connection, self.post.getfirst('username'))
-    password = str(self.post.getfirst('password', ''))
-    hashed = hashlib.sha1(password + binascii.hexlify(user['salt'])).digest()
-    if user['password'] == hashed:
+    if user.VerifyPlaintext(str(self.post.getfirst('password', ''))):
       return self._ULF_Success(False)
     return self._ULF_Failure(False)
 
@@ -158,13 +186,14 @@ class LoginMixin(object):
         self.connection, self.post.getfirst('username'))
     challenge = self.ULF_CHALLENGE.FromPrimary(
         self.connection, (user, self.req.env['REMOTE_ADDR']))
-    password = binascii.hexlify(user['password'])
-    chall_str = binascii.hexlify(challenge['challenge'])
-    challenge.Delete()  # Delete the challenge so we do not re-use it.
-    password = hashlib.sha1(password + chall_str).hexdigest()
-    if password == self.post.getfirst('salted', ''):
-      return self._ULF_Success(True)
-    return self._ULF_Failure(True)
+    try:
+      user_attempt = binascii.unhexlify(self.post.getfirst('salted', ''))
+      if user.VerifyChallenge(user_attempt, challenge['challenge']):
+        return self._ULF_Success(True)
+      return self._ULF_Failure(True)
+    finally:
+      challenge.Delete()  # Delete the challenge so we do not re-use it.
+
 
   def _ULF_Failure(self, secure):
     """Renders the response to the user upon authentication failure."""
