@@ -23,7 +23,7 @@ import errno
 import lockfile
 
 import scaffold
-from underdark.libs.daemon import pidlockfile
+from underdark.libs.app.daemon import pidlockfile
 
 
 class FakeFileDescriptorStringIO(StringIO, object):

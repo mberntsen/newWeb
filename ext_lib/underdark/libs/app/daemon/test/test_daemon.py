@@ -30,8 +30,8 @@ from test_pidlockfile import (
     setup_pidfile_fixtures,
     )
 
-from underdark.libs import daemon
-from underdark.libs.daemon import pidlockfile
+from underdark.libs.app import daemon
+from underdark.libs.app.daemon import pidlockfile
 
 
 class Exception_TestCase(scaffold.Exception_TestCase):
