@@ -43,7 +43,7 @@ class BaseRecord(dict):
   _PRIMARY_KEY = 'ID'
   _TABLE = None
 
-  def __init__(self, connection, record):
+  def __init__(self, connection, record, run_init_hook=True):
     """Initializes a BaseRecord instance.
 
     Arguments:
@@ -51,6 +51,9 @@ class BaseRecord(dict):
         The database connection to use for further queries.
       @ record: mapping
         A field:value mapping of the database record information.
+      % run_init_hook: bool ~~ True
+        States whether or not the `_PostInit()` hook should be run after
+        the other initialization steps have completed.
     """
     super(BaseRecord, self).__init__(record)
     if not hasattr(BaseRecord, '_SUBTYPES'):
@@ -58,6 +61,11 @@ class BaseRecord(dict):
       BaseRecord._SUBTYPES = dict(RecordTableNames())
     self.connection = connection
     self._record = self._DataRecord()
+    # _PostInit hook should run after making a live copy of the data, so that
+    # mirrored data transforms between _PostInit and _PreSave will not trigger
+    # the record to be updated on saves where the data hasn't actually changed.
+    if run_init_hook:
+      self._PostInit()
 
   def __eq__(self, other):
     """Simple equality comparison for database objects.
@@ -155,6 +163,47 @@ class BaseRecord(dict):
     return NotImplemented
 
   # ############################################################################
+  # Hooks for things to run before and after creating and updating records
+  #
+  def _PreCreate(self, _cursor):
+    """Hook that runs before creating (inserting) a Record in the database.
+
+    Typically you would verify values of the Record in this step, or transform
+    the data for database-safe insertion. If the data is transformed here, this
+    transformation should be reversed in `_PostCreate()`.
+    """
+
+  def _PreSave(self, _cursor):
+    """Hook that runs before saving (updating) a Record in the database.
+
+    Typically you would verify values of the Record in this step, or transform
+    the data for database-safe insertion. If the data is transformed here, this
+    transformation should be reversed in `_PostSave()`.
+    """
+
+  def _PostInit(self):
+    """Hook that runs after initializing a Record instance.
+
+    This typically runs on every instance, but can be suppressed. Records that
+    are newly created using the `Create()` classmethod will NOT have this hook
+    run. They should use `_PreCreate()` and `_PostCreate()` methods.
+
+    Any transforms done after creating and saving should likely be present here.
+    """
+
+  def _PostCreate(self, _cursor):
+    """Hook that runs after creating (inserting) a Record in the database.
+
+    Any transforms that were performed on the data should be reversed here.
+    """
+
+  def _PostSave(self, _cursor):
+    """Hook that runs after saving (updating) a Record in the database.
+
+    Any transforms that were performed on the data should be reversed here.
+    """
+
+  # ############################################################################
   # Base record functionality methods, to be implemented by subclasses.
   # Some methods have a generic implementation, but may need customization,
   #
@@ -173,9 +222,19 @@ class BaseRecord(dict):
     Returns:
       BaseRecord: the record that was created from the initiation mapping.
     """
-    record = cls(connection, record)
-    record.Save(create_new=True)
+    record = cls(connection, record, run_init_hook=False)
+    with connection as cursor:
+      # Accessing protected members of a foreign class.
+      # pylint: disable=W0212
+      record._PreCreate(cursor)
+      record._RecordCreate(cursor)
+      record._PostCreate(cursor)
+      # pylint: enable=W0212
     return record
+
+  def _RecordCreate(self, cursor):
+    """Inserts the record's current values in the database as a new record."""
+    raise NotImplementedError
 
   @classmethod
   def DeletePrimary(cls, connection, key):
@@ -230,7 +289,7 @@ class BaseRecord(dict):
     """
     raise NotImplementedError
 
-  def Save(self, create_new=False):
+  def Save(self):
     """Saves the changes made to the record.
 
     This performs an update to the record, except when `create_new` if set to
@@ -541,22 +600,40 @@ class Record(BaseRecord):
       return '`%s` = %s' % (cls._PRIMARY_KEY,
                             connection.EscapeValues(cls._ValueOrPrimary(value)))
 
-  def _RecordInsert(self, cursor):
+  def _RecordCreate(self, cursor):
     """Inserts the record's current values in the database as a new record.
 
     Upon success, the record's primary key is set to the result's insertid
     """
+    # Compound key case
     if isinstance(self._PRIMARY_KEY, tuple):
       values = self._DataRecord()
       auto_inc_field = set(self._PRIMARY_KEY) - set(values)
       if auto_inc_field:
         raise ValueError('No value for compound key field(s): %s' % (
             ', '.join(map(repr, auto_inc_field))))
-      cursor.Insert(table=self.TableName(), values=self._DataRecord())
-    else:
-      result = cursor.Insert(table=self.TableName(), values=self._DataRecord())
-      if result.insertid:
-        self._record[self._PRIMARY_KEY] = self.key = result.insertid
+      return cursor.Insert(table=self.TableName(), values=self._DataRecord())
+    # Single-column key case
+    result = cursor.Insert(table=self.TableName(), values=self._DataRecord())
+    if result.insertid:
+      self._record[self._PRIMARY_KEY] = self.key = result.insertid
+
+  def _RecordUpdate(self, cursor):
+    """Updates the existing database entry with the record's current values.
+
+    The constraint with which the record is updated is the name and value of
+    the Record's primary key (`self._PRIMARY_KEY` and `self.key` resp.)
+    """
+    try:
+      if isinstance(self._PRIMARY_KEY, tuple):
+        primary = tuple(self._record[key] for key in self._PRIMARY_KEY)
+      else:
+        primary = self._record[self._PRIMARY_KEY]
+    except KeyError:
+      raise Error('Cannot update record without pre-existing primary key.')
+    cursor.Update(
+        table=self.TableName(), values=difference,
+        conditions=self._PrimaryKeyCondition(self.connection, primary))
 
   def _SaveForeign(self, cursor):
     """Recursively saves all nested Record instances."""
@@ -578,16 +655,9 @@ class Record(BaseRecord):
     """
     difference = self._Changes()
     if difference:
-      try:
-        if isinstance(self._PRIMARY_KEY, tuple):
-          primary = tuple(self._record[key] for key in self._PRIMARY_KEY)
-        else:
-          primary = self._record[self._PRIMARY_KEY]
-      except KeyError:
-        raise Error('Cannot update record without pre-existing primary key.')
-      cursor.Update(
-          table=self.TableName(), values=difference,
-          conditions=self._PrimaryKeyCondition(self.connection, primary))
+      self._PreSave(cursor)
+      self._RecordUpdate(cursor)
+      self._PostSave(cursor)
       self._record.update(difference)
 
   # ############################################################################
@@ -618,16 +688,13 @@ class Record(BaseRecord):
     for record in records:
       yield cls(connection, record)
 
-  def Save(self, create_new=False, save_foreign=False):
+  def Save(self, save_foreign=False):
     """Saves the changes made to the record.
 
     This expands on the base Save method, providing a save_foreign that will
     recursively update all nested records when set to True.
 
     Arguments:
-      % create_new: bool ~~ False
-        Tells the method to create a new record instead of updating a current.
-        This should be used when Save is called by the Create() method.
       % save_foreign: bool ~~ False
         If set, each Record (subclass) contained by this one will be saved as
         well. This recursive saving triggers *before* this record itself will be
@@ -635,9 +702,7 @@ class Record(BaseRecord):
         that a failure to save this object will *not* roll back child saves.
     """
     with self.connection as cursor:
-      if create_new:
-        return self._RecordInsert(cursor)
-      elif save_foreign:
+      if save_foreign:
         self._SaveForeign(cursor)
       self._SaveSelf(cursor)
 
@@ -738,20 +803,26 @@ class VersionedRecord(Record):
     if last_key:
       return last_key[0][0]
 
-  def _SaveSelf(self, cursor):
-    """Saves the versioned record to the database.
+  def _PreCreate(self, cursor):
+    """Attaches a RecordKey to the Record if it doens't have one already.
 
-    If the appropriate record key has not been set, the next one will be gotten
-    from the `_NextRecordKey` method and added to the record.
-
-    N.B. Even when no data was changed, calling Save() will add a new record
-    to the database. This is because no check is done whether the record has
-    actually changed.
+    Before we create a new record, we need to acquire the next-in-line RecordKey
+    if none has been provided. If one has been provided, we'll use that one.
     """
     if self.record_key is None:
       self.record_key = self._NextRecordKey(cursor)
+
+  def _PreSave(self, cursor):
+    """Before saving a record, reset the primary key value.
+
+    This assures that we will not have a primary key conflict, though it does
+    assume an AutoIncrement primary key field.
+    """
     self.key = None
-    self._RecordInsert(cursor)
+
+  def _RecordUpdate(self, cursor):
+    """All updates are handled as new inserts for the same Record Key."""
+    self._RecordCreate(cursor)
 
   # Pylint falsely believes this property is overwritten by its setter later on.
   # pylint: disable=E0202
@@ -784,6 +855,17 @@ class MongoRecord(BaseRecord):
     return getattr(connection, cls.TableName())
 
   @classmethod
+  def Create(cls, connection, record):
+    record = cls(connection, record, run_init_hook=False)
+    # Accessing protected members of a foreign class.
+    # pylint: disable=W0212
+    record._PreCreate()
+    record._RecordCreate()
+    record._PostCreate()
+    # pylint: enable=W0212
+    return record
+
+  @classmethod
   def DeletePrimary(cls, connection, pkey_value):
     collection = cls.Collection(connection)
     collection.remove({cls._PRIMARY_KEY: pkey_value})
@@ -805,9 +887,16 @@ class MongoRecord(BaseRecord):
     for record in cls.Collection(connection).find():
       yield cls(connection, record)
 
-  def Save(self, create_new=False):
-    if create_new or self._Changes():
-      self.key = self.Collection(self.connection).save(self._DataRecord())
+  def _RecordCreate(self):
+    self.key = self.Collection(self.connection).save(self._DataRecord())
+
+  def Save(self):
+    changes = self._Changes()
+    if changes:
+      self._PreSave()
+      self._RecordCreate()
+      self._PostSave()
+      self._record.update(changes)
 
 
 class Smorgasbord(object):
