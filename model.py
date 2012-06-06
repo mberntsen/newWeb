@@ -222,18 +222,6 @@ class BaseRecord(dict):
     Returns:
       BaseRecord: the record that was created from the initiation mapping.
     """
-    record = cls(connection, record, run_init_hook=False)
-    with connection as cursor:
-      # Accessing protected members of a foreign class.
-      # pylint: disable=W0212
-      record._PreCreate(cursor)
-      record._RecordCreate(cursor)
-      record._PostCreate(cursor)
-      # pylint: enable=W0212
-    return record
-
-  def _RecordCreate(self, cursor):
-    """Inserts the record's current values in the database as a new record."""
     raise NotImplementedError
 
   @classmethod
@@ -632,7 +620,7 @@ class Record(BaseRecord):
     except KeyError:
       raise Error('Cannot update record without pre-existing primary key.')
     cursor.Update(
-        table=self.TableName(), values=difference,
+        table=self.TableName(), values=self._Changes(),
         conditions=self._PrimaryKeyCondition(self.connection, primary))
 
   def _SaveForeign(self, cursor):
@@ -664,6 +652,18 @@ class Record(BaseRecord):
   # Public methods for creation, deletion and storing Record objects.
   #
   @classmethod
+  def Create(cls, connection, record):
+    record = cls(connection, record, run_init_hook=False)
+    with connection as cursor:
+      # Accessing protected members of a foreign class.
+      # pylint: disable=W0212
+      record._PreCreate(cursor)
+      record._RecordCreate(cursor)
+      record._PostCreate(cursor)
+      # pylint: enable=W0212
+    return record
+
+  @classmethod
   def DeletePrimary(cls, connection, pkey_value):
     print 'DELETING RECORD FOR PRIMARY: %r' % (pkey_value, )
     with connection as cursor:
@@ -688,6 +688,8 @@ class Record(BaseRecord):
     for record in records:
       yield cls(connection, record)
 
+  # SQL Records have foreign relations, saving needs an extra argument for this.
+  # pylint: disable=W0221
   def Save(self, save_foreign=False):
     """Saves the changes made to the record.
 
@@ -705,6 +707,7 @@ class Record(BaseRecord):
       if save_foreign:
         self._SaveForeign(cursor)
       self._SaveSelf(cursor)
+  # pylint: enable=W0221
 
 
 class VersionedRecord(Record):
@@ -812,7 +815,7 @@ class VersionedRecord(Record):
     if self.record_key is None:
       self.record_key = self._NextRecordKey(cursor)
 
-  def _PreSave(self, cursor):
+  def _PreSave(self, _cursor):
     """Before saving a record, reset the primary key value.
 
     This assures that we will not have a primary key conflict, though it does
@@ -859,9 +862,9 @@ class MongoRecord(BaseRecord):
     record = cls(connection, record, run_init_hook=False)
     # Accessing protected members of a foreign class.
     # pylint: disable=W0212
-    record._PreCreate()
-    record._RecordCreate()
-    record._PostCreate()
+    record._PreCreate(None)
+    record._StoreRecord()
+    record._PostCreate(None)
     # pylint: enable=W0212
     return record
 
@@ -887,16 +890,16 @@ class MongoRecord(BaseRecord):
     for record in cls.Collection(connection).find():
       yield cls(connection, record)
 
-  def _RecordCreate(self):
-    self.key = self.Collection(self.connection).save(self._DataRecord())
-
   def Save(self):
     changes = self._Changes()
     if changes:
-      self._PreSave()
-      self._RecordCreate()
-      self._PostSave()
+      self._PreSave(None)
+      self._StoreRecord()
+      self._PostSave(None)
       self._record.update(changes)
+
+  def _StoreRecord(self):
+    self.key = self.Collection(self.connection).save(self._DataRecord())
 
 
 class Smorgasbord(object):
