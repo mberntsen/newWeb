@@ -29,6 +29,10 @@ class TemplateNameError(Error):
   """The template conditional contains a reference that cannot be resolved."""
 
 
+class TemplateValueError(Error):
+  """A value provided to the templateparser is incorrect."""
+
+
 class TemplateSyntaxError(Error):
   """The template contains illegal syntax."""
 
@@ -344,7 +348,7 @@ class Template(list):
     if name == 'inline':
       self.AddFile(data[0])
     elif name == 'for':
-      self._StartScope(TemplateLoop(data[2], data[0]))  # alias and tag
+      self._StartScope(TemplateLoop(data[-1], data[:-2]))  # alias and tag
     elif name == 'endfor':
       self._CloseScope(TemplateLoop)
     elif name == 'if':
@@ -500,14 +504,14 @@ class TemplateLoop(list):
   items in the loop are parsed. The loop variable is made available as the given
   alias, which itself can be referenced as a tag in the loop body.
   """
-  def __init__(self, tag, alias):
+  def __init__(self, tag, aliases):
     """Initializes a TemplateLoop instance.
 
     Arguments:
       @ tag: str
         The tag to retrieve the iterable from.
-      @ alias: str
-        The alias under which the loop variable should be made available.
+      @ aliases: *str
+        The alias(es) under which the loop variable should be made available.
     """
     try:
       tag = TemplateTag.FromString(tag)
@@ -515,7 +519,8 @@ class TemplateLoop(list):
       raise TemplateSyntaxError('Tag %r in {{ for }} loop is not valid' % tag)
 
     super(TemplateLoop, self).__init__()
-    self.alias = alias
+    self.aliases = ''.join(aliases).split(',')
+    self.aliascount = len(self.aliases)
     self.tag = tag
 
   def __repr__(self):
@@ -534,8 +539,18 @@ class TemplateLoop(list):
     """
     output = []
     replacements = kwds.copy()
-    for alias in self.tag.GetValue(kwds):
-      replacements[self.alias] = alias
+    for item in self.tag.Iterator(**kwds):
+      if self.aliascount == 1:
+        replacements[self.aliases[0]] = item
+      else:
+        try:
+          if self.aliascount != len(item):
+            raise TemplateValueError('Cannot unpack %d values into %d tags' % (
+                len(item), self.aliascount))
+        except TypeError:
+          raise TemplateValueError(
+              'Cannot unpack %s into %d tags' % (type(item), self.aliascount))
+        replacements.update(zip(self.aliases, item))
       output.append(''.join(tag.Parse(**replacements) for tag in self))
     return ''.join(output)
 
@@ -649,6 +664,22 @@ class TemplateTag(object):
     if isinstance(value, unicode):
       return value.encode('utf8')
     return str(value)
+
+  def Iterator(self, **kwds):
+    """Parses the tag for iteration purposes.
+
+    Functions are processed, but no defaults or other conversion is done. Tags
+    that cannot be resolved result in empty iterators.
+    """
+    try:
+      value = self.GetValue(kwds)
+    except TemplateKeyError:
+      # On any failure to get the given index, return an empty iterator
+      return ()
+    for func in self.functions:
+      value = TAG_FUNCTIONS[func](value)
+    return iter(value)
+
 
   @staticmethod
   def _GetIndex(haystack, needle):

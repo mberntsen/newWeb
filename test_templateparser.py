@@ -539,6 +539,30 @@ class TemplateLoops(unittest.TestCase):
     self.parser.RegisterFunction('upper', str.upper)
     self.assertEqual(result, self.parser.ParseString(template, bundles=bundles))
 
+  def testLoopOnFunctions(self):
+    """{{ for }} Loops work on function results if functions are used"""
+    template = '{{ for item in [mapping|items] }} [item:0]=[item:1]{{ endfor }}'
+    mapping = {'first': 12, 'second': 42}
+    result = ' first=12 second=42'
+    self.parser.RegisterFunction('items', lambda d: sorted(d.items()))
+    self.assertEqual(result, self.parser.ParseString(template, mapping=mapping))
+
+  def testLoopTupleAssignment(self):
+    """{{ for }} Loops support tuple unpacking for iterators"""
+    template = '{{ for key,val in [mapping|items] }} [key]=[val] {{ endfor }}'
+    mapping = {'first': 12, 'second': 42}
+    result = ' first=12 second=42'
+    self.parser.RegisterFunction('items', lambda d: sorted(d.items()))
+    self.assertEqual(result, self.parser.ParseString(template, mapping=mapping))
+
+  def testLoopTupleAssignmentMismatch(self):
+    """{{ for }} Loops raise TemplateValueError when tuple unpacking fails"""
+    template = '{{ for a, b, c in [iterator] }}[a] {{ endfor }}'
+    self.assertEqual('x', self.parser.ParseString(template, iterator=['xyz']))
+    self.assertRaises(templateparser.TemplateValueError,
+                      self.parser.ParseString, template, iterator=['eggs'])
+    self.assertRaises(templateparser.TemplateValueError,
+                      self.parser.ParseString, template, iterator=range(10))
 
 class TemplateNestedScopes(unittest.TestCase):
   """Test cases for nested function scopes."""
