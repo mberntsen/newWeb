@@ -627,7 +627,7 @@ class TemplateTag(object):
         value = self._GetIndex(value, index)
       return value
     except KeyError:
-      raise TemplateKeyError('No replacement with name %r' % self.name)
+      raise TemplateNameError('No replacement with name %r' % self.name)
 
   def Parse(self, **kwds):
     """Returns the parsed string of the tag, using given replacements.
@@ -650,7 +650,7 @@ class TemplateTag(object):
     """
     try:
       value = self.GetValue(kwds)
-    except TemplateKeyError:
+    except (TemplateKeyError, TemplateNameError):
       # On any failure to get the given index, return the unmodified tag.
       return str(self)
     # Process functions, or apply default if value is not SafeString
