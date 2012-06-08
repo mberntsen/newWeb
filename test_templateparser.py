@@ -611,6 +611,56 @@ class TemplateLoops(unittest.TestCase):
     self.assertFalse(self.parser.ParseString(template, tag='absent'))
 
 
+class TemplateTagPresenceCheck(unittest.TestCase):
+  """Test cases for the `ifpresent` TemplateParser construct."""
+  def setUp(self):
+    self.parser = templateparser.Parser()
+
+  def testBasicTagPresence(self):
+    """{{ ifpresent }} runs the code block if the tag is present"""
+    template = '{{ ifpresent [tag] }} hello {{ endif }}'
+    self.assertEqual(' hello', self.parser.ParseString(template, tag='spam'))
+
+  def testBasicTagAbsence(self):
+    """{{ ifpresent }} does not run the main block if the tag is missing"""
+    template = '{{ ifpresent [tag] }} hello {{ endif }}'
+    self.assertFalse(self.parser.ParseString(template))
+
+  def testTagPresenceElse(self):
+    """{{ ifpresent }} has a functioning `else` clause"""
+    template = '{{ ifpresent [tag] }} yes {{ else }} no {{ endif }}'
+    self.assertEqual(' yes', self.parser.ParseString(template, tag='spam'))
+    self.assertEqual(' no', self.parser.ParseString(template))
+
+  def testPresenceElif(self):
+    """{{ ifpresent }} has functioning `elif` support"""
+    template = ('{{ ifpresent [one] }} first'
+                '{{ elif [two] }} second {{ else }} third {{ endif }}')
+    self.assertEqual(' first', self.parser.ParseString(template, one='present'))
+    self.assertEqual(' second', self.parser.ParseString(template, two='ready'))
+    self.assertEqual(' third', self.parser.ParseString(template))
+
+  def testPresenceOfKey(self):
+    """{{ ifpresent }} also works on index selectors"""
+    template = '{{ ifpresent [tag:6] }} yes {{ else }} no {{ endif }}'
+    self.assertEqual(' yes', self.parser.ParseString(template, tag='longtext'))
+    self.assertEqual(' no', self.parser.ParseString(template, tag='short'))
+    self.assertEqual(' no', self.parser.ParseString(template))
+
+  def testMultiTagPresence(self):
+    """{{ ifpresent }} checks the presence of *all* provided tagnames/indices"""
+    template = '{{ ifpresent [one] [two] }} good {{ endif }}'
+    self.assertEqual(' good', self.parser.ParseString(template, one=1, two=2))
+    self.assertFalse(self.parser.ParseString(template, one=1))
+    self.assertFalse(self.parser.ParseString(template, two=2))
+
+  def testBadSyntax(self):
+    """{{ ifpresent }} requires proper tags to be checked for presence"""
+    template = '{{ ifpresent var }} {{ endif }}'
+    self.assertRaises(templateparser.TemplateSyntaxError,
+                      self.parser.ParseString, template)
+
+
 class TemplateStringRepresentations(unittest.TestCase):
   """Test cases for string representation of various TemplateParser parts."""
   def setUp(self):

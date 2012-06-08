@@ -353,6 +353,8 @@ class Template(list):
       self._CloseScope(TemplateLoop)
     elif name == 'if':
       self._StartScope(TemplateConditional(node.split(None, 1)[1]))
+    elif name == 'ifpresent':
+      self._StartScope(TemplateConditionalPresence(node.split(None, 1)[1]))
     elif name == 'elif':
       self._VerifyOpenScope(TemplateConditional)
       self.scopes[-1].Elif(node.split(None, 1)[1])
@@ -405,8 +407,9 @@ class Template(list):
 class TemplateConditional(object):
   """Template conditionals allow selective use of templates and the like."""
   def __init__(self, expr):
-    self.branches = [(tuple(Template.TagSplit(expr)), [])]
+    self.branches = []
     self.default = None
+    self.NewBranch(expr)
 
   def __repr__(self):
     repr_branches = []
@@ -447,7 +450,7 @@ class TemplateConditional(object):
     """
     if self.default is not None:
       raise TemplateSyntaxError('{{ elif }} clause may not follow {{ else }}.')
-    self.branches.append((tuple(Template.TagSplit(expr)), []))
+    self.NewBranch(expr)
 
   def Else(self):
     """Starts the `else` clause.
@@ -475,6 +478,10 @@ class TemplateConditional(object):
     except NameError, error:
       raise TemplateNameError(str(error).capitalize() + '. Try it as tagname?')
 
+  def NewBranch(self, expr):
+    """Begins a new branch based on the given expression."""
+    self.branches.append((tuple(Template.TagSplit(expr)), []))
+
   def Parse(self, **kwds):
     """Returns the TemplateConditional parsed as string.
 
@@ -495,6 +502,21 @@ class TemplateConditional(object):
     if self.default:
       return ''.join(part.Parse(**kwds) for part in self.default)
     return ''
+
+
+class TemplateConditionalPresence(TemplateConditional):
+  @staticmethod
+  def Expression(tags, **kwds):
+    """Checks the presence of all tags named on the branch."""
+    try:
+      for tag in tags:
+        tag.GetValue(kwds)
+      return True
+    except (TemplateKeyError, TemplateNameError):
+      return False
+
+  def NewBranch(self, tags):
+    self.branches.append((map(TemplateTag.FromString, tags.split()), []))
 
 
 class TemplateLoop(list):
