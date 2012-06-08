@@ -300,7 +300,7 @@ class TemplateTagFunctions(unittest.TestCase):
     result = 'A replacement processed by two functions: 8 characters.'
     self.assertEqual(result, self.parser.ParseString(template, spam='ham&eggs'))
 
-  def testFunctionSeparation(self):
+  def testFunctionUse(self):
     """[TagFunctions] Tag functions are only called when requested by tags"""
     fragments_received = []
     def CountAndReturn(fragment):
@@ -314,6 +314,34 @@ class TemplateTagFunctions(unittest.TestCase):
     self.assertEqual(result, self.parser.ParseString(
         template, num='one', noun='broken'))
     self.assertEqual(1, len(fragments_received))
+
+  def testTagFunctionUrl(self):
+    """[TagFunctions] The tag function 'url' is present and works"""
+    template = 'http://example.com/?breakfast=[query|url]'
+    result = 'http://example.com/?breakfast=%22ham+%26+eggs%22'
+    query = '"ham & eggs"'
+    self.assertEqual(result, self.parser.ParseString(template, query=query))
+
+  def testTagFunctionItems(self):
+    """[TagFunctions] The tag function 'items' is present and works"""
+    template = '[tag|items]'
+    tag = {'ham': 'eggs'}
+    result = "[('ham', 'eggs')]"
+    self.assertEqual(result, self.parser.ParseString(template, tag=tag))
+
+  def testTagFunctionValues(self):
+    """[TagFunctions] The tag function 'values' is present and works"""
+    template = '[tag|values]'
+    tag = {'ham': 'eggs'}
+    result = "['eggs']"
+    self.assertEqual(result, self.parser.ParseString(template, tag=tag))
+
+  def testTagFunctionSorted(self):
+    """[TagFunctions] The tag function 'sorted' is present and works"""
+    template = '[tag|sorted]'
+    tag = [5, 1, 3, 2, 4]
+    result = "[1, 2, 3, 4, 5]"
+    self.assertEqual(result, self.parser.ParseString(template, tag=tag))
 
 
 class TemplateUnicodeSupport(unittest.TestCase):
@@ -452,32 +480,38 @@ class TemplateConditionals(unittest.TestCase):
   def testSyntaxErrorNoEndif(self):
     """{{ if }} Conditional without {{ endif }} raises TemplateSyntaxError"""
     template = '{{ if [var] }} foo'
-    self.assertRaises(
-        templateparser.TemplateSyntaxError, self.parser.ParseString, template)
+    self.assertRaises(templateparser.TemplateSyntaxError,
+                      self.parser.ParseString, template)
 
   def testSyntaxErrorElifAfterElse(self):
     """{{ if }} An `elif` clause following `else` raises TemplateSyntaxError"""
     template = '{{ if [var] }} {{ else }} {{ elif [var] }} {{ endif }}'
-    self.assertRaises(
-        templateparser.TemplateSyntaxError, self.parser.ParseString, template)
+    self.assertRaises(templateparser.TemplateSyntaxError,
+                      self.parser.ParseString, template)
 
   def testSyntaxErrorDoubleElse(self):
     """{{ if }} Starting a second `else` clause raises TemplateSyntaxError"""
     template = '{{ if [var] }} {{ else }} {{ else }} {{ endif }}'
-    self.assertRaises(
-        templateparser.TemplateSyntaxError, self.parser.ParseString, template)
+    self.assertRaises(templateparser.TemplateSyntaxError,
+                      self.parser.ParseString, template)
 
   def testSyntaxErrorClauseWithoutIf(self):
     """{{ if }} elif / else / endif without `if` raises TemplateSyntaxError"""
     template = '{{ elif }}'
-    self.assertRaises(
-        templateparser.TemplateSyntaxError, self.parser.ParseString, template)
+    self.assertRaises(templateparser.TemplateSyntaxError,
+                      self.parser.ParseString, template)
     template = '{{ else }}'
-    self.assertRaises(
-        templateparser.TemplateSyntaxError, self.parser.ParseString, template)
+    self.assertRaises(templateparser.TemplateSyntaxError,
+                      self.parser.ParseString, template)
     template = '{{ endif }}'
-    self.assertRaises(
-        templateparser.TemplateSyntaxError, self.parser.ParseString, template)
+    self.assertRaises(templateparser.TemplateSyntaxError,
+                      self.parser.ParseString, template)
+
+  def testTagPresence(self):
+    """{{ if }} Clauses require the tag to be present as a replacement"""
+    template = '{{ if [absent] }} {{ endif }}'
+    self.assertRaises(templateparser.TemplateNameError,
+                      self.parser.ParseString, template)
 
   def testVariableMustBeTag(self):
     """{{ if }} Clauses must reference variables using a tag, not a name"""
@@ -542,18 +576,18 @@ class TemplateLoops(unittest.TestCase):
 
   def testLoopOnFunctions(self):
     """{{ for }} Loops work on function results if functions are used"""
-    template = '{{ for item in [mapping|items] }} [item:0]=[item:1]{{ endfor }}'
+    template = ('{{ for item in [mapping|items|sorted] }} '
+                '[item:0]=[item:1]{{ endfor }}')
     mapping = {'first': 12, 'second': 42}
     result = ' first=12 second=42'
-    self.parser.RegisterFunction('items', lambda d: sorted(d.items()))
     self.assertEqual(result, self.parser.ParseString(template, mapping=mapping))
 
   def testLoopTupleAssignment(self):
     """{{ for }} Loops support tuple unpacking for iterators"""
-    template = '{{ for key,val in [mapping|items] }} [key]=[val] {{ endfor }}'
+    template = ('{{ for key,val in [mapping|items|sorted] }} '
+                '[key]=[val] {{ endfor }}')
     mapping = {'first': 12, 'second': 42}
     result = ' first=12 second=42'
-    self.parser.RegisterFunction('items', lambda d: sorted(d.items()))
     self.assertEqual(result, self.parser.ParseString(template, mapping=mapping))
 
   def testLoopTupleAssignmentMismatch(self):
@@ -564,6 +598,17 @@ class TemplateLoops(unittest.TestCase):
                       self.parser.ParseString, template, iterator=['eggs'])
     self.assertRaises(templateparser.TemplateValueError,
                       self.parser.ParseString, template, iterator=range(10))
+
+  def testLoopTagPresence(self):
+    """{{ for }} Loops require the loop tag to be present"""
+    template = '{{ for item in [absent] }} hello {{ endfor }}'
+    self.assertRaises(templateparser.TemplateNameError,
+                      self.parser.ParseString, template)
+
+  def testLoopAbsentIndex(self):
+    """{{ for }} Loops over an absent index result in no loops (no error)"""
+    template = '{{ for item in [tag:absent] }} x {{ endfor }}'
+    self.assertFalse(self.parser.ParseString(template, tag='absent'))
 
 
 class TemplateStringRepresentations(unittest.TestCase):
