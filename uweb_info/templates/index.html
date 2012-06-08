@@ -8,18 +8,18 @@
         </ul>
         <br />
         <h2>Query arguments (GET):</h2>
-        <ul class="varlist">
-          {{ for var in [getvars] }} {{ inline varlisting.html }} {{ endfor}}
+        <ul class="query">
+          {{ for name, value in [query|items|sorted] }} {{ inline varlisting.html }} {{ endfor }}
         </ul>
         <br />
         <h2>POST data:</h2>
         <ul class="varlist">
-          {{ for var in [postvars] }} {{ inline varlisting.html }} {{ endfor}}
+          {{ for name, value in [postvars|items|sorted] }} {{ inline varlisting.html }} {{ endfor }}
         </ul>
         <br />
         <h2>Cookies:</h2>
         <ul class="varlist">
-          {{ for var in [cookies] }} {{ inline varlisting.html }} {{ endfor}}
+          {{ for name, value in [cookies|items|sorted] }} {{ inline varlisting.html }} {{ endfor }}
         </ul>
       </div>
       <div>
@@ -116,19 +116,19 @@
       <div>
         <h2>Client headers:</h2>
         <ul class="varlist">
-          {{ for var in [headers] }} {{ inline varlisting.html }} {{ endfor}}
+          {{ for name, value in [headers|items|sorted] }} {{ inline varlisting.html }} {{ endfor }}
         </ul>
       </div>
       <div>
         <h2>Environment variables:</h2>
         <ul class="varlist">
-          {{ for var in [env] }} {{ inline varlisting.html }} {{ endfor}}
+          {{ for name, value in [env|items|sorted] }} {{ inline varlisting.html }} {{ endfor }}
         </ul>
       </div>
       <div>
         <h2>Extended environment variables:</h2>
         <ul class="varlist">
-          {{ for var in [ext_env] }} {{ inline varlisting.html }} {{ endfor}}
+          {{ for name, value in [ext_env|items|sorted] }} {{ inline varlisting.html }} {{ endfor }}
         </ul>
       </div>
     </div>

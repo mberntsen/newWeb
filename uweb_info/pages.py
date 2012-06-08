@@ -51,12 +51,12 @@ class PageMaker(login.LoginMixin, login.OpenIdMixin, uweb.DebuggingPageMaker):
         'index.html',
         method=self.req.env['REQUEST_METHOD'],
         conn_id=self.persistent.Get('conn_id'),
-        getvars=[(var, self.get[var]) for var in sorted(self.get)],
-        postvars=[(var, self.post.getlist(var)) for var in sorted(self.post)],
-        cookies=sorted(self.cookies.items()),
-        headers=sorted(self.req.headers.items()),
-        env=sorted(self.req.env.items()),
-        ext_env=sorted(self.req.ExtendedEnvironment().items()),
+        query=self.get,
+        postvars=self.post,
+        cookies=self.cookies,
+        headers=self.req.headers,
+        env=self.req.env,
+        ext_env=self.req.ExtendedEnvironment(),
         **self.CommonBlocks('main'))
 
   def Json(self):
