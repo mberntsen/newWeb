@@ -528,14 +528,14 @@ class TemplateLoop(list):
 
   def __str__(self):
     return '\n{{ for %s in %s }}%s\n{{ endfor }}' % (
-        self.alias, self.tag, ''.join(map(str, self)))
+        ', '.join(self.aliases), self.tag, ''.join(map(str, self)))
 
   def Parse(self, **kwds):
     """Returns the TemplateLoop parsed as string.
 
     Firstly, the value for the loop tag is retrieved. For each item in this
     iterable, all members of the TemplateLoop body will be parsed, with the
-    item from the iterable added to the replacements dict as `self.alias`.
+    item from the iterable added to the replacements dict as alias(es).
     """
     output = []
     replacements = kwds.copy()

@@ -564,6 +564,15 @@ class TemplateLoops(unittest.TestCase):
     self.assertRaises(templateparser.TemplateValueError,
                       self.parser.ParseString, template, iterator=range(10))
 
+  def testLoopStringRepresentation(self):
+    """{{ for }} Loops have a working string representation"""
+    def StripWhitespace(string):
+      return ''.join(string.split())
+    template = ('{{ for a, b in [iteritems] }}{{ for c in [a] }}[c]'
+                '{{ endfor }}{{ endfor }}')
+    self.assertEqual(StripWhitespace(template),
+                     StripWhitespace(str(self.tmpl(template))))
+
 class TemplateNestedScopes(unittest.TestCase):
   """Test cases for nested function scopes."""
   def setUp(self):
