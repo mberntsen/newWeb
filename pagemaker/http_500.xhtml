@@ -110,8 +110,8 @@
             <table class="source">
               <thead><tr><td colspan="2">Source code</td></tr></thead>
               <tbody>
-                {{ for line in [frame:source] }}
-                <tr><td>[line:0]</td><td>[line:1]</td></tr>
+                {{ for filename, line_no in [frame:source] }}
+                <tr><td>[filename]</td><td>[line_no]</td></tr>
                 {{ endfor }}
               </tbody>
             </table>
@@ -121,8 +121,8 @@
             <table>
               <thead><tr><td colspan="2">Frame locals</td></tr></thead>
               <tbody>
-                {{ for var in [frame:locals] }}
-                <tr><td>[var:0]</td><td>[var:1]</td></tr>
+                {{ for name, value in [frame:locals|items|sorted] }}
+                <tr><td>[name]</td><td>[value]</td></tr>
                 {{ endfor }}
               </tbody>
             </table>
@@ -147,8 +147,8 @@
             <table class="source">
               <thead><tr><td colspan="2">Source code</td></tr></thead>
               <tbody>
-                {{ for line in [frame:source] }}
-                <tr><td>[line:0]</td><td>[line:1]</td></tr>
+                {{ for filename, line_no in [frame:source] }}
+                <tr><td>[filename]</td><td>[line_no]</td></tr>
                 {{ endfor }}
               </tbody>
             </table>
@@ -163,8 +163,8 @@
     <table>
       <thead><tr><td colspan="2">Cookies</td></tr></thead>
       <tbody>
-          {{ for var in [cookies] }}
-          <tr><td>[var:0]</td><td>[var:1]</td></tr>
+          {{ for name, value in [cookies|items|sorted] }}
+          <tr><td>[name]</td><td>[value]</td></tr>
           {{ endfor }}
       </tbody>
     </table>
@@ -173,8 +173,8 @@
     <table>
       <thead><tr><td colspan="2">Query arguments (GET)</td></tr></thead>
       <tbody>
-          {{ for var in [query_args] }}
-          <tr><td>[var:0]</td><td>[var:1]</td></tr>
+          {{ for name, value in [query_args|items|sorted] }}
+          <tr><td>[name]</td><td>[value]</td></tr>
           {{ endfor }}
       </tbody>
     </table>
@@ -183,8 +183,8 @@
     <table>
       <thead><tr><td colspan="2">POST data</td></tr></thead>
       <tbody>
-          {{ for var in [post_data] }}
-          <tr><td>[var:0]</td><td>[var:1]</td></tr>
+          {{ for name, value in [post_data|items|sorted] }}
+          <tr><td>[name]</td><td>[value]</td></tr>
           {{ endfor }}
       </tbody>
     </table>
@@ -193,8 +193,8 @@
     <table>
       <thead><tr><td colspan="2">Full environment</td></tr></thead>
       <tbody>
-          {{ for var in [environ] }}
-          <tr><td>[var:0]</td><td>[var:1]</td></tr>
+          {{ for name, value in [environ|items|sorted] }}
+          <tr><td>[name]</td><td>[value]</td></tr>
           {{ endfor }}
       </tbody>
     </table>

@@ -767,4 +767,7 @@ TAG_FUNCTIONS = {
     'default': HtmlEscape,
     'html': HtmlEscape,
     'raw': lambda x: x,
-    'url': UrlQuote}
+    'url': UrlQuote,
+    'items': lambda d: d.items(),
+    'values': lambda d: d.values(),
+    'sorted': sorted}

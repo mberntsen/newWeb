@@ -164,6 +164,12 @@ class IndexedFieldStorage(cgi.FieldStorage):
        standard as of 2005: http://tools.ietf.org/html/rfc3986.
   """
   FIELD_AS_ARRAY = re.compile(r'(.*)\[(.*)\]')
+  def iteritems(self):
+    return ((key, self.getlist(key)) for key in self)
+
+  def items(self):
+    return list(self.iteritems())
+
   def read_urlencoded(self):
     indexed = {}
     self.list = []

@@ -304,7 +304,7 @@ class DebuggerMixin(object):
       frame = stack.tb_frame
       frames.append({'file': frame.f_code.co_filename,
                      'scope': frame.f_code.co_name,
-                     'locals': sorted(frame.f_locals.items()),
+                     'locals': frame.f_locals,
                      'source': self._SourceLines(
                          frame.f_code.co_filename, frame.f_lineno)})
       stack = stack.tb_next
@@ -335,11 +335,10 @@ class DebuggerMixin(object):
         'INTERNAL SERVER ERROR (HTTP 500) DURING PROCESSING OF %r',
         self.req.env['PATH_INFO'], exc_info=(exc_type, exc_value, traceback))
     exception_data = {
-        'cookies': sorted(self.cookies.items()),
-        'environ': sorted(self.req.ExtendedEnvironment().items()),
-        'query_args': [(var, self.get[var]) for var in sorted(self.get)],
-        'post_data': [(var, self.post.getlist(var))
-                      for var in sorted(self.post)],
+        'cookies': self.cookies,
+        'environ': self.req.ExtendedEnvironment(),
+        'query_args': self.get,
+        'post_data': self.post,
         'error_for_error': False,
         'exc': {'type': exc_type, 'value': exc_value,
                 'traceback': self._ParseStackFrames(traceback)}}
