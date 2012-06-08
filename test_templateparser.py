@@ -568,10 +568,11 @@ class TemplateLoops(unittest.TestCase):
     """{{ for }} Loops have a working string representation"""
     def StripWhitespace(string):
       return ''.join(string.split())
-    template = ('{{ for a, b in [iteritems] }}{{ for c in [a] }}[c]'
+    template = ('{{ for a, b in [iter|items] }}{{ for c in [a] }}[c]'
                 '{{ endfor }}{{ endfor }}')
     self.assertEqual(StripWhitespace(template),
                      StripWhitespace(str(self.tmpl(template))))
+
 
 class TemplateNestedScopes(unittest.TestCase):
   """Test cases for nested function scopes."""
