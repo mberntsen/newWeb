@@ -8,6 +8,7 @@ __version__ = '1.2'
 
 # Standard modules
 import os
+import re
 import unittest
 
 # Unittest target
@@ -564,14 +565,37 @@ class TemplateLoops(unittest.TestCase):
     self.assertRaises(templateparser.TemplateValueError,
                       self.parser.ParseString, template, iterator=range(10))
 
-  def testLoopStringRepresentation(self):
-    """{{ for }} Loops have a working string representation"""
-    def StripWhitespace(string):
-      return ''.join(string.split())
+
+class TemplateStringRepresentations(unittest.TestCase):
+  """Test cases for string representation of various TemplateParser parts."""
+  def setUp(self):
+    self.strip = lambda string: re.sub('\s', '', string)
+    self.tmpl = templateparser.Template
+    self.parser = templateparser.Parser()
+
+  def testTemplateTag(self):
+    """[Representation] TemplateTags str() echoes its literal"""
+    template = '[greeting] [title|casing] [person:name|casing] har'
+    self.assertEqual(self.strip(template), self.strip(str(self.tmpl(template))))
+
+  def testTemplateConditional(self):
+    """[Representation] TemplateConditional str() echoes its literal"""
+    template = '{{ if [a] == "foo" }} foo [b] {{ else }} bar [b] {{ endif }}'
+    self.assertEqual(self.strip(template), self.strip(str(self.tmpl(template))))
+
+  def testTemplateInline(self):
+    """[Representation] TemplateInline str() shows the inlined template part"""
+    example = 'Hello [location]'
+    template = '{{ inline example }}'
+    self.parser['example'] = self.tmpl(example)
+    self.assertEqual(self.strip(example),
+                     self.strip(str(self.tmpl(template, parser=self.parser))))
+
+  def testTemplateLoop(self):
+    """[Representation] TemplateLoop str() echoes its definition"""
     template = ('{{ for a, b in [iter|items] }}{{ for c in [a] }}[c]'
                 '{{ endfor }}{{ endfor }}')
-    self.assertEqual(StripWhitespace(template),
-                     StripWhitespace(str(self.tmpl(template))))
+    self.assertEqual(self.strip(template), self.strip(str(self.tmpl(template))))
 
 
 class TemplateNestedScopes(unittest.TestCase):

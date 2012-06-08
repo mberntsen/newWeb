@@ -151,7 +151,7 @@ class Parser(dict):
       self.AddTemplate(template)
     return super(Parser, self).__getitem__(template)
 
-  def AddTemplate(self, template, name=None):
+  def AddTemplate(self, location, name=None):
     """Reads the given `template` filename and adds it to the cache.
 
     The `template` argument should be a path/filename. This will be resolved
@@ -159,7 +159,7 @@ class Parser(dict):
     the cache using the `template` filename, or the provided `name`.
 
     Arguments:
-      @ template: str
+      @ location: str
         Location of the template file that should be loaded
       % name: str ~~ None
         Optional name to store the the file as in the cache, instead of the
@@ -169,8 +169,8 @@ class Parser(dict):
       TemplateReadError: When the template file cannot be read
     """
     try:
-      template_path = os.path.join(self.template_dir, template)
-      self[name or template] = Template.FromFile(template_path, parser=self)
+      template_path = os.path.join(self.template_dir, location)
+      self[name or location] = Template.FromFile(template_path, parser=self)
     except IOError:
       raise TemplateReadError('Could not load template %r' % template_path)
 
@@ -414,7 +414,7 @@ class TemplateConditional(object):
       clause = 'IF' if not repr_branches else 'ELIF'
       repr_branches.append('%s %r { %r }' % (clause, expr, branch))
     if self.default:
-      repr_branches.append('ELSE { %r }' % self.default)
+      repr_branches.append(' ELSE { %r }' % self.default)
     return '%s(%s)' % (type(self).__name__, ''.join(repr_branches))
 
   def __str__(self):
@@ -424,7 +424,7 @@ class TemplateConditional(object):
       repr_branches.append('{{ %s %s }}%s' % (
           clause, ''.join(map(str, expr)), ''.join(map(str, branch))))
     if self.default:
-      repr_branches.append('{{ else }}%s' % self.default)
+      repr_branches.append('{{ else }}%s' % ''.join(map(str, self.default)))
     repr_branches.append('{{ endif }}')
     return '\n' + '\n'.join(repr_branches)
 
