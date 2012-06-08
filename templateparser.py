@@ -405,7 +405,7 @@ class Template(list):
 
 
 class TemplateConditional(object):
-  """Template conditionals allow selective use of templates and the like."""
+  """A template construct to control flow based on the value of a tag."""
   def __init__(self, expr):
     self.branches = []
     self.default = None
@@ -505,6 +505,7 @@ class TemplateConditional(object):
 
 
 class TemplateConditionalPresence(TemplateConditional):
+  """A template construct to safely check for the presence of tags."""
   @staticmethod
   def Expression(tags, **kwds):
     """Checks the presence of all tags named on the branch."""
@@ -516,6 +517,7 @@ class TemplateConditionalPresence(TemplateConditional):
       return False
 
   def NewBranch(self, tags):
+    """Begins a new branch based on the given tags."""
     self.branches.append((map(TemplateTag.FromString, tags.split()), []))
 
 
