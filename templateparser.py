@@ -292,7 +292,7 @@ class Template(list):
       TemplateReadError: Whenever the template file could not be read.
     """
     if self.parser is not None:
-      return self._AddPart(self.parser[name])
+      return self._AddToOpenScope(self.parser[name])
     return self.FromFile(name)
 
   def AddString(self, raw_template):
@@ -332,7 +332,7 @@ class Template(list):
       elif node:
         yield TemplateText(node)
 
-  def _ExtendFunction(self, node):
+  def _ExtendFunction(self, nodes):
     """Processes a function node and adds its results to the Template.
 
     For loops, a new scope level is opened by adding the TemplateLoop to the
@@ -343,41 +343,62 @@ class Template(list):
     Raises:
       TemplateSyntaxError: Unexpected / unknown command or otherwise bad syntax.
     """
-    data = node.split()
-    name = data.pop(0)
-    if name == 'inline':
-      self.AddFile(data[0])
-    elif name == 'for':
-      self._StartScope(TemplateLoop(data[-1], data[:-2]))  # alias and tag
-    elif name == 'endfor':
-      self._CloseScope(TemplateLoop)
-    elif name == 'if':
-      self._StartScope(TemplateConditional(node.split(None, 1)[1]))
-    elif name == 'ifpresent':
-      self._StartScope(TemplateConditionalPresence(node.split(None, 1)[1]))
-    elif name == 'elif':
-      self._VerifyOpenScope(TemplateConditional)
-      self.scopes[-1].Elif(node.split(None, 1)[1])
-    elif name == 'else':
-      self._VerifyOpenScope(TemplateConditional)
-      self.scopes[-1].Else()
-    elif name == 'endif':
-      self._CloseScope(TemplateConditional)
-    else:
-      raise TemplateSyntaxError('Unknown template function {{ %s }}' % name)
+    nodes = nodes.split()
+    function = nodes.pop(0)
+    try:
+      getattr(self, '_TemplateConstruct%s' % function.title())(*nodes)
+    except AttributeError:
+      raise TemplateSyntaxError('Unknown template function {{ %s }}' % function)
 
   def _ExtendText(self, node):
     """Processes a text node and adds its tags and texts to the Template."""
     for node in self.TagSplit(node):
-      self._AddPart(node)
+      self._AddToOpenScope(node)
 
-  def _AddPart(self, item):
-    """Adds a template part to the current open scope."""
-    self.scopes[-1].append(item)
+  # ############################################################################
+  # Template syntax constructs
+  #
+  def _TemplateConstructInline(self, name):
+    """Processing for {{ inline }} template syntax."""
+    self.AddFile(name)
+
+  def _TemplateConstructFor(self, *nodes):
+    """Processing for {{ for }} template syntax."""
+    self._StartScope(TemplateLoop(nodes[-1], nodes[:-2]))
+
+  def _TemplateConstructEndfor(self):
+    """Processing for {{ endfor }} template syntax."""
+    self._CloseScope(TemplateLoop)
+
+  def _TemplateConstructIf(self, *nodes):
+    """Processing for {{ if }} template syntax."""
+    self._StartScope(TemplateConditional(' '.join(nodes)))
+
+  def _TemplateConstructIfpresent(self, *nodes):
+    """Processing for {{ ifpresent }} template syntax."""
+    self._StartScope(TemplateConditionalPresence(' '.join(nodes)))
+
+  def _TemplateConstructElif(self, *nodes):
+    """Processing for {{ elif }} template syntax."""
+    self._VerifyOpenScope(TemplateConditional)
+    self.scopes[-1].Elif(' '.join(nodes))
+
+  def _TemplateConstructElse(self):
+    """Processing for {{ else }} template syntax."""
+    self._VerifyOpenScope(TemplateConditional)
+    self.scopes[-1].Else()
+
+  def _TemplateConstructEndif(self):
+    """Processing for {{ endif }} template syntax."""
+    self._CloseScope(TemplateConditional)
 
   # ############################################################################
   # Methods for scope management
   #
+  def _AddToOpenScope(self, item):
+    """Adds a template part to the current open scope."""
+    self.scopes[-1].append(item)
+
   def _CloseScope(self, scope_cls):
     """Closes the current open scope, if it's of the given scope type.
 
@@ -391,7 +412,7 @@ class Template(list):
 
   def _StartScope(self, scope):
     """Adds the given part to the template and adds it as new current scope."""
-    self._AddPart(scope)
+    self._AddToOpenScope(scope)
     self.scopes.append(scope)
 
   def _VerifyOpenScope(self, scope_cls):
