@@ -31,7 +31,7 @@ class PIDFileParseError(ValueError, PIDFileError):
   """Raised when parsing contents of PID file fails. """
 
 
-class PIDLockFile(lockfile.FileLock, object):
+class PIDLockFile(lockfile.LockFile, object):
   """Lockfile implemented as a Unix PID file.
 
   The PID file is named by the attribute `path`. When locked,
