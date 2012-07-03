@@ -1,7 +1,7 @@
 #!/usr/bin/python2.5
 """SQLTalk SQLite Cursor class."""
 __author__ = 'Elmer de Looff <elmer@underdark.nl>'
-__version__ = '0.3'
+__version__ = '0.4'
 
 
 # Custom modules
@@ -30,19 +30,20 @@ class Cursor(object):
         result=result.fetchall())
 
   def Insert(self, table, values):
-    if isinstance(values, dict):
+    if not values:
+      raise ValueError('Must insert 1 or more value')
+    elif isinstance(values, dict):
       query = ('INSERT INTO %s (%s) VALUES (%s)' %
                (table,
                 ', '.join(map(self.connection.EscapeField, values)),
                 ', '.join('?' * len(values))))
       return self.Execute(query, args=values.values(), many=False)
-    else:
-      query = ('INSERT INTO %s (%s) VALUES (%s)' %
-               (table,
-                ', '.join(map(self.connection.EscapeField, values[0])),
-                ', '.join('?' * len(values[0]))))
-      return self.Execute(
-          query, args=(row.values() for row in values), many=True)
+    query = ('INSERT INTO %s (%s) VALUES (%s)' %
+             (table,
+              ', '.join(map(self.connection.EscapeField, values[0])),
+              ', '.join('?' * len(values[0]))))
+    return self.Execute(
+        query, args=(row.values() for row in values), many=True)
 
   def Select(self, table, fields=None, conditions=None, order=None, group=None,
              limit=None, offset=0):

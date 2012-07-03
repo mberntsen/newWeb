@@ -2,7 +2,7 @@
 """SQLTalk MySQL Cursor class.
 """
 __author__ = 'Elmer de Looff <elmer@underdark.nl>'
-__version__ = '0.11'
+__version__ = '0.12'
 
 # Standard modules
 import warnings
@@ -216,6 +216,8 @@ class Cursor(object):
     Returns:
       sqlresult.ResultSet object.
     """
+    if not values:
+      raise ValueError('Must insert 1 or more value')
     values = self.connection.EscapeValues(values) if escape else values
     table = self.connection.EscapeField(table) if escape else table
     try:
