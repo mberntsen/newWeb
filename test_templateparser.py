@@ -1,7 +1,7 @@
 #!/usr/bin/python2.5
 """Tests for the templateparser module."""
 __author__ = 'Elmer de Looff <elmer@underdark.nl>'
-__version__ = '1.2'
+__version__ = '1.3'
 
 # Too many public methods
 # pylint: disable=R0904
@@ -255,7 +255,7 @@ class TemplateTagFunctions(unittest.TestCase):
     """[TagFunctions] Tags functions may contain word chars and dashes only"""
     good_funcs = "aAzZ0123-_"
     good_func = lambda tag: 'SUCCESS'
-    bad_funcs = """ :~!@#$%^&*()+={}\;':",./<>? """
+    bad_funcs = """ :~!@#$%^&*+={}\;':"./<>?| """
     bad_func = lambda tag: 'FAIL'
     for index in good_funcs:
       template = '[tag|%s]' % index
@@ -266,7 +266,6 @@ class TemplateTagFunctions(unittest.TestCase):
       self.parser.RegisterFunction(index, bad_func)
       self.assertEqual(template, self.parser.ParseString(template, tag='foo'))
     self.parser.RegisterFunction('|', bad_func)
-    self.assertRaises(KeyError, self.parser.ParseString, '[tag||]', tag='foo')
 
   def testDefaultHtmlSafe(self):
     """[TagFunctions] The default function escapes HTML entities"""
@@ -342,6 +341,70 @@ class TemplateTagFunctions(unittest.TestCase):
     tag = [5, 1, 3, 2, 4]
     result = "[1, 2, 3, 4, 5]"
     self.assertEqual(result, self.parser.ParseString(template, tag=tag))
+
+
+class TemplateTagFunctionClosures(unittest.TestCase):
+  """Tests the functions that are performed on replaced tags."""
+  @staticmethod
+  def Limit(length=80):
+    """Returns a closure that limits input to a number of chars/elements."""
+    return lambda string: string[:int(length)]
+
+  @staticmethod
+  def LimitString(length=80, endchar='...'):
+    """Limits input to `length` chars and appends `endchar` if it was longer."""
+    def _Limit(string, length=int(length), endchar=endchar):
+      if len(string) > length:
+        return string[:length] + endchar
+      return string
+    return _Limit
+
+  def setUp(self):
+    """Sets up a parser instance, as it never changes."""
+    self.parser = templateparser.Parser()
+    self.parser.RegisterFunction('limit', self.Limit)
+    self.parser.RegisterFunction('strlimit', self.LimitString)
+    self.tag = 'hello world ' * 10
+
+  def testSimpleClosureWithoutArguments(self):
+    """[TagClosures] Simple tag closure-functions without arguments succeed"""
+    template = '[tag|limit()]'
+    result = self.parser.ParseString(template, tag=self.tag)
+    self.assertEqual(result, self.tag[:80])
+
+  def testSimpleClosureArgument(self):
+    """[TagClosures] Simple tag-closure functions operate on their argument"""
+    template = '[tag|limit(20)]'
+    result = self.parser.ParseString(template, tag=self.tag)
+    self.assertEqual(result, self.tag[:20])
+
+  def testComplexClosureWithoutArguments(self):
+    """[TagClosures] Complex tag closure-functions without arguments succeed"""
+    template = '[tag|strlimit()]'
+    result = self.parser.ParseString(template, tag=self.tag)
+    self.assertEqual(len(result), 83)
+    self.assertEqual(result[:80], self.tag[:80])
+    self.assertEqual(result[-3:], '...')
+
+  def testComplexClosureArguments(self):
+    """[TagClosures] Complex tag closure-functions operate on arguments"""
+    template = '[tag|strlimit(20, TOOLONG)]'
+    result = self.parser.ParseString(template, tag=self.tag)
+    self.assertEqual(len(result), 27)
+    self.assertEqual(result[:20], self.tag[:20])
+    self.assertEqual(result[-7:], 'TOOLONG')
+
+  def testCharactersInClosureArguments(self):
+    """[TagClosures] Arguments may contain most specialchars (but no commas)"""
+    template = '[tag|strlimit(20, `-=./<>?`!@#$%^&*_+[]\{}|;\':")]'
+    result = self.parser.ParseString(template, tag=self.tag)
+    self.assertTrue(result.endswith('`-=./<>?`!@#$%^&*_+[]\{}|;\':"'))
+
+  def testCommaInArgument(self):
+    """[TagClosures] Arguments may not contain commas as they separate args"""
+    template = '[tag|strlimit(10, "ham, eggs")]'
+    self.assertRaises(templateparser.TemplateTypeError,
+                      self.parser.ParseString, template, tag=self.tag)
 
 
 class TemplateUnicodeSupport(unittest.TestCase):
