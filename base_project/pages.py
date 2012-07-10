@@ -15,9 +15,9 @@ class PageMaker(uweb.DebuggingPageMaker):
 
   def Index(self):
     """Returns the index.html template"""
-    return self.parser.Parse('index.html')
+    return self.parser.Parse('index.utp')
 
   def FourOhFour(self, path):
     """The request could not be fulfilled, this returns a 404."""
-    return uweb.Response(self.parser.Parse('404.html', path=path),
+    return uweb.Response(self.parser.Parse('404.utp', path=path),
                          httpcode=404)
