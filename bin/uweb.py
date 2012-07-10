@@ -69,48 +69,77 @@ def Initialize(arguments):
   logging.debug('initializing uweb')
   logging.debug('--------------------------------------------')
   
-  #set al paths
-  uweb_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-  project_path = os.path.abspath(arguments.name)
-  router_path = os.path.join(project_path, ROUTER_PATH, ROUTER_NAME)
-  source_path = os.path.dirname('%s/base_project/' % uweb_path)
+  path = Get_paths(arguments)
   
-  router_destination = os.path.join(project_path,
-                                    ROUTER_PATH, 
-                                    arguments.name + '.py')
-  
-  apache_config_path = os.path.join(project_path,
-                                    APACHE_CONFIG_NAME)
-  
-  #remove original project if needed
   if arguments.force:
-    logging.debug('removing original files')
-    try:
-      shutil.rmtree(project_path) 
-    except OSError:
-      pass
+    Remove_project(path['project'])
   
-  #copy uweb demo project
+  if not Copy_source(path['source'], path['project']):
+    return Fail()
+  
+  Adjust_router_name(path['router'], path['project'], arguments.name)
+  Write_apache_config(arguments, path['apache'], path['project'])
+  
+  return Succes()
+  
+def Get_paths(arguments):
+  path = {}
+  path['uweb'] = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+  path['project'] = os.path.abspath(arguments.name)
+  path['router'] = os.path.join(path['project'], ROUTER_PATH, ROUTER_NAME)
+  path['source'] = os.path.dirname('%s/base_project/' % path['uweb'])
+  path['apache'] = os.path.join(path['project'],
+                                 APACHE_CONFIG_NAME)
+                                 
+  return path
+
+def Adjust_router_name(router_path, project_path, name):
+  """Rename router and return new name"""
+  router_destination = os.path.join(project_path, 
+                                    name + '.py')
+  
+  logging.debug('setting up router')
+  shutil.move(router_path, router_destination)
+
+def Copy_source(source_path, project_path):
+  """Copy source files from uweb demo project"""
   logging.debug('cloning uweb source')
   try:
     shutil.copytree(source_path, project_path)
+  except OSError as error:
+    logging.debug('Project already excist, use -f (force) to wipe project.')
+    return False
+  return True
+
+def Remove_project(project_path):
+  """Removes project"""
+  logging.debug('wiping old project')
+  try:
+    shutil.rmtree(project_path) 
   except OSError:
-    logging.debug('Project already excist, use -f (force) to whipe project.')
-    return Fail()
+    pass
   
-  #adjust router name
-  logging.debug('setting up router')
-  shutil.move(router_path, router_destination)
-  router_path = router_destination
-  
-  #write apache config
+def Write_apache_config(arguments, apache_config_path, project_path):
+  """write apache config file"""
   logging.debug('setting up apache config')
   with open(apache_config_path, 'w') as apache_file:
     apache_file.write(GenerateApacheConfig(project_path,
                                            arguments.host,
                                            arguments.name))
+
+def Succes():
+  """Script has succeeded"""
+  logging.debug('--------------------------------------------')
+  logging.debug('initialization complete - have fun with uweb')
+  logging.debug('--------------------------------------------')
+  return True
   
-  return Succes()
+def Fail():
+  """Script has failed"""
+  logging.debug('--------------------------------------------')
+  logging.debug('initialization failed - check details above')
+  logging.debug('--------------------------------------------')
+  return False
 
 def main():
   """Main uweb method"""
@@ -127,20 +156,6 @@ def main():
     Initialize(options)
   elif 'genconf' in arguments:
     print GenerateApacheConfig(options.path, options.host, options.name)
-
-def Succes():
-  """Script has succeeded"""
-  logging.debug('--------------------------------------------')
-  logging.debug('initialization complete - have fun with uweb')
-  logging.debug('--------------------------------------------')
-  return True
-  
-def Fail():
-  """Script has failed"""
-  logging.debug('--------------------------------------------')
-  logging.debug('initialization failed - check details above')
-  logging.debug('--------------------------------------------')
-  return False
-
+    
 if __name__ == '__main__':
-  main()
+  main()  
