@@ -15,8 +15,9 @@ ROUTER_NAME = 'router.py'
 APACHE_CONFIG_NAME = 'apache.conf'
 
 SITES_FILE = 'sites.json'
+#UWEB_DATA_FOLDER = os.path.join(os.getenv("HOME"), '.uweb')
 
-
+#print UWEB_DATA_FOLDER
 
 class BaseOperation(object):
   def ParseCall(self):
@@ -264,7 +265,8 @@ class Stop(BaseOperation):
 
 def Sites():
   if not os.path.isfile(SitesLocation()):
-    return Create_sites_location();
+    CreateSitesFile()
+    return {}
   else:
     with open(SitesLocation(), 'r') as sites_file:
       data = json.load(sites_file)
@@ -274,7 +276,6 @@ def CreateSitesFile():
   if not os.path.isfile(SitesLocation()):
     with open(SitesLocation(), 'w') as sites_file:
       sites_file.write(json.dumps({}))
-      return {}
 
 
 def AdjustRouterName(router_path, project_path, name):
