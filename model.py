@@ -265,12 +265,14 @@ class BaseRecord(dict):
     raise NotImplementedError
 
   @classmethod
-  def List(cls, connection):
+  def List(cls, connection, condition=None):
     """Yields a Record object for every table entry.
 
     Arguments:
       @ connection: object
         Database connection to use.
+      % condition: str
+        Optional query portion that will be used to limit the list of results
 
     Yields:
       Record: Database record abstraction class.
@@ -503,7 +505,7 @@ class Record(BaseRecord):
   # Private methods to be used for development
   #
   @classmethod
-  def _FromParent(cls, parent, relation_field=None):
+  def _FromParent(cls, parent, relation_field=None, conditions=None):
     """Returns all `cls` objects that are a child of the given parent.
 
     This utilized the parent's _Children method, with either this class'
@@ -515,13 +517,19 @@ class Record(BaseRecord):
       % relation_field: str ~~ cls.TableName()
         The fieldname in this class' table which relates to the parent's primary
         key. If not given, parent.TableName() will be used.
+      % conditions: str / iterable ~~ None
+        The extra condition(s) that should be applied when querying for records.
     """
     if not isinstance(parent, Record):
       raise TypeError('parent argument should be a Record type.')
-    # Accessing a protected member of a similar class, this is okay.
-    # pylint: disable=W0212
-    return parent._Children(cls, relation_field=relation_field)
-    # pylint: enable=W0212
+    relation_field = relation_field or parent.TableName()
+    relation_value = parent.connection.EscapeValues(parent.key)
+    qry_conditions = ['`%s` = %s' % (relation_field, relation_value)]
+    if isinstance(conditions, basestring):
+      qry_conditions.append(conditions)
+    elif conditions:
+      qry_conditions.extend(conditions)
+    return cls.List(parent.connection, conditions=qry_conditions)
 
   def _Children(self, child_class, relation_field=None, conditions=None):
     """Returns all `child_class` objects related to this record.
@@ -538,23 +546,13 @@ class Record(BaseRecord):
         The fieldname in the `child_class` table which relates that table to
         the table for this record.
       % conditions: str / iterable ~~
-        The extra condition(s) that need to be applied when querying for child
-        records.
+        The extra condition(s) that should be applied when querying for records.
     """
-    relation_field = relation_field or self.TableName()
-    with self.connection as cursor:
-      safe_key = self.connection.EscapeValues(self.key)
-      qry_conditions = ['`%s` = %s' % (relation_field, safe_key)]
-      if isinstance(conditions, basestring):
-        qry_conditions.append(conditions)
-      elif conditions:
-        qry_conditions.extend(conditions)
-      children = cursor.Select(
-          table=child_class.TableName(),
-          conditions=qry_conditions)
-    for child in children:
-      child[relation_field] = self
-      yield child_class(self.connection, child)
+    # Delegating to let child class handle its own querying. These are methods
+    # for development, and are private only to prevent name collisions.
+    # pylint: disable=W0212
+    return child_class._FromParent(
+        self, relation_field=relation_field, conditions=conditions)
 
   def _DeleteChildren(self, child_class, relation_field=None):
     """Deletes all `child_class` objects related to this record.
@@ -633,7 +631,6 @@ class Record(BaseRecord):
         # pylint: disable=W0212
         value._SaveForeign(cursor)
         value._SaveSelf(cursor)
-        # pylint: enable=W0212
 
   def _SaveSelf(self, cursor):
     """Updates the existing database entry with the record's current values.
@@ -660,12 +657,10 @@ class Record(BaseRecord):
       record._PreCreate(cursor)
       record._RecordCreate(cursor)
       record._PostCreate(cursor)
-      # pylint: enable=W0212
     return record
 
   @classmethod
   def DeletePrimary(cls, connection, pkey_value):
-    print 'DELETING RECORD FOR PRIMARY: %r' % (pkey_value, )
     with connection as cursor:
       cursor.Delete(table=cls.TableName(),
                     conditions=cls._PrimaryKeyCondition(connection, pkey_value))
@@ -682,9 +677,9 @@ class Record(BaseRecord):
     return cls(connection, record[0])
 
   @classmethod
-  def List(cls, connection):
+  def List(cls, connection, conditions=None):
     with connection as cursor:
-      records = cursor.Select(table=cls.TableName())
+      records = cursor.Select(table=cls.TableName(), conditions=conditions)
     for record in records:
       yield cls(connection, record)
 
@@ -747,7 +742,7 @@ class VersionedRecord(Record):
     return cls(connection, record[0])
 
   @classmethod
-  def List(cls, connection):
+  def List(cls, connection, conditions=None):
     """Yields the latest Record for each versioned entry in the table.
 
     Arguments:
@@ -757,6 +752,8 @@ class VersionedRecord(Record):
     Yields:
       Record: The Record with the newest version for each versioned entry.
     """
+    if isinstance(conditions, (list, tuple)):
+      conditions = ' AND '.join(conditions)
     with connection as cursor:
       records = cursor.Execute("""
           SELECT `%(table)s`.*
@@ -765,28 +762,34 @@ class VersionedRecord(Record):
                 FROM `%(table)s`
                 GROUP BY `%(record_key)s`) AS `versions`
               ON (`%(table)s`.`%(primary)s` = `versions`.`max`)
+          WHERE %(conditions)s
           """ % {'primary': cls._PRIMARY_KEY,
                  'record_key': cls._RECORD_KEY,
-                 'table': cls.TableName()})
+                 'table': cls.TableName(),
+                 'conditions': conditions})
     for record in records:
       yield cls(connection, record)
 
   @classmethod
-  def ListVersions(cls, connection, identifier):
+  def ListVersions(cls, connection, identifier, conditions='1'):
     """Yields all versions for a given record identifier.
 
     Arguments:
       @ connection: sqltalk.connection
         Database connection to use.
+      % conditions: str
+        Optional query portion that will be used to limit the list of results
 
     Yields:
       Record: One for each stored version for the identifier.
     """
+    if isinstance(conditions, (list, tuple)):
+      conditions = ' AND '.join(conditions)
     safe_id = connection.EscapeValues(identifier)
     with connection as cursor:
-      records = cursor.Select(
-          table=cls.TableName(),
-          conditions='`%s` = %s' % (cls._RECORD_KEY, safe_id))
+      records = cursor.Select(table=cls.TableName(),
+                              conditions='`%s` = %s AND %s' % (
+                                  cls._RECORD_KEY, safe_id, conditions))
     for record in records:
       yield cls(connection, record)
 
@@ -886,8 +889,8 @@ class MongoRecord(BaseRecord):
     return cls(connection, record[0])
 
   @classmethod
-  def List(cls, connection):
-    for record in cls.Collection(connection).find():
+  def List(cls, connection, conditions=None):
+    for record in cls.Collection(connection).find(conditions or {}):
       yield cls(connection, record)
 
   def Save(self):
