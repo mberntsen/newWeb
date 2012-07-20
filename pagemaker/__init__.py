@@ -280,7 +280,7 @@ class DebuggerMixin(object):
   lacks interactive functions.
   """
   CACHE_DURATION = MimeTypeDict({})
-  ERROR_TEMPLATE = templateparser.Template.FromFile(os.path.join(
+  ERROR_TEMPLATE = templateparser.FileTemplate.FromFile(os.path.join(
       os.path.dirname(__file__), 'http_500.xhtml'))
 
   def _ParseStackFrames(self, stack):
