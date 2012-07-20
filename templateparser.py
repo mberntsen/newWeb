@@ -10,7 +10,7 @@ Error classes:
   TemplateReadError: Template file could not be read or found.
 """
 __author__ = 'Elmer de Looff <elmer@underdark.nl'
-__version__ = '1.4'
+__version__ = '1.5'
 
 # Standard modules
 import os
@@ -175,7 +175,7 @@ class Parser(dict):
     """
     try:
       template_path = os.path.join(self.template_dir, location)
-      self[name or location] = Template.FromFile(template_path, parser=self)
+      self[name or location] = FileTemplate.FromFile(template_path, parser=self)
     except IOError:
       raise TemplateReadError('Could not load template %r' % template_path)
 
@@ -269,7 +269,7 @@ class Template(list):
     Two templates are equal if they are of the same type, and have the same
     content for their unparsed template; or string representation.
     """
-    return isinstance(other, type(self)) and str(other) == str(self)
+    return isinstance(other, Template) and str(other) == str(self)
 
   def __repr__(self):
     return '%s(%s)' % (type(self).__name__, list(self))
@@ -277,35 +277,19 @@ class Template(list):
   def __str__(self):
     return ''.join(map(str, self))
 
-  @classmethod
-  def FromFile(cls, template_path, parser=None):
-    """Returns a Template after reading the given template file.
-
-    Arguments:
-      @ template_path: str
-        The path and filename of the file to read and create a template from.
-      % parser: Parser ~~ None
-        The parser object to pass along to the new Template.
-    """
-    try:
-      with file(template_path) as template:
-        return cls(template.read(), parser=parser)
-    except IOError:
-      raise TemplateReadError('Cannot open: %r' % template_path)
-
   def AddFile(self, name):
     """Extends the Template by reading template data from a file.
 
-    If a Parser instance is present on the Template, the file is loaded through
-    this parser, making use of its caching capabilities. If it is not present,
-    an attempt is made to load the file from within the Template itself.
+    The file is loaded through the Parser instance associated with the template.
+    If there is none associated, this will raise a TypeError.
 
     Raises:
-      TemplateReadError: Whenever the template file could not be read.
+      TemplateReadError: The template file could not be read by the Parser.
+      TypeError: There is no parser associated with the template.
     """
-    if self.parser is not None:
-      return self._AddToOpenScope(self.parser[name])
-    return self.FromFile(name)
+    if self.parser is None:
+      raise TypeError('The template requires parser for adding template files.')
+    return self._AddToOpenScope(self.parser[name])
 
   def AddString(self, raw_template):
     """Extends the Template by adding a raw template string.
@@ -435,6 +419,74 @@ class Template(list):
     if not isinstance(self.scopes[-1], scope_cls):
       raise TemplateSyntaxError('Expected open scope %s, but scope is %s' % (
           scope_cls.__name__, type(self.scopes[-1]).__name__))
+
+
+class FileTemplate(Template):
+  """Template class that loads from file."""
+  def __init__(self, raw_template, file_name, file_mtime, parser=None):
+    """Initializes a FileTemplate
+
+    The optional parser is used for loading (inlining) other templats using the
+    AddFile() method.
+
+    Arguments:
+      @ raw_template: str
+        A string to begin a template with. This is parsed and used to build the
+        initial raw template from.
+      % parser: Parser ~~ None
+        The Parser instance to use for speeding up AddFile through caching.
+    """
+    self._file_name = file_name
+    self._file_mtime = file_mtime
+    super(FileTemplate, self).__init__(raw_template, parser=parser)
+
+  @classmethod
+  def FromFile(cls, template_path, parser=None):
+    """Returns a FileTemplate after reading the given template file.
+
+    Arguments:
+      @ template_path: str
+        The path and filename of the file to read and create a template from.
+      % parser: Parser ~~ None
+        The parser object to pass along to the new FileTemplate.
+    """
+    try:
+      mtime = os.path.getmtime(template_path)
+      content = file(template_path).read()
+      return cls(content, template_path, mtime, parser=parser)
+    except (IOError, OSError):
+      raise TemplateReadError('Cannot open: %r' % template_path)
+
+  def Parse(self, **kwds):
+    """Returns the parsed template as SafeString.
+
+    The template is parsed by parsing each of its members and combining that.
+    """
+    self.ReloadIfModified()
+    return super(FileTemplate, self).Parse(**kwds)
+
+  def ReloadIfModified(self):
+    """Reloads the template file if it was modified on disk.
+
+    If the template is not present, cannot be read, or there is another error
+    accessing the file, the operation is aborted and the old template is left
+    in place.
+
+    If the new template has a syntax error or other problem during looading,
+    that error *will* be raised.
+    """
+    try:
+      mtime = os.path.getmtime(self._file_name)
+      if mtime > self._file_mtime:
+        template = file(self._file_name).read()
+        del self[:]
+        self.scopes = [self]
+        self.AddString(template)
+        self._file_mtime = mtime
+    except (IOError, OSError):
+      # File cannot be stat'd or read. No longer exists or we lack permissions.
+      # We shouldn't error in this case, but carry on with the template we have.
+      pass
 
 
 class TemplateConditional(object):

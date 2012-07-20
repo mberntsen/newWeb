@@ -1,7 +1,7 @@
 #!/usr/bin/python2.5
 """Tests for the templateparser module."""
 __author__ = 'Elmer de Looff <elmer@underdark.nl>'
-__version__ = '1.3'
+__version__ = '1.4'
 
 # Too many public methods
 # pylint: disable=R0904
@@ -9,6 +9,7 @@ __version__ = '1.3'
 # Standard modules
 import os
 import re
+import time
 import unittest
 
 # Unittest target
@@ -33,17 +34,17 @@ class Parser(unittest.TestCase):
   def testAddTemplate(self):
     """[Parser] AddTemplate adds a template to the parser"""
     parser = templateparser.Parser()
-    self.assertEqual(0, len(parser))
+    self.assertEqual(len(parser), 0)
     parser.AddTemplate(self.name)
-    self.assertEqual(1, len(parser))
-    self.assertEqual(self.template, parser[self.name])
+    self.assertEqual(len(parser), 1)
+    self.assertEqual(parser[self.name], self.template)
 
   def testAccessTemplate(self):
     """[Parser] getting a template by key loads it when required"""
     parser = templateparser.Parser()
-    self.assertEqual(0, len(parser))
-    self.assertEqual(self.template, parser[self.name])
-    self.assertEqual(1, len(parser))
+    self.assertEqual(len(parser), 0)
+    self.assertEqual(parser[self.name], self.template)
+    self.assertEqual(len(parser), 1)
 
   def testOverWriteTemplate(self):
     """[Parser] AddTemplate overrides previously loaded template"""
@@ -64,7 +65,7 @@ class Parser(unittest.TestCase):
     """[Parser] Templates can be preloaded when instantiating the Parser"""
     parser = templateparser.Parser(templates=[self.name])
     self.assertEqual(1, len(parser))
-    self.assertEqual(self.template, parser[self.name])
+    self.assertEqual(parser[self.name], self.template)
 
   def testParseVersusParseString(self):
     """[Parser] Parse and ParseString only differ in cached lookup"""
@@ -790,6 +791,62 @@ class TemplateNestedScopes(unittest.TestCase):
         tmpl, loops=range(1, 6), x=True))
     self.assertEqual('value: foo', self.parser.ParseString(
         tmpl, value='foo', x=False))
+
+
+class TemplateReloading(unittest.TestCase):
+  """Tests for FileTemplate automatic reloading upon modification."""
+  def setUp(self):
+    self.simple = 'simple.utp'
+    self.simple_raw = 'simple [noun]'
+    self.loop = 'loop.utp'
+    self.loop_raw = '{{ for bit in [blob] }}{{ inline simple.utp }}{{ endfor }}'
+    with file(self.simple, 'w') as simple:
+      simple.write(self.simple_raw)
+    with file(self.loop, 'w') as loop:
+      loop.write(self.loop_raw)
+    self.parser = templateparser.Parser()
+    self.parser.AddTemplate(self.simple)
+    self.parser.AddTemplate(self.loop)
+
+  def tearDown(self):
+    for tmpfile in (self.loop, self.simple):
+      if os.path.exists(tmpfile):
+        if os.path.isdir(tmpfile):
+          os.rmdir(tmpfile)
+        else:
+          os.unlink(tmpfile)
+
+  def testFileBasicReload(self):
+    """[Reload] Template file is reloaded from disk after updating"""
+    first = self.parser[self.simple].Parse()
+    self.assertEqual(first, self.simple_raw)
+    with file(self.simple, 'w') as new_template:
+      new_template.write('new content')
+      time.sleep(.01) # short pause so that mtime will actually be different
+    second = self.parser[self.simple].Parse()
+    self.assertEqual(second, 'new content')
+
+  def testInlineReload(self):
+    """[Reload] Inlined templates are not automatically reloaded"""
+    self.assertEqual(self.parser[self.loop].Parse(blob='four'),
+                     self.simple_raw * 4)
+    with file(self.simple, 'w') as new_template:
+      new_template.write('new content')
+      time.sleep(.01) # short pause so that mtime will actually be different
+    second = self.parser[self.loop].Parse(blob='four')
+    self.assertEqual(second, 'new content' * 4)
+
+  def testReloadDeletedTemplate(self):
+    """[Reload] Deleted templates are not reloaded and don't trigger errors"""
+    os.unlink(self.simple)
+    self.assertEqual(self.parser[self.simple].Parse(), self.simple_raw)
+
+  def testReplaceTemplateWithDirectory(self):
+    """[Reload] Deleted templates are not reloaded and don't trigger errors"""
+    os.unlink(self.simple)
+    time.sleep(.01) # short pause so that mtime will actually be different
+    os.mkdir(self.simple)
+    self.assertEqual(self.parser[self.simple].Parse(), self.simple_raw)
 
 
 if __name__ == '__main__':
