@@ -27,7 +27,7 @@ class TemplateKeyError(Error):
 
 
 class TemplateNameError(Error):
-  """The referenced tag does not exist."""
+  """The referenced tag or function does not exist."""
 
 
 class TemplateValueError(Error, ValueError):
@@ -763,6 +763,8 @@ class TemplateTag(object):
       return TAG_FUNCTIONS[func](*args)(value)
     except TypeError, e:
       raise TemplateTypeError(e)
+    except KeyError, e:
+      raise TemplateNameError('Unknown template tag function %r' % e.args[0])
 
   def Parse(self, **kwds):
     """Returns the parsed string of the tag, using given replacements.
