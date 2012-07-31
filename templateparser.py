@@ -539,6 +539,7 @@ class TemplateConditional(object):
       else:
         nodes.append(node)
     try:
+      #XXX(Elmer): This uses eval, it's so much easier than lexing and parsing
       return eval(''.join(nodes), None, local_vars)
     except NameError, error:
       raise TemplateNameError(str(error).capitalize() + '. Try it as tagname?')
@@ -552,7 +553,7 @@ class TemplateConditional(object):
 
     One by one, the `if` clause and optional `elif` clauses are evaluated.
     Their strings are parsed (template tags replaced, though functions are NOT
-    processed) and then passed through `eval()`. Strings passed into the
+    processed) and the resulting expression evaluated. Strings passed into the
     templateparser will be strings for evaluation (not literal code), so this
     is safe with regards to users executing code in the templateparser scope.
 
@@ -739,8 +740,11 @@ class TemplateTag(object):
       if not closure:
         return TAG_FUNCTIONS[func](value)
       func, args = closure.groups()
-      args = [arg.strip() for arg in args.split(',')] if args else []
+      #XXX(Elmer): This uses eval, it's so much easier than lexing and parsing
+      args = eval(args + ',') if args.strip() else ()
       return TAG_FUNCTIONS[func](*args)(value)
+    except SyntaxError:
+      raise TemplateSyntaxError('Invalid argument syntax: %r' % args)
     except TypeError, err_obj:
       raise TemplateTypeError(err_obj)
     except KeyError, err_obj:

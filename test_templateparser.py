@@ -347,12 +347,12 @@ class TemplateTagFunctionClosures(unittest.TestCase):
   @staticmethod
   def Limit(length=80):
     """Returns a closure that limits input to a number of chars/elements."""
-    return lambda string: string[:int(length)]
+    return lambda string: string[:length]
 
   @staticmethod
   def LimitString(length=80, endchar='...'):
     """Limits input to `length` chars and appends `endchar` if it was longer."""
-    def _Limit(string, length=int(length), endchar=endchar):
+    def _Limit(string, length=length, endchar=endchar):
       if len(string) > length:
         return string[:length] + endchar
       return string
@@ -388,22 +388,34 @@ class TemplateTagFunctionClosures(unittest.TestCase):
 
   def testComplexClosureArguments(self):
     """[TagClosures] Complex tag closure-functions operate on arguments"""
-    template = '[tag|strlimit(20, TOOLONG)]'
+    template = '[tag|strlimit(20, "TOOLONG")]'
     result = self.parse(template, tag=self.tag)
     self.assertEqual(len(result), 27)
     self.assertEqual(result[:20], self.tag[:20])
     self.assertEqual(result[-7:], 'TOOLONG')
 
   def testCharactersInClosureArguments(self):
-    """[TagClosures] Arguments may contain most specialchars (but no commas)"""
-    template = '[tag|strlimit(20, `-=./<>?`!@#$%^&*_+[]\{}|;\':")]'
+    """[TagClosures] Arguments strings may contain specialchars"""
+    template = '[tag|strlimit(20, "`-=./<>?`!@#$%^&*_+[]\{}|;\':")]'
     result = self.parser.ParseString(template, tag=self.tag)
-    self.assertTrue(result.endswith('`-=./<>?`!@#$%^&*_+[]\{}|;\':"'))
+    self.assertTrue(result.endswith('`-=./<>?`!@#$%^&*_+[]\{}|;\':'))
 
   def testCommaInArgument(self):
-    """[TagClosures] Arguments may not contain commas as they separate args"""
+    """[TagClosures] String arguments may contain commas"""
     template = '[tag|strlimit(10, "ham, eggs")]'
-    self.assertRaises(templateparser.TemplateTypeError,
+    result = self.parse(template, tag=self.tag)
+    self.assertEqual(result[-9:], "ham, eggs")
+
+  def testNamedArguments(self):
+    """[TagClosures] Named arguments are not allowed"""
+    template = '[tag|limit(length=20)]'
+    self.assertRaises(templateparser.TemplateSyntaxError,
+                      self.parse, template, tag=self.tag)
+
+  def testTrailingComma(self):
+    """[TagClosures] Arguments may not have a trailing comma"""
+    template = '[tag|limit(20,)]'
+    self.assertRaises(templateparser.TemplateSyntaxError,
                       self.parse, template, tag=self.tag)
 
 
