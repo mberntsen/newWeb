@@ -486,12 +486,12 @@ class TemplateConditionals(unittest.TestCase):
 
   def testBasicConditional(self):
     """{{ if }} Basic boolean check works for relevant data types"""
-    template = '{{ if [variable] }} foo {{ endif }}'
+    template = '{{ if [variable] }} ack {{ endif }}'
     # Boolean True inputs should return a SafeString object stating 'foo'.
-    self.assertTrue(self.parse(template, variable=True))
-    self.assertTrue(self.parse(template, variable='truth'))
-    self.assertTrue(self.parse(template, variable=12))
-    self.assertTrue(self.parse(template, variable=[1, 2]))
+    self.assertEqual(self.parse(template, variable=True), ' ack')
+    self.assertEqual(self.parse(template, variable='truth'), ' ack')
+    self.assertEqual(self.parse(template, variable=12), ' ack')
+    self.assertEqual(self.parse(template, variable=[1, 2]), ' ack')
     # Boolean False inputs should yield an empty SafeString object.
     self.assertFalse(self.parse(template, variable=None))
     self.assertFalse(self.parse(template, variable=0))
@@ -506,10 +506,10 @@ class TemplateConditionals(unittest.TestCase):
 
   def testTagIsInstance(self):
     """{{ if }} Basic tag value comparison"""
-    template = '{{ if isinstance([variable], int) }} foo {{ endif }}'
+    template = '{{ if isinstance([variable], int) }} ack {{ endif }}'
     self.assertFalse(self.parse(template, variable=[1]))
     self.assertFalse(self.parse(template, variable='number'))
-    self.assertTrue(self.parse(template, variable=5))
+    self.assertEqual(self.parse(template, variable=5), ' ack')
 
   def testDefaultElse(self):
     """{{ if }} Else block will be parsed when `if` fails"""
