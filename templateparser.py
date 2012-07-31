@@ -175,7 +175,7 @@ class Parser(dict):
     """
     try:
       template_path = os.path.join(self.template_dir, location)
-      self[name or location] = FileTemplate.FromFile(template_path, parser=self)
+      self[name or location] = FileTemplate(template_path, parser=self)
     except IOError:
       raise TemplateReadError('Could not load template %r' % template_path)
 
@@ -244,19 +244,14 @@ class Template(list):
       re.VERBOSE)
 
   def __init__(self, raw_template, parser=None):
-    """Initializes a Template
-
-    The optional parser is used to load templates using AddFile() where
-    available. Adding a parser will allow Template to benefit from the caching
-    performed by Parser. Without this, AddFile will still work but not benefit
-    from this caching.
+    """Initializes a Template from a string.
 
     Arguments:
       @ raw_template: str
-        A string to begin a template with. This is parsed and used to build the
-        initial raw template from.
+        The string that represents the template.
       % parser: Parser ~~ None
-        The Parser instance to use for speeding up AddFile through caching.
+        An optional parser instance that is necessary to enable support for
+        adding files to the current template. This is used by {{ inline }}.
     """
     super(Template, self).__init__()
     self.parser = parser
@@ -423,37 +418,22 @@ class Template(list):
 
 class FileTemplate(Template):
   """Template class that loads from file."""
-  def __init__(self, raw_template, file_name, file_mtime, parser=None):
-    """Initializes a FileTemplate
-
-    The optional parser is used for loading (inlining) other templats using the
-    AddFile() method.
-
-    Arguments:
-      @ raw_template: str
-        A string to begin a template with. This is parsed and used to build the
-        initial raw template from.
-      % parser: Parser ~~ None
-        The Parser instance to use for speeding up AddFile through caching.
-    """
-    self._file_name = file_name
-    self._file_mtime = file_mtime
-    super(FileTemplate, self).__init__(raw_template, parser=parser)
-
-  @classmethod
-  def FromFile(cls, template_path, parser=None):
-    """Returns a FileTemplate after reading the given template file.
+  def __init__(self, template_path, parser=None):
+    """Initializes a FileTemplate based on a given template path.
 
     Arguments:
       @ template_path: str
-        The path and filename of the file to read and create a template from.
+        A string to begin a template with. This is parsed and used to build the
+        initial raw template from.
       % parser: Parser ~~ None
-        The parser object to pass along to the new FileTemplate.
+        An optional parser instance that is necessary to enable support for
+        adding files to the current template. This is used by {{ inline }}.
     """
     try:
-      mtime = os.path.getmtime(template_path)
-      content = file(template_path).read()
-      return cls(content, template_path, mtime, parser=parser)
+      self._file_name = os.path.abspath(template_path)
+      self._file_mtime = os.path.getmtime(self._file_name)
+      raw_template = file(self._file_name).read()
+      super(FileTemplate, self).__init__(raw_template, parser=parser)
     except (IOError, OSError):
       raise TemplateReadError('Cannot open: %r' % template_path)
 
@@ -761,10 +741,11 @@ class TemplateTag(object):
       func, args = closure.groups()
       args = [arg.strip() for arg in args.split(',')] if args else []
       return TAG_FUNCTIONS[func](*args)(value)
-    except TypeError, e:
-      raise TemplateTypeError(e)
-    except KeyError, e:
-      raise TemplateNameError('Unknown template tag function %r' % e.args[0])
+    except TypeError, err_obj:
+      raise TemplateTypeError(err_obj)
+    except KeyError, err_obj:
+      raise TemplateNameError(
+          'Unknown template tag function %r' % err_obj.args[0])
 
   def Parse(self, **kwds):
     """Returns the parsed string of the tag, using given replacements.
