@@ -766,7 +766,7 @@ class VersionedRecord(Record):
           """ % {'primary': cls._PRIMARY_KEY,
                  'record_key': cls._RECORD_KEY,
                  'table': cls.TableName(),
-                 'conditions': conditions})
+                 'conditions': conditions or '1'})
     for record in records:
       yield cls(connection, record)
 
