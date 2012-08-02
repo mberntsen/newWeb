@@ -13,9 +13,9 @@
               <td class="int"><a href="/[basepath]/table/[column|classname]/edit/[column:key]">[column:key]</a></td>
             {{ endif }}
           {{ endfor }}
+          <td><a href="/[basepath]/table/[table]/edit/[key]">Edit</a></td>
           <td><form method="POST" action="/[basepath]/table/[table]/delete/">
                 <input type="hidden" value="[key]" name="key" />
-                <input type="submit" onclick="return confirm('Are you sure?')" value="Delete" />
+                <input type="submit" onclick="return confirm('This will delete the record?')" value="Delete" />
               </form></td>
-          <td><a href="/[basepath]/table/[table]/edit/[key]">Edit</a></td>
         </tr>
