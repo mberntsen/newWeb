@@ -702,6 +702,7 @@ class Record(BaseRecord):
       if save_foreign:
         self._SaveForeign(cursor)
       self._SaveSelf(cursor)
+    return self
   # pylint: enable=W0221
 
 
@@ -900,6 +901,7 @@ class MongoRecord(BaseRecord):
       self._StoreRecord()
       self._PostSave(None)
       self._record.update(changes)
+    return self
 
   def _StoreRecord(self):
     self.key = self.Collection(self.connection).save(self._DataRecord())
