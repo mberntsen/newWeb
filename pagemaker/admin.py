@@ -28,7 +28,7 @@ class AdminMixin(object):
 
     if not self.ADMIN_MODEL:
       return 'Setup ADMIN_MODEL first'
-    indextemplate = templateparser.Template.FromFile(
+    indextemplate = templateparser.FileTemplate(
       os.path.join(os.path.dirname(__file__), 'admin', 'index.html'))
 
     urlparts = (url or '').split('/')
@@ -63,7 +63,7 @@ class AdminMixin(object):
           (columns, results) = self.__AdminTablesMethodsResults(urlparts[2],
                                                                 method)
 
-          resulttemplate = templateparser.Template.FromFile(
+          resulttemplate = templateparser.FileTemplate(
               os.path.join(os.path.dirname(__file__), 'admin', 'record.html'))
 
           for result in results:
@@ -104,7 +104,7 @@ class AdminMixin(object):
   def __EditRecord(self, table, key):
     self.parser.RegisterFunction('items', lambda d: d.items())
     self.parser.RegisterFunction('classname', lambda cls: type(cls).__name__)
-    edittemplate = templateparser.Template.FromFile(
+    edittemplate = templateparser.FileTemplate(
         os.path.join(os.path.dirname(__file__), 'admin', 'edit.html'))
     fields = self.__EditRecordFields(table, key)
     if not fields:
