@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <style type="text/css">
+    html{
+      font:1em/1.2em sans-serif;
+    }
+    body{
+      margin:0 8px;
+    }
+    nav{
+      width:15%;
+      float:left;
+      padding-right:1em;
+    }
+    nav ul{
+      margin:0;
+      padding:0;
+      background:#eed;
+      border-collapse:collapse;
+      border:1px solid #888;
+    }
+    nav li{
+      list-style-type:none;
+      margin:0;
+      padding:0 0 0 .6em;
+    }
+    section{
+      float:left;
+      width:60%;
+    }
+    h2{
+      margin:.5em 0 .5em;
+      line-height:.7em;
+    }
+    ol + h2 {
+      margin-top: 0;
+    }
+    p,
+    .message,
+    .docs{
+      margin:0.5em;
+    }
+    .message,
+    .docs{
+      padding:1em;
+      display:block;
+    }
+    table,
+    .message,
+    .docs{
+      background:#eed;
+      border-collapse:collapse;
+      border:1px solid #888;
+    }
+    table thead td{
+      background:#888;
+      color:#fff;
+      padding:.1em 1.5em;
+    }
+    table td:first-child{
+      font-weight:bold;
+      vertical-align:top;
+    }
+    table td{
+      padding:0 0 0 .6em;
+    }
+    table td.int{
+      text-align:right;
+    }
+    table tr:nth-child(2n),
+    nav li:nth-child(2n){
+      background:#e4e4c4;
+    }
+    table tbody tr:hover td,
+    nav li:hover{
+      background:#ffb;
+      background:rgba(255,255,0,.3)
+    }
+    form li{
+      list-style-type:none;
+      clear:both;
+    }
+    form li label,
+    form li input{
+      float:left;
+    }
+    form li label{
+      width:150px;
+    }
+    </style>
+    <title>&micro;Web, Admin interface {{if [table]}}[table]{{ endif }} {{if [method]}} - [method]{{ endif }} </title>
+  </head>
+  <body>
+    <nav>
+      <h2>Tables</h2>
+      <ul>
+      {{ for table in [tables] }}
+        <li><a href="/[basepath]/table/[table]">[table]</a></li>
+      {{ endfor }}
+      </ul>
+      {{ if [methods] }}
+      <h2>Methods for [table]</h2>
+      <ul>
+      {{ for method in [methods] }}
+        <li><a href="/[basepath]/method/[table]/[method]">[method]</a></li>
+      {{ endfor }}
+      </ul>
+
+      {{ endif }}
+    </nav>
+    <section>
+      {{ if [results] }}
+      <h2>Results for [table] / [method]</h2>
+      <table>
+        <thead>
+          <tr>
+            <td><input type="checkbox" title="Select All" onclick="" /></td>
+            {{ for column in [columns]}}
+            <td>[column|raw]</td>
+            {{ endfor }}
+            <td>Edit</td>
+            <td>Delete</td>
+          </tr>
+        </thead>
+        <tbody>
+        {{ for result in [results] }}
+          [result|raw]
+        {{ endfor }}
+        </tbody>
+      </table>
+      {{ elif [edit]}}
+       [edit|raw]
+      {{ elif [message]}}
+      <span class="message">[message]</span>
+      {{ elif [docs]}}
+      <h2>Documentation for [method] on <a href="/[basepath]/table/[table]">[table]</a></h2>
+      <span class="docs"><pre>[docs]</pre></span>
+      {{ endif }}
+    </section>
+  </body>
+</html>
