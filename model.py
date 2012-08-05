@@ -1041,10 +1041,13 @@ def RecordToDict(record, complete=False, recursive=False):
   return record_dict
 
 
-def MakeJson(record_dict):
-  """Returns a JSON representation of the given `record_dict`.
+def MakeJson(record, complete=False, recursive=False):
+  """Returns a JSON object string of the given `record`.
 
-  The `record_dict` is the result of `RecordToDict(record)`.
+  Before turning the record into a JSON object, it is passed through
+  RecordToDict(). The arguemnts `complete` and `recursive` function to those
+  on that function.
+
   Additional conversion will be done for types  such as datetime `datetime`,
   `time`, and `date`.
 
@@ -1059,4 +1062,6 @@ def MakeJson(record_dict):
     if isinstance(obj, datetime.time):
       return obj.strftime('%T')
 
-  return simplejson.dumps(record_dict, default=_Encode, sort_keys=True)
+  if isinstance(record, Record):
+    record = RecordToDict(complete=complete, recursive=recursive)
+  return simplejson.dumps(record, default=_Encode, sort_keys=True)
