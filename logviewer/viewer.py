@@ -50,7 +50,7 @@ class Viewer(uweb.DebuggingPageMaker):
   def Index(self):
     logs = model.Logging(self.paths, self.options['paths']['filemask'])
     return self.parser.Parse(
-        'index.xhtml', logfiles=logs.ListFiles(), **self.CommonBlocks('Home'))
+        'index.html', logfiles=logs.ListFiles(), **self.CommonBlocks('Home'))
 
   def Database(self, db_name):
     log_db = self._OpenLogDatabase(db_name)
@@ -63,22 +63,22 @@ class Viewer(uweb.DebuggingPageMaker):
     pagelinks = []
     if offset > 0:
       pagelinks.append(self.parser.Parse(
-          'pagination_link.xhtml', count=count, level=level,
+          'pagination_link.html', count=count, level=level,
           offset=max(offset - count, 0), query=query, title='Previous Page'))
     #XXX(Elmer): This may generate a false last next-link, because there is
     # no way to tell whether there are more files. It's a good bet though.
     if len(events) == count:
       pagelinks.append(self.parser.Parse(
-          'pagination_link.xhtml', count=count, level=level,
+          'pagination_link.html', count=count, level=level,
           offset=offset + count, query=query, title='Next Page'))
     if pagelinks:
-      pagination = self.parser.Parse('pagination.xhtml',
+      pagination = self.parser.Parse('pagination.html',
                                      pagelinks=''.join(pagelinks))
     else:
       pagination = ''
 
     return self.parser.Parse(
-        'database.xhtml',
+        'database.html',
         pagination=pagination,
         db_name=db_name,
         req_vars={'query': query, 'count': count, 'level': level},
@@ -117,21 +117,21 @@ class Viewer(uweb.DebuggingPageMaker):
     """
     if not page_id:
       page_id = title.replace(' ', '_').lower()
-    return self.parser.Parse('header.xhtml', title=title, page_id=page_id)
+    return self.parser.Parse('header.html', title=title, page_id=page_id)
 
   def Footer(self, scripts=()):
     """Returns the footer html"""
     scripts = ['<script type="text/javascript" src="%s"></script>' % path
                for path in scripts]
     return self.parser.Parse(
-        'footer.xhtml',
+        'footer.html',
         scripts=''.join(scripts),
         year=time.strftime('%Y'),
         version={'uweb': uweb.__version__, 'logviewer': __version__})
 
   def Sidebar(self):
     logs = model.Logging(self.paths, self.options['paths']['filemask'])
-    return self.parser.Parse('sidebar.xhtml', logfiles=logs.ListFiles())
+    return self.parser.Parse('sidebar.html', logfiles=logs.ListFiles())
 
   def CommonBlocks(self, title, page_id=None, scripts=()):
     return {'sidebar': self.Sidebar(),
