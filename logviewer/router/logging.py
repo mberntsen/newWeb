@@ -8,7 +8,7 @@ from uweb.logviewer import viewer
 __author__ = 'Elmer de Looff'
 __version__ = '0.3'
 
-CONFIG = 'logging.conf'
+CONFIG = '../logging.conf'
 PACKAGE = 'logviewer'
 
 PAGE_CLASS = viewer.Viewer

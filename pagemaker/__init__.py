@@ -281,7 +281,7 @@ class DebuggerMixin(object):
   """
   CACHE_DURATION = MimeTypeDict({})
   ERROR_TEMPLATE = templateparser.FileTemplate(os.path.join(
-      os.path.dirname(__file__), 'http_500.xhtml'))
+      os.path.dirname(__file__), 'http_500.utp'))
 
   def _ParseStackFrames(self, stack):
     """Generates list items for traceback information.
