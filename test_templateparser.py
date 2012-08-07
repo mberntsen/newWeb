@@ -13,7 +13,7 @@ import time
 import unittest
 
 # Unittest target
-import templateparser as templateparser
+import templateparser
 
 
 class Parser(unittest.TestCase):
