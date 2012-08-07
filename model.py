@@ -414,7 +414,9 @@ class Record(BaseRecord):
       obj: The value belonging to the given `field`. In case of resolved foreign
            references, this will be the referenced object. Else it's unchanged.
     """
-    if not isinstance(value, BaseRecord):
+    if value is None:
+      return None
+    elif not isinstance(value, BaseRecord):
       if field in self._FOREIGN_RELATIONS:
         return self._LoadUsingForeignRelations(
             self._FOREIGN_RELATIONS[field], field, value)
