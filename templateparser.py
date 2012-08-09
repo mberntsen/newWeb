@@ -266,6 +266,13 @@ class Template(list):
     """
     return isinstance(other, Template) and str(other) == str(self)
 
+  def __mod__(self, kwds):
+    """Syntactic sugar that enables percent-sign template parsing.
+
+    The provided keywords MUST be in a dictionary.
+    """
+    return self.Parse(**kwds)
+
   def __repr__(self):
     return '%s(%s)' % (type(self).__name__, list(self))
 

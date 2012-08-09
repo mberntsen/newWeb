@@ -157,6 +157,11 @@ class TemplateTagBasic(unittest.TestCase):
            'spam': 'opening or ', 'eggs': 'closing brackets'})
     self.assertEqual(result, expected)
 
+  def testTemplateInterpolationSyntax(self):
+    """[BasicTag] Templates support string interpolation of dicts"""
+    template = 'Hello [name]'
+    self.assertEqual(self.tmpl(template) % {'name': 'Bob'}, 'Hello Bob')
+
 
 class TemplateTagIndexed(unittest.TestCase):
   """Tests the handling of complex tags (those with attributes/keys/indexes)."""
