@@ -15,6 +15,9 @@ class Error(Exception):
   """Superclass used for inheritance and external exception handling."""
 
 
+class BadFieldError(Error):
+  """A field in the record could not be written to the database."""
+
 class AlreadyExistError(Error):
   """The resource already exists, and cannot be created twice."""
 
@@ -593,18 +596,22 @@ class Record(BaseRecord):
 
     Upon success, the record's primary key is set to the result's insertid
     """
-    # Compound key case
-    if isinstance(self._PRIMARY_KEY, tuple):
-      values = self._DataRecord()
-      auto_inc_field = set(self._PRIMARY_KEY) - set(values)
-      if auto_inc_field:
-        raise ValueError('No value for compound key field(s): %s' % (
-            ', '.join(map(repr, auto_inc_field))))
-      return cursor.Insert(table=self.TableName(), values=self._DataRecord())
-    # Single-column key case
-    result = cursor.Insert(table=self.TableName(), values=self._DataRecord())
-    if result.insertid:
-      self._record[self._PRIMARY_KEY] = self.key = result.insertid
+    try:
+      # Compound key case
+      if isinstance(self._PRIMARY_KEY, tuple):
+        values = self._DataRecord()
+        auto_inc_field = set(self._PRIMARY_KEY) - set(values)
+        if auto_inc_field:
+          raise ValueError('No value for compound key field(s): %s' % (
+              ', '.join(map(repr, auto_inc_field))))
+        return cursor.Insert(table=self.TableName(), values=self._DataRecord())
+      # Single-column key case
+      result = cursor.Insert(table=self.TableName(), values=self._DataRecord())
+      if result.insertid:
+        self._record[self._PRIMARY_KEY] = self.key = result.insertid
+    except cursor.OperationalError, err_obj:
+      if err_obj[0] == 1054:
+        raise BadFieldError(err_obj[1])
 
   def _RecordUpdate(self, cursor):
     """Updates the existing database entry with the record's current values.
@@ -617,11 +624,14 @@ class Record(BaseRecord):
         primary = tuple(self._record[key] for key in self._PRIMARY_KEY)
       else:
         primary = self._record[self._PRIMARY_KEY]
+      cursor.Update(
+          table=self.TableName(), values=self._Changes(),
+          conditions=self._PrimaryKeyCondition(self.connection, primary))
     except KeyError:
       raise Error('Cannot update record without pre-existing primary key.')
-    cursor.Update(
-        table=self.TableName(), values=self._Changes(),
-        conditions=self._PrimaryKeyCondition(self.connection, primary))
+    except cursor.OperationalError, err_obj:
+      if err_obj[0] == 1054:
+        raise BadFieldError(err_obj[1])
 
   def _SaveForeign(self, cursor):
     """Recursively saves all nested Record instances."""
@@ -710,7 +720,21 @@ class Record(BaseRecord):
 
 class VersionedRecord(Record):
   """Basic class for database table/record abstraction."""
-  _RECORD_KEY = 'recordKey'
+  _RECORD_KEY = None
+
+  # ############################################################################
+  # RecordKey method, analogous to TableName
+  #
+  @classmethod
+  def RecordKey(cls):
+    """Returns the record identifier fieldname.
+
+    If this is not explicitly defined by the class constant `_RECORD_KEY`, the
+    return value will be the class' TableName() with 'ID' appended.
+    """
+    if cls._RECORD_KEY is not None:
+      return cls._RECORD_KEY
+    return cls.TableName() + 'ID'
 
   # ############################################################################
   # Public methods for creation, deletion and storing Record objects.
@@ -738,7 +762,7 @@ class VersionedRecord(Record):
     with connection as cursor:
       record = cursor.Select(
           table=cls.TableName(), order=[(cls._PRIMARY_KEY, True)],
-          conditions='`%s`=%s' % (cls._RECORD_KEY, safe_id))
+          conditions='`%s`=%s' % (cls.RecordKey(), safe_id))
     if not record:
       raise NotExistError('There is no %r for identifier %r' % (
           cls.__name__, identifier))
@@ -767,14 +791,14 @@ class VersionedRecord(Record):
               ON (`%(table)s`.`%(primary)s` = `versions`.`max`)
           WHERE %(conditions)s
           """ % {'primary': cls._PRIMARY_KEY,
-                 'record_key': cls._RECORD_KEY,
+                 'record_key': cls.RecordKey(),
                  'table': cls.TableName(),
                  'conditions': conditions or '1'})
     for record in records:
       yield cls(connection, record)
 
   @classmethod
-  def ListVersions(cls, connection, identifier, conditions='1'):
+  def Versions(cls, connection, identifier, conditions='1'):
     """Yields all versions for a given record identifier.
 
     Arguments:
@@ -792,7 +816,7 @@ class VersionedRecord(Record):
     with connection as cursor:
       records = cursor.Select(table=cls.TableName(),
                               conditions='`%s` = %s AND %s' % (
-                                  cls._RECORD_KEY, safe_id, conditions))
+                                  cls.RecordKey(), safe_id, conditions))
     for record in records:
       yield cls(connection, record)
 
@@ -807,8 +831,8 @@ class VersionedRecord(Record):
   @classmethod
   def _MaxRecordKey(cls, cursor):
     """Returns the currently largest record key value."""
-    last_key = cursor.Select(table=cls.TableName(), fields=cls._RECORD_KEY,
-                             order=[(cls._RECORD_KEY, True)], limit=1)
+    last_key = cursor.Select(table=cls.TableName(), fields=cls.RecordKey(),
+                             order=[(cls.RecordKey(), True)], limit=1)
     if last_key:
       return last_key[0][0]
 
@@ -821,12 +845,13 @@ class VersionedRecord(Record):
     if self.record_key is None:
       self.record_key = self._NextRecordKey(cursor)
 
-  def _PreSave(self, _cursor):
+  def _PreSave(self, cursor):
     """Before saving a record, reset the primary key value.
 
     This assures that we will not have a primary key conflict, though it does
     assume an AutoIncrement primary key field.
     """
+    super(VersionedRecord, self)._PreSave(cursor)
     self.key = None
 
   def _RecordUpdate(self, cursor):
@@ -842,7 +867,7 @@ class VersionedRecord(Record):
     This is used for the Save/Update methods, where foreign relations should be
     stored by their primary key.
     """
-    return self.get(self._RECORD_KEY)
+    return self.get(self.RecordKey())
   # pylint: enable=E0202
 
   # Pylint doesn't understand property setters at all.
@@ -850,7 +875,7 @@ class VersionedRecord(Record):
   @record_key.setter
   def record_key(self, value):
     """Sets the value of the primary key."""
-    self[self._RECORD_KEY] = value
+    self[self.RecordKey()] = value
   # pylint: enable=E0102, E0202, E1101
 
 
