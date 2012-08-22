@@ -55,21 +55,24 @@ class BaseRecordTests(unittest.TestCase):
     self.record_class = BasicTestRecord
 
   def testTableName(self):
-    """TableName returns the expected value and obeys _TABLE"""
+    """[BaseRecord] TableName returns the expected value and obeys _TABLE"""
     self.assertEqual(self.record_class.TableName(), 'basicTestRecord')
     self.record_class._TABLE = 'WonderfulSpam'
     self.assertEqual(self.record_class.TableName(), 'WonderfulSpam')
 
   def testPrimaryKey(self):
-    """Primary key defaults to 'ID' and changes to _PRIMARY_KEY are followed"""
-    self.record = self.record_class(None, {'ID': 12, 'name': 'Tolkien'})
-    self.assertEqual(self.record.key, 12)
-    # Change the primary key and key will return the corresponding value
+    """[BaseRecord] Primary key value on `key` property, default field 'ID'"""
+    record = self.record_class(None, {'ID': 12, 'name': 'J.R.R. Tolkien'})
+    self.assertEqual(record.key, 12)
+
+  def testPrimaryKeyChanges(self):
+    """[BaseRecord] Defining _PRIMARY_KEY overrides default value"""
+    record = self.record_class(None, {'ID': 12, 'name': 'K. May'})
     self.record_class._PRIMARY_KEY = 'name'
-    self.assertEqual(self.record.key, 'Tolkien')
+    self.assertEqual(record.key, 'K. May')
 
   def testEquality(self):
-    """Records of the same content are equal to eachother"""
+    """[BaseRecord] Records of the same content are equal to eachother"""
     record_one = self.record_class(None, {'ID': 2, 'name': 'Rowling'})
     record_two = self.record_class(None, {'ID': 2, 'name': 'Rowling'})
     record_three = self.record_class(None, {'ID': 3, 'name': 'Rowling'})
@@ -84,7 +87,7 @@ class RecordTests(unittest.TestCase):
   """Online tests of methods and behavior of the Record class."""
   def setUp(self):
     """Sets up the tests for the Record class."""
-    self.connection = mysql.Connect('uweb_model_test', 'uweb_model_test')
+    self.connection = DatabaseConnection()
     with self.connection as cursor:
       cursor.Execute("""CREATE TABLE `author` (
                             `ID` smallint(5) unsigned NOT NULL AUTO_INCREMENT,
@@ -105,21 +108,29 @@ class RecordTests(unittest.TestCase):
       cursor.Execute('DROP TABLE `book`')
 
   def testLoadPrimary(self):
-    """Database records can be loaded by primary key using FromPrimary()"""
+    """[Record] Records can be loaded by primary key using FromPrimary()"""
     with self.connection as cursor:
-      res = cursor.Insert(table='author', values={'name': 'A. Chrstie'})
-      self.assertEqual(res.insertid, 1)  # First database record sanity check
-    author = Author.FromPrimary(self.connection, res.insertid)
-    self.assertEqual(type(author), Author)          # Result is of correct type
-    self.assertEqual(author.key, res.insertid)      # Primary key is set
-    self.assertEqual(author['name'], 'A. Chrstie')  # Name value is correct
-    self.assertEqual(len(author), 2)                # No additional fields
-    # Another test with a non-autoincremented primary field
+      inserted = cursor.Insert(table='author', values={'name': 'A. Chrstie'})
+    author = Author.FromPrimary(self.connection, inserted.insertid)
+    self.assertEqual(type(author), Author)
+    self.assertEqual(len(author), 2)
+    self.assertEqual(author.key, inserted.insertid)
+    self.assertEqual(author['name'], 'A. Chrstie')
+
+  def testLoadAlternatePrimary(self):
+    """[Record] Records can be loaded from alternative primary key"""
     with self.connection as cursor:
-      res = cursor.Insert(table='author', values={'ID': 300, 'name': 'Seuss'})
-      self.assertEqual(res.insertid, 300)  # Primary key value sanity check
-    bobby = Author.FromPrimary(self.connection, res.insertid)
-    self.assertEqual(bobby['name'], 'Seuss')
+      inserted = cursor.Insert(table='author', values={'name': 'B. Cartland'})
+    # Adjust primary key field name
+    Author._PRIMARY_KEY = 'name'
+    # Actual tests
+    author = Author.FromPrimary(self.connection, 'B. Cartland')
+    self.assertEqual(type(author), Author)
+    self.assertEqual(len(author), 2)
+    self.assertEqual(author.key, author['name'])
+    self.assertEqual(author['ID'], inserted.insertid)
+    # Restore global state
+    Author._PRIMARY_KEY = 'ID'
 
   def testCreateRecord(self):
     """Database records can be created using Create()"""
@@ -181,7 +192,7 @@ class NonStandardTableAndRelations(unittest.TestCase):
   """Verified autoloading works for records with an alternate table name."""
   def setUp(self):
     """Sets up the tests for the Record class."""
-    self.connection = mysql.Connect('uweb_model_test', 'uweb_model_test')
+    self.connection = DatabaseConnection()
     with self.connection as cursor:
       cursor.Execute("""CREATE TABLE `writers` (
                             `ID` smallint(5) unsigned NOT NULL AUTO_INCREMENT,
@@ -229,9 +240,10 @@ class NonStandardTableAndRelations(unittest.TestCase):
 
 
 class VersionedRecordTests(unittest.TestCase):
+  """Tests for the VersionedRecord class."""
   def setUp(self):
     """Sets up the tests for the VersionedRecord class."""
-    self.connection = mysql.Connect('uweb_model_test', 'uweb_model_test')
+    self.connection = DatabaseConnection()
     with self.connection as cursor:
       cursor.Execute("""CREATE TABLE `versionedAuthor` (
                             `ID` smallint(5) unsigned NOT NULL AUTO_INCREMENT,
@@ -257,6 +269,8 @@ class VersionedRecordTests(unittest.TestCase):
 
   def testRecordKeyName(self):
     """[Versioned] Versioning key name follows table name unless specified"""
+    # Accessing protected members to check intended behavior
+    # pylint: disable=W0212
     # Sanity checks, we're changing global scope here
     self.assertTrue(VersionedAuthor._TABLE is None)
     self.assertTrue(VersionedAuthor._RECORD_KEY is None)
@@ -304,7 +318,13 @@ class VersionedRecordTests(unittest.TestCase):
 
 
 class CompoundKeyRecordTests(unittest.TestCase):
+  """Tests for Record classes with a compound key."""
   pass
+
+
+def DatabaseConnection():
+  """Returns an SQLTalk database connection to 'uweb_model_test'."""
+  mysql.Connect('uweb_model_test', 'uweb_model_test')
 
 
 def main():
