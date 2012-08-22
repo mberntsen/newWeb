@@ -14,7 +14,7 @@ from uweb import templateparser
 from uweb import model
 
 ALLOWED_CLASS_TYPES = [model.VersionedRecord, model.Record]
-NOT_ALLOWED_METHODS = dir({}) + ['key', 'record_key']
+NOT_ALLOWED_METHODS = dir({}) + ['key', 'identifier']
 
 FIELDTYPES = {'datetime':datetime.datetime,
               'decimal':decimal.Decimal}

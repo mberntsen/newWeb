@@ -842,8 +842,8 @@ class VersionedRecord(Record):
     Before we create a new record, we need to acquire the next-in-line RecordKey
     if none has been provided. If one has been provided, we'll use that one.
     """
-    if self.record_key is None:
-      self.record_key = self._NextRecordKey(cursor)
+    if self.identifier is None:
+      self.identifier = self._NextRecordKey(cursor)
 
   def _PreSave(self, cursor):
     """Before saving a record, reset the primary key value.
@@ -861,7 +861,7 @@ class VersionedRecord(Record):
   # Pylint falsely believes this property is overwritten by its setter later on.
   # pylint: disable=E0202
   @property
-  def record_key(self):
+  def identifier(self):
     """Returns the value of the version field of the record.
 
     This is used for the Save/Update methods, where foreign relations should be
@@ -872,8 +872,8 @@ class VersionedRecord(Record):
 
   # Pylint doesn't understand property setters at all.
   # pylint: disable=E0102, E0202, E1101
-  @record_key.setter
-  def record_key(self, value):
+  @identifier.setter
+  def identifier(self, value):
     """Sets the value of the primary key."""
     self[self.RecordKey()] = value
   # pylint: enable=E0102, E0202, E1101

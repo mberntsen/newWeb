@@ -235,17 +235,18 @@ class VersionedRecordTests(unittest.TestCase):
     with self.connection as cursor:
       cursor.Execute("""CREATE TABLE `versionedAuthor` (
                             `ID` smallint(5) unsigned NOT NULL AUTO_INCREMENT,
-                            `authorID` smallint(5) unsigned NOT NULL,
+                            `versionedAuthorID` smallint(5) unsigned NOT NULL,
                             `name` varchar(32) NOT NULL,
                             PRIMARY KEY (`ID`),
-                            KEY `recordKey` (`authorID`)
+                            KEY `recordKey` (`versionedAuthorID`)
                           ) ENGINE=InnoDB DEFAULT CHARSET=utf8""")
       cursor.Execute("""CREATE TABLE `versionedBook` (
                             `ID` smallint(5) unsigned NOT NULL AUTO_INCREMENT,
-                            `msgID` smallint(6) NOT NULL,
+                            `versionedBookID` smallint(6) NOT NULL,
                             `author` smallint(5) unsigned NOT NULL,
                             `title` varchar(32) NOT NULL,
-                            PRIMARY KEY (`ID`)
+                            PRIMARY KEY (`ID`),
+                            KEY `recordKey` (`versionedBookID`)
                           ) ENGINE=InnoDB DEFAULT CHARSET=utf8""")
 
   def tearDown(self):
@@ -259,13 +260,47 @@ class VersionedRecordTests(unittest.TestCase):
     # Sanity checks, we're changing global scope here
     self.assertTrue(VersionedAuthor._TABLE is None)
     self.assertTrue(VersionedAuthor._RECORD_KEY is None)
+    # Actual tests
     self.assertEqual(VersionedAuthor.RecordKey(), 'versionedAuthorID')
     VersionedAuthor._TABLE = 'author'
     self.assertEqual(VersionedAuthor.RecordKey(), 'authorID')
     VersionedAuthor._RECORD_KEY = 'recordKey'
     self.assertEqual(VersionedAuthor.RecordKey(), 'recordKey')
+    # Restore global state
     VersionedAuthor._TABLE = None
     VersionedAuthor._RECORD_KEY = None
+
+  def testCreateVersioned(self):
+    """[Versioned] Creating and loading a record from identifier works"""
+    author = VersionedAuthor.Create(self.connection, {'name': 'J. Grisham'})
+    loaded = VersionedAuthor.FromIdentifier(self.connection, author.identifier)
+    self.assertEqual(loaded['name'], 'J. Grisham')
+    self.assertEqual(loaded, author)
+
+  def testUpdateVersioned(self):
+    """[Versioned] Updating records and loading from identifier works"""
+    author = VersionedAuthor.Create(self.connection, {'name': 'Z. Gray'})
+    initial_primary = author.key
+    author['name'] = 'Z. Grey'
+    author.Save()
+    self.assertNotEqual(author.key, initial_primary)
+    # Loading from identifier gives updated name
+    loaded = VersionedAuthor.FromIdentifier(self.connection, author.identifier)
+    self.assertEqual(loaded['name'], 'Z. Grey')
+    # Loading from old primary key gives old name
+    loaded = VersionedAuthor.FromPrimary(self.connection, initial_primary)
+    self.assertEqual(loaded['name'], 'Z. Gray')
+
+  def testListVersions(self):
+    """[Versioned] Listing versions works, and happens in [old]-->[new] order"""
+    author = VersionedAuthor.Create(self.connection, {'name': 'A. Martin'})
+    author['name'] = 'A. Rice'
+    author.Save()
+    versions = list(VersionedAuthor.Versions(self.connection,
+                                             author.identifier))
+    self.assertEqual(len(versions), 2)
+    self.assertEqual(versions[0]['name'], 'A. Martin')
+    self.assertEqual(versions[1]['name'], 'A. Rice')
 
 
 class CompoundKeyRecordTests(unittest.TestCase):
