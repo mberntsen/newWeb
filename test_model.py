@@ -143,24 +143,6 @@ class RecordTests(unittest.TestCase):
     self.assertRaises(model.BadFieldError, Author.Create, self.connection,
                       {'name': 'L. Tolstoy', 'email': 'leo@tolstoy.ru'})
 
-  def testLoadRelated(self):
-    """Fieldnames that match tablenames trigger automatic loading"""
-    Author.Create(self.connection, {'name': 'D. Koontz'})
-    book = Book(self.connection, {'author': 1})
-    self.assertEqual(type(book['author']), Author)
-    self.assertEqual(book['author']['name'], 'D. Koontz')
-    self.assertEqual(book['author'].key, 1)
-
-  def testLoadRelatedFailure(self):
-    """Automatic loading raises NotExistError if the foreign record is absent"""
-    book = Book(self.connection, {'author': 1})
-    self.assertRaises(model.NotExistError, book.__getitem__, 'author')
-
-  def testLoadRelatedSuppressedForNone(self):
-    """Automatic loading is not attempted when the field value is `None`"""
-    book = Book(self.connection, {'author': None})
-    self.assertEqual(book['author'], None)
-
   def testUpdateRecord(self):
     """The record can be given new values and these are properly stored"""
     author = Author.Create(self.connection, {'name': 'B. King'})
@@ -186,6 +168,24 @@ class RecordTests(unittest.TestCase):
                       self.connection, 1)
     same_author = Author.FromPrimary(self.connection, 101)
     self.assertEqual(same_author, author)
+
+  def testLoadRelated(self):
+    """Fieldnames that match tablenames trigger automatic loading"""
+    Author.Create(self.connection, {'name': 'D. Koontz'})
+    book = Book(self.connection, {'author': 1})
+    self.assertEqual(type(book['author']), Author)
+    self.assertEqual(book['author']['name'], 'D. Koontz')
+    self.assertEqual(book['author'].key, 1)
+
+  def testLoadRelatedFailure(self):
+    """Automatic loading raises NotExistError if the foreign record is absent"""
+    book = Book(self.connection, {'author': 1})
+    self.assertRaises(model.NotExistError, book.__getitem__, 'author')
+
+  def testLoadRelatedSuppressedForNone(self):
+    """Automatic loading is not attempted when the field value is `None`"""
+    book = Book(self.connection, {'author': None})
+    self.assertEqual(book['author'], None)
 
 
 class NonStandardTableAndRelations(unittest.TestCase):
