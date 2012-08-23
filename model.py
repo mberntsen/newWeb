@@ -371,6 +371,7 @@ class BaseRecord(dict):
 
 class Record(BaseRecord):
   """Extensions to the Record abstraction for relational database use."""
+  _LOAD_METHOD = 'FromPrimary'
   _FOREIGN_RELATIONS = {}
 
   # ############################################################################
@@ -384,6 +385,17 @@ class Record(BaseRecord):
     """
     value = super(Record, self).__getitem__(field)
     return self._LoadForeign(field, value)
+
+  @classmethod
+  def _LoadAsForeign(cls, connection, relation_value, method=None):
+    """Loads a record as a foreign relation of another.
+
+    Defaults to using the _LOAD_METHOD defined on the class, but when
+    provided the optional `method` argument, this named method is used instead.
+    """
+    if method is None:
+      method = cls._LOAD_METHOD
+    return getattr(cls, method)(connection, relation_value)
 
   def _LoadForeign(self, field, value):
     """Loads and returns objects referenced by foreign key.
@@ -410,7 +422,7 @@ class Record(BaseRecord):
       @ field: str
         The field name to be checked for foreign references
       @ value: obj
-        The current value for the field. This is used as primary key in case
+        The current value for the field. This is used as lookup index in case
         of foreign references.
 
     Returns:
@@ -426,7 +438,7 @@ class Record(BaseRecord):
       elif field == self.TableName():
         return value
       elif field in self._SUBTYPES:
-        value = self._SUBTYPES[field].FromPrimary(self.connection, value)
+        value = self._SUBTYPES[field]._LoadAsForeign(self.connection, value)
         self[field] = value
     return value
 
@@ -439,7 +451,7 @@ class Record(BaseRecord):
 
     If the class is given as string, it will be loaded from the current module.
     It should be a proper subclass of Record, after which the current `value` is
-    used to create a record using `cls.FromPrimary`.
+    used to create a record using `cls._LoadAsForeign`.
 
     Arguments:
       @ cls: None / type / str
@@ -447,7 +459,7 @@ class Record(BaseRecord):
       @ field: str
         The field name to be checked for foreign references
       @ value: obj
-        The current value for the field. This is used as primary key in case
+        The current value for the field. This is used as lookup index in case
         of foreign references.
 
     Raises:
@@ -458,19 +470,27 @@ class Record(BaseRecord):
       obj: The value belonging to the given `field`. In case of resolved foreign
            references, this will be the referenced object. Else it's unchanged.
     """
-    if not cls:
+    def GetRecordClass(cls):
+      """Returns the record class or loads it from its string name"""
+      if isinstance(cls, basestring):
+        try:
+          cls = getattr(sys.modules[self.__module__], cls)
+        except AttributeError:
+          raise ValueError(
+              'Bad _FOREIGN_RELATIONS map: Target %r not a class in %r' % (
+                  cls, self.__module__))
+      if not issubclass(cls, Record):
+        raise ValueError('Bad _FOREIGN_RELATIONS map: '
+                         'Target %r not a subclass of Record' % cls.__name__)
+      return cls
+
+    if type(cls) is dict:
+      record_cls = GetRecordClass(cls['class'])
+      loader = cls.get('loader', record_cls._LOAD_METHOD)
+      value = record_cls._LoadAsForeign(self.connection, value, method=loader)
       return value
-    if isinstance(cls, basestring):
-      try:
-        cls = getattr(sys.modules[self.__module__], cls)
-      except AttributeError:
-        raise ValueError(
-            'Bad _FOREIGN_RELATIONS map: Target %r not a class in %r' % (
-                cls, self.__module__))
-    if not issubclass(cls, Record):
-      raise ValueError('Bad _FOREIGN_RELATIONS map: '
-                       'Target %r not a subclass of Record' % cls.__name__)
-    value = cls.FromPrimary(self.connection, value)
+    else:
+      value = GetRecordClass(cls)._LoadAsForeign(self.connection, value)
     self[field] = value
     return value
 
@@ -720,6 +740,7 @@ class Record(BaseRecord):
 
 class VersionedRecord(Record):
   """Basic class for database table/record abstraction."""
+  _LOAD_METHOD = 'FromIdentifier'
   _RECORD_KEY = None
 
   # ############################################################################

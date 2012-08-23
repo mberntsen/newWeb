@@ -117,7 +117,7 @@ class RecordTests(unittest.TestCase):
     self.assertEqual(author.key, inserted.insertid)
     self.assertEqual(author['name'], 'A. Chrstie')
 
-  def testLoadAlternatePrimary(self):
+  def testLoadPrimaryWithChangedKey(self):
     """[Record] Records can be loaded from alternative primary key"""
     with self.connection as cursor:
       inserted = cursor.Insert(table='author', values={'name': 'B. Cartland'})
@@ -317,7 +317,7 @@ class VersionedRecordTests(unittest.TestCase):
     self.assertEqual(versions[1]['name'], 'A. Rice')
 
   def testRelationsBasedOnIdentifier(self):
-    """[Versioned] Related loading defaults to loading by identifier"""
+    """[Versioned] Related loading defaults to using FromIdentifier"""
     # Set up records with different record keys and identifiers
     collins = VersionedAuthor.Create(self.connection, {'name': 'K. Collins'})
     collins['name'] = 'J. Collins'
@@ -329,9 +329,49 @@ class VersionedRecordTests(unittest.TestCase):
     self.assertEqual(patten.key, 3)
     self.assertEqual(patten.identifier, 2)
     # Create book with foreign relation to author and perform actual test
-    book = VersionedBook.Create(self.connection, {
+    book = VersionedBook(self.connection, {
         'title': 'The Diamond Sport', 'versionedAuthor': 2})
     self.assertEqual(book['versionedAuthor'], patten)
+
+  def testRelationsWithModifiedLoadRelationsMethod(self):
+    """[Versioned] Related loading can be controlled with _LOAD_METHOD"""
+    # Accessing protected members to verify and modify behavior
+    # pylint: disable=W0212
+    # Sanity checks, we're changing global scope here
+    self.assertEqual(VersionedBook._LOAD_METHOD, 'FromIdentifier')
+    # Actual tests
+    VersionedAuthor._LOAD_METHOD = 'FromPrimary'
+    author = VersionedAuthor.Create(self.connection, {'name': 'L. Amour'})
+    author['name'] = "L. L'Amour"
+    author.Save()
+    book = VersionedBook(self.connection, {
+        'title': 'The Riders of High Rock', 'versionedAuthor': 1})
+    self.assertEqual(book['versionedAuthor']['name'], 'L. Amour')
+    latest_version = VersionedAuthor.FromIdentifier(self.connection, 1)
+    self.assertEqual(latest_version['name'], "L. L'Amour")
+    # Restore global state
+    VersionedBook._LOAD_METHOD = 'FromIdentifier'
+
+  def testRelationsUsingCustomForeignRelations(self):
+    """[Versioned] Related loading method can be set with _FOREIGN_RELATIONS"""
+    # Accessing protected members to verify and modify behavior
+    # pylint: disable=W0212
+    # Sanity checks, we're changing global scope here
+    self.assertEqual(VersionedBook._FOREIGN_RELATIONS, {})
+    # Actual tests
+    VersionedBook._FOREIGN_RELATIONS = {'versionedAuthor': {
+        'class': 'VersionedAuthor', 'loader': 'FromPrimary'}}
+    author = VersionedAuthor.Create(self.connection, {'name': 'H. Alger'})
+    author['name'] = 'H. Alger, Jr.'
+    author.Save()
+    book = VersionedBook(self.connection, {
+        'title': 'Voices of the Past', 'versionedAuthor': 1})
+    self.assertEqual(book['versionedAuthor']['name'], 'H. Alger')
+    latest_version = VersionedAuthor.FromIdentifier(self.connection, 1)
+    self.assertEqual(latest_version['name'], 'H. Alger, Jr.')
+    # Restore global state
+    VersionedBook._FOREIGN_RELATIONS = {}
+
 
 
 class CompoundKeyRecordTests(unittest.TestCase):
