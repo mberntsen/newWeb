@@ -255,7 +255,7 @@ class VersionedRecordTests(unittest.TestCase):
       cursor.Execute("""CREATE TABLE `versionedBook` (
                             `ID` smallint(5) unsigned NOT NULL AUTO_INCREMENT,
                             `versionedBookID` smallint(6) NOT NULL,
-                            `author` smallint(5) unsigned NOT NULL,
+                            `versionedAuthor` smallint(5) unsigned NOT NULL,
                             `title` varchar(32) NOT NULL,
                             PRIMARY KEY (`ID`),
                             KEY `recordKey` (`versionedBookID`)
@@ -316,6 +316,23 @@ class VersionedRecordTests(unittest.TestCase):
     self.assertEqual(versions[0]['name'], 'A. Martin')
     self.assertEqual(versions[1]['name'], 'A. Rice')
 
+  def testRelationsBasedOnIdentifier(self):
+    """[Versioned] Related loading defaults to loading by identifier"""
+    # Set up records with different record keys and identifiers
+    collins = VersionedAuthor.Create(self.connection, {'name': 'K. Collins'})
+    collins['name'] = 'J. Collins'
+    collins.Save()
+    patten = VersionedAuthor.Create(self.connection, {'name': 'G. Patten'})
+    # Verify sanity of keys and identifiers
+    self.assertEqual(collins.key, 2)
+    self.assertEqual(collins.identifier, 1)
+    self.assertEqual(patten.key, 3)
+    self.assertEqual(patten.identifier, 2)
+    # Create book with foreign relation to author and perform actual test
+    book = VersionedBook.Create(self.connection, {
+        'title': 'The Diamond Sport', 'versionedAuthor': 2})
+    self.assertEqual(book['versionedAuthor'], patten)
+
 
 class CompoundKeyRecordTests(unittest.TestCase):
   """Tests for Record classes with a compound key."""
@@ -324,7 +341,7 @@ class CompoundKeyRecordTests(unittest.TestCase):
 
 def DatabaseConnection():
   """Returns an SQLTalk database connection to 'uweb_model_test'."""
-  mysql.Connect('uweb_model_test', 'uweb_model_test')
+  return mysql.Connect('uweb_model_test', 'uweb_model_test')
 
 
 def main():
