@@ -1092,12 +1092,12 @@ def RecordToDict(record, complete=False, recursive=False):
 def MakeJson(record, complete=False, recursive=False):
   """Returns a JSON object string of the given `record`.
 
-  Before turning the record into a JSON object, it is passed through
-  RecordToDict(). The arguemnts `complete` and `recursive` function to those
-  on that function.
+  The record may be a regular Python dictionary, in which case it will be
+  converted to JSON, with a few additional conversions for date and time types.
 
-  Additional conversion will be done for types  such as datetime `datetime`,
-  `time`, and `date`.
+  If the record is a Record subclass, it is first passed through the
+  RecordToDict() function. The arguments `complete` and `recursive` function
+  similarly to the arguments on that function.
 
   Returns:
     str: JSON representation of the given record dictionary.
@@ -1111,5 +1111,5 @@ def MakeJson(record, complete=False, recursive=False):
       return obj.strftime('%T')
 
   if isinstance(record, Record):
-    record = RecordToDict(complete=complete, recursive=recursive)
+    record = RecordToDict(record, complete=complete, recursive=recursive)
   return simplejson.dumps(record, default=_Encode, sort_keys=True)
