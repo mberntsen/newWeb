@@ -43,6 +43,7 @@ class BaseRecord(dict):
   * Listing all records of the current type;
   * Calculating the minimum changed set and storing this to the database.
   """
+  _LOAD_METHOD = 'FromPrimary'
   _PRIMARY_KEY = 'ID'
   _TABLE = None
 
@@ -295,6 +296,17 @@ class BaseRecord(dict):
     """
     raise NotImplementedError
 
+  @classmethod
+  def _LoadAsForeign(cls, connection, relation_value, method=None):
+    """Loads a record as a foreign relation of another.
+
+    Defaults to using the _LOAD_METHOD defined on the class, but when
+    provided the optional `method` argument, this named method is used instead.
+    """
+    if method is None:
+      method = cls._LOAD_METHOD
+    return getattr(cls, method)(connection, relation_value)
+
 
   # ############################################################################
   # Functions for tracking table and primary key values
@@ -371,7 +383,6 @@ class BaseRecord(dict):
 
 class Record(BaseRecord):
   """Extensions to the Record abstraction for relational database use."""
-  _LOAD_METHOD = 'FromPrimary'
   _FOREIGN_RELATIONS = {}
 
   # ############################################################################
@@ -385,17 +396,6 @@ class Record(BaseRecord):
     """
     value = super(Record, self).__getitem__(field)
     return self._LoadForeign(field, value)
-
-  @classmethod
-  def _LoadAsForeign(cls, connection, relation_value, method=None):
-    """Loads a record as a foreign relation of another.
-
-    Defaults to using the _LOAD_METHOD defined on the class, but when
-    provided the optional `method` argument, this named method is used instead.
-    """
-    if method is None:
-      method = cls._LOAD_METHOD
-    return getattr(cls, method)(connection, relation_value)
 
   def _LoadForeign(self, field, value):
     """Loads and returns objects referenced by foreign key.
