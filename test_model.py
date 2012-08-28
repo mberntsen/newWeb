@@ -45,6 +45,11 @@ class VersionedBook(model.VersionedRecord):
   """Versioned Book class for testing purposes."""
 
 
+class Compounded(model.Record):
+  """Compound key record for generic storage."""
+  _PRIMARY_KEY = 'first', 'second'
+
+
 # ##############################################################################
 # Start of tests
 #
@@ -254,7 +259,7 @@ class VersionedRecordTests(unittest.TestCase):
                           ) ENGINE=InnoDB DEFAULT CHARSET=utf8""")
       cursor.Execute("""CREATE TABLE `versionedBook` (
                             `ID` smallint(5) unsigned NOT NULL AUTO_INCREMENT,
-                            `versionedBookID` smallint(6) NOT NULL,
+                            `versionedBookID` smallint(5) unsigned NOT NULL,
                             `versionedAuthor` smallint(5) unsigned NOT NULL,
                             `title` varchar(32) NOT NULL,
                             PRIMARY KEY (`ID`),
@@ -373,10 +378,57 @@ class VersionedRecordTests(unittest.TestCase):
     VersionedBook._FOREIGN_RELATIONS = {}
 
 
-
 class CompoundKeyRecordTests(unittest.TestCase):
   """Tests for Record classes with a compound key."""
-  pass
+  def setUp(self):
+    """Sets up the tests for the VersionedRecord class."""
+    self.connection = DatabaseConnection()
+    with self.connection as cursor:
+      cursor.Execute("""CREATE TABLE `compounded` (
+                            `first` smallint(5) unsigned NOT NULL AUTO_INCREMENT,
+                            `second` smallint(5) unsigned NOT NULL,
+                            `message` varchar(32) NOT NULL,
+                            PRIMARY KEY (`first`, `second`)
+                          ) ENGINE=InnoDB DEFAULT CHARSET=utf8""")
+
+  def tearDown(self):
+    """Destroy tables after testing."""
+    with self.connection as cursor:
+      cursor.Execute('DROP TABLE `compounded`')
+
+  def testCreate(self):
+    """[Compound] Creating a compound record requires both keys provided"""
+    compound = Compounded.Create(self.connection, {
+        'first': 1, 'second': 1, 'message': 'New compound key record'})
+    self.assertEqual(compound.key, (1, 1))
+
+  def testLoadPrimary(self):
+    Compounded.Create(self.connection, {
+        'first': 12, 'second': 42, 'message': 'Ahoi Ahoi'})
+    compound = Compounded.FromPrimary(self.connection, (12, 42))
+    self.assertEqual(compound['message'], 'Ahoi Ahoi')
+
+  def testLoadWrongValueCount(self):
+    """[Compound] Loading from primary requires the correct number of values"""
+    self.assertRaises(
+        TypeError, Compounded.FromPrimary, self.connection, 12)
+    self.assertRaises(
+        ValueError, Compounded.FromPrimary, self.connection, (1,))
+    self.assertRaises(
+        ValueError, Compounded.FromPrimary, self.connection, (1, 2, 3))
+
+  def testKeying(self):
+    """[Compound] Compound record raises as expected in case of duplicate key"""
+    Compounded.Create(self.connection, {
+        'first': 1, 'second': 1, 'message': 'very first'})
+    Compounded.Create(self.connection, {
+        'first': 1, 'second': 2, 'message': 'second messge'})
+    Compounded.Create(self.connection, {
+        'first': 2, 'second': 1, 'message': 'three is a charm'})
+    self.assertRaises(
+        self.connection.IntegrityError, Compounded.Create,
+        self.connection, {'first': 2, 'second': 1, 'message': 'Break stuff'})
+
 
 
 def DatabaseConnection():

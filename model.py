@@ -15,7 +15,11 @@ class Error(Exception):
   """Superclass used for inheritance and external exception handling."""
 
 
-class BadFieldError(Error):
+class DatabaseError(Error):
+  """Superclass for errors returned by the database backend."""
+
+
+class BadFieldError(DatabaseError):
   """A field in the record could not be written to the database."""
 
 class AlreadyExistError(Error):
@@ -442,7 +446,7 @@ class Record(BaseRecord):
         self[field] = value
     return value
 
-  def _LoadUsingForeignRelations(self, cls, field, value):
+  def _LoadUsingForeignRelations(self, foreign_cls, field, value):
     """Loads and returns foreign relation based on given class (name).
 
     The action taken depends on the given `cls`. If the given class is None (or
@@ -454,8 +458,10 @@ class Record(BaseRecord):
     used to create a record using `cls._LoadAsForeign`.
 
     Arguments:
-      @ cls: None / type / str
-        The class name or actual type to create an instance from.
+      @ foreign_cls: Record / str / dict
+        The class name or actual type to create an instance from. Could also
+        be a dictionary with `class` and `loader` keys that indicate class and
+        method to use for loading foreign relations.
       @ field: str
         The field name to be checked for foreign references
       @ value: obj
@@ -484,13 +490,13 @@ class Record(BaseRecord):
                          'Target %r not a subclass of Record' % cls.__name__)
       return cls
 
-    if type(cls) is dict:
-      record_cls = GetRecordClass(cls['class'])
-      loader = cls.get('loader', record_cls._LOAD_METHOD)
-      value = record_cls._LoadAsForeign(self.connection, value, method=loader)
+    if type(foreign_cls) is dict:
+      cls = GetRecordClass(foreign_cls['class'])
+      loader = foreign_cls.get('loader')
+      value = cls._LoadAsForeign(self.connection, value, method=loader)
       return value
     else:
-      value = GetRecordClass(cls)._LoadAsForeign(self.connection, value)
+      value = GetRecordClass(foreign_cls)._LoadAsForeign(self.connection, value)
     self[field] = value
     return value
 
@@ -601,9 +607,12 @@ class Record(BaseRecord):
   @classmethod
   def _PrimaryKeyCondition(cls, connection, value):
     """Returns the MySQL primary key condition to be used."""
-    if isinstance(value, tuple):
+    if isinstance(cls._PRIMARY_KEY, tuple):
+      if not isinstance(value, tuple):
+        raise TypeError(
+            'Compound keys should be loaded using a tuple of key values.')
       if len(value) != len(cls._PRIMARY_KEY):
-        raise ValueError('Not enough values for compound key.')
+        raise ValueError('Not enough values (%d) for compound key.', len(value))
       values = map(cls._ValueOrPrimary, value)
       return ' AND '.join('`%s` = %s' % (field, value) for field, value
                    in zip(cls._PRIMARY_KEY, connection.EscapeValues(values)))
@@ -1089,7 +1098,7 @@ def RecordToDict(record, complete=False, recursive=False):
   return record_dict
 
 
-def MakeJson(record, complete=False, recursive=False):
+def MakeJson(record, complete=False, recursive=False, indent=None):
   """Returns a JSON object string of the given `record`.
 
   The record may be a regular Python dictionary, in which case it will be
@@ -1110,6 +1119,7 @@ def MakeJson(record, complete=False, recursive=False):
     if isinstance(obj, datetime.time):
       return obj.strftime('%T')
 
-  if isinstance(record, Record):
+  if isinstance(record, BaseRecord):
     record = RecordToDict(record, complete=complete, recursive=recursive)
-  return simplejson.dumps(record, default=_Encode, sort_keys=True)
+  return simplejson.dumps(
+      record, default=_Encode, sort_keys=True, indent=indent)
