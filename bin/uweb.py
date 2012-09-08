@@ -11,38 +11,64 @@ import logging
 import subprocess
 from optparse import OptionParser
 
-ROUTER_PATH = 'router'
-ROUTER_NAME = 'router.py'
-APACHE_CONFIG_NAME = 'apache.conf'
-UWEB_DATA_FOLDER = os.path.expanduser('~/.uweb')
+# Application specific modules
+import tables
+
+
+class Error(Exception):
+  """Base class for application errors."""
 
 
 class UwebSites(object):
-  def __init__(self, sites_dir=None, sites_file='sites.json'):
-    sites_dir = sites_dir or UWEB_DATA_FOLDER
-    self.sites_file = os.path.join(sites_dir, sites_file)
+  SITES_BASE = {'uweb_info': {'router': 'uweb.uweb_info.router.uweb_info',
+                              'workdir': '/'},
+                'logviewer': {'router': 'uweb.logviewer.router.logging',
+                              'workdir': '/'}}
+
+  """Abstraction for the uWeb site managing JSON file."""
+  def __init__(self):
+    self.sites_file = os.path.expanduser('~/.uweb/sites.json')
     self.sites = self._LoadSites()
 
+  def _InstallBaseSites(self):
+    """Create sites file with default data, and directory where necessary."""
+    dirname = os.path.dirname(self.sites_file)
+    if not os.path.isdir(dirname):
+      print '.. no uweb data directory; creating %r' % dirname
+      os.mkdir(os.path.dirname(self.sites_file))
+    with file(self.sites_file, 'w') as sites:
+      print '.. creating %r with default sites' % self.sites_file
+      sites.write(simplejson.dumps(self.SITES_BASE))
+    print ''
+
   def _LoadSites(self):
+    """Load the sites file and return parsed JSON."""
+    if not os.path.exists(self.sites_file):
+      self._InstallBaseSites()
     with file(self.sites_file) as sites:
-      return simplejson.loads(sites.read())
+      try:
+        return simplejson.loads(sites.read())
+      except simplejson.JSONDecodeError:
+        raise Error('Could not read %r: Illegal JSON syntax' % self.sites_file)
 
   def _WriteSites(self):
+    """Write a new sites file after changes were made."""
     with file(self.sites_file, 'w') as sites:
       sites.write(simplejson.dumps(self.sites))
 
-  def LongestName(self):
-    return sorted(self.sites, key=len)[-1]
+  def __contains__(self, key):
+    return key in self.sites
 
   def __iter__(self):
-    return self.sites.iteritems()
+    return iter(sorted(self.sites.items()))
+
+  def __nonzero__(self):
+    return bool(self.sites)
 
   def __getitem__(self, name):
     return self.sites[name]
 
-  def __setitem__(self, name, router, allow_update=False):
-    if name in self.sites and not allow_update:
-      raise ValueError('There is already a site with name %r' % name)
+  def __setitem__(self, name, router):
     self.sites[name] = router
     self._WriteSites()
 
@@ -53,15 +79,16 @@ class UwebSites(object):
     self._WriteSites()
 
 
-# Navigate one directory up to get the library path
-LOCAL_FILE = os.path.realpath(__file__)
-LIBRARY_PATH = os.path.dirname(os.path.dirname(LOCAL_FILE))
-
 class BaseOperation(object):
   """A simple class which parses command line values and call's it self."""
   def ParseCall(self):
     """Base method to parse arguments and options."""
     raise NotImplementedError
+
+  @staticmethod
+  def Banner(message):
+    line = '-' * 62
+    return '+%s+\n| %-60s |\n+%s+' % (line, message[:60], line)
 
   def Run(self):
     """Default method to parse arguments/options and activate class"""
@@ -73,89 +100,64 @@ class BaseOperation(object):
     raise NotImplementedError
 
 
+# ##############################################################################
+# Initialization of and Apache configuration for projects
+#
 class Init(BaseOperation):
   """Inintialize uweb generator which create new uweb instance"""
+  # Base directory where the uWeb library lives
+  LIBRARY_PATH = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+  ROUTER_PATH = 'router'
+  ROUTER_NAME = 'router.py'
+  APACHE_CONFIG_NAME = 'apache.conf'
+
   def ParseCall(self):
     parser = OptionParser(add_help_option=False)
-    parser.add_option('-n', '--name', action='store',
-                      default='uweb_project', dest='name')
-
     parser.add_option('-f', '--force', action='store_true',
                       default=False, dest='force')
-
     parser.add_option('-h', '--host', action='store', dest='host')
-
     parser.add_option('-p', '--path', action='store',
                     default=os.getcwd(), dest='path')
-
     parser.add_option('-s', '--silent', action='store_true',
                     default=False, dest='silent')
 
     opts, args = parser.parse_args()
     return vars(opts), args
 
-  def __call__(self, name='uweb_project', force=False,
-      path=None, silent=False, host='uweb.local', *args):
-
+  def __call__(self, name=None, force=False, path=None, silent=False,
+               host='uweb.local'):
+    if name is None:
+      raise Error('Initialization requires a project name.')
     project_path = os.path.abspath(name)
-    source_path = os.path.dirname('%s/base_project/' % LIBRARY_PATH)
-    apache_path = os.path.join(project_path, APACHE_CONFIG_NAME)
+    source_path = os.path.dirname('%s/base_project/' % self.LIBRARY_PATH)
+    apache_path = os.path.join(project_path, self.APACHE_CONFIG_NAME)
 
-
-    logging.debug('--------------------------------------------')
-    logging.debug('initializing uweb')
-    logging.debug('--------------------------------------------')
-
-    if force:
-      logging.debug('wiping old project')
-      Init.RemoveProject(project_path)
-
-    try:
-      logging.debug('cloning uweb source')
-      shutil.copytree(source_path, project_path)
-    except OSError:
-      logging.debug('Project already excist, use -f (force) to wipe project.')
-      Init.Fail()
-      return False
-
-    router_path = os.path.join(project_path, ROUTER_PATH, ROUTER_NAME)
-    router_destination = os.path.join(project_path, ROUTER_PATH,
-                                      name + '.py')
-
-    logging.debug('setting up router')
+    print self.Banner('initializing new uWeb project %r' % name)
+    if os.path.exists(project_path):
+      if force:
+        print '* Removing existing project directory'
+        shutil.rmtree(project_path)
+      else:
+        raise Error('Target already exists, use -f (force) to overwrite.')
+    print '* copying uWeb base project directory'
+    shutil.copytree(source_path, project_path)
+    os.chdir(project_path)
+    print '* setting up router'
+    router_path = os.path.join(self.ROUTER_PATH, self.ROUTER_NAME)
+    router_destination = os.path.join(self.ROUTER_PATH, '%s.py' % name)
     shutil.move(router_path, router_destination)
 
-    logging.debug('setting up apache config')
+    print '* setting up apache config'
     GenerateApacheConfig.WriteApacheConfig(name,
                                            host,
                                            apache_path,
                                            project_path)
 
-    logging.debug('setting up apache config')
-    Add()(name, router_destination)
-    Init.Succes()
+    # Make sure we add the project to the sites list
+#    sites = UwebSites()
+#    sites[name] = router
+    print self.Banner('initialization complete - have fun with uWeb')
 
-  @staticmethod
-  def RemoveProject(project_path):
-    """Removes project"""
-    try:
-      shutil.rmtree(project_path)
-    except OSError:
-      pass
-
-  @staticmethod
-  def Succes():
-    """Script has succeeded"""
-    logging.debug('--------------------------------------------')
-    logging.debug('initialization complete - have fun with uweb')
-    logging.debug('--------------------------------------------')
-
-  @staticmethod
-  def Fail():
-    """Script has failed"""
-    logging.debug('--------------------------------------------')
-    logging.debug('initialization failed - check details above')
-    logging.debug('--------------------------------------------')
 
 class GenerateApacheConfig(BaseOperation):
   """Generate apache config file for uweb project"""
@@ -175,7 +177,7 @@ class GenerateApacheConfig(BaseOperation):
     opts, args = parser.parse_args()
     return vars(opts), args
 
-  def __call__(self, name, host, path, *args):
+  def __call__(self, name, host, path):
     """Returns apache config string based on arguments"""
     return ('<VirtualHost *:80>\n'
             '    documentroot %(path)s\n'
@@ -195,43 +197,46 @@ class GenerateApacheConfig(BaseOperation):
       string = GenerateApacheConfig()(name, host, project_path)
       apache_file.write(string)
 
-class Sites(BaseOperation):
+
+# ##############################################################################
+# Commands to manage configured uWeb sites.
+#
+class ListSites(BaseOperation):
   """Print availible uweb sites."""
   def ParseCall(self):
     return {}, ()
 
   def __call__(self, *args):
     sites = UwebSites()
-    spaces = -(-(len(sites.LongestName()) + 4) // 1)
+    if not sites:
+      raise Error('No configured uWeb sites.')
     print 'Overview of active sites:\n'
-    import tables
-    names, routers = zip(*sites)
+    configs = [(name, site['router'], site['workdir']) for name, site in sites]
+    names, routers, dirs = zip(*configs)
     print tables.Table(tables.Column('Name', names),
-                       tables.Column('Router', routers))
-#    \n\nName%sRouter\n%s' % (
-#        ' ' * (spaces - 4), '=' * (spaces + 40))
-#    for name, router in sites:
-#      spacing = spaces + -len(name)
-#      print '%s%s%s' % (name, ' ' * spacing, router)
+                       tables.Column('Router', routers),
+                       tables.Column('Working dir', dirs))
 
 
 class Add(BaseOperation):
   """Register uweb site"""
   def ParseCall(self):
     parser = OptionParser()
+    parser.add_option('-d', '--directory', action='store',
+                    default='/', dest='directory')
     parser.add_option('-u', '--update', action='store_true',
                     default=False, dest='update')
 
     opts, args = parser.parse_args()
     return vars(opts), args
 
-  def __call__(self, name, router, update=False):
+  def __call__(self, name, router, directory='/', update=False):
     sites = UwebSites()
-    try:
-      sites[name] = router
-    except ValueError:
-      sys.exit('Could not add a router with this name, one already exists.'
-               '\n\nTo update the existing, use the --update flag')
+    if name in sites and not update:
+      raise Error('Could not add a router with this name, one already exists.'
+                  '\n\nTo update the existing, use the --update flag')
+    sites[name] = {'router': router, 'workdir': directory}
+
 
 class Remove(BaseOperation):
   """Unregister uweb site"""
@@ -241,12 +246,16 @@ class Remove(BaseOperation):
     return vars(opts), args
 
   def __call__(self, name, *args):
-    sites = UwebSites()
     try:
+      sites = UwebSites()
       del sites[name]
     except ValueError:
-      sys.exit('There was no site named %r' % name)
+      raise Error('There was no site named %r' % name)
 
+
+# ##############################################################################
+# Commands to control configured uWeb routers.
+#
 class Start(BaseOperation):
   """Start project router"""
   def ParseCall(self):
@@ -255,20 +264,9 @@ class Start(BaseOperation):
     return vars(opts), args
 
   def __call__(self, name, *args):
-    sites = UwebSites()
-    return subprocess.Popen(['python', '-m', sites[name], 'start']).wait()
-
-
-class Restart(BaseOperation):
-  """Restart project router"""
-  def ParseCall(self):
-    parser = OptionParser()
-    opts, args = parser.parse_args()
-    return vars(opts), args
-
-  def __call__(self, name, *args):
-    sites = UwebSites()
-    return subprocess.Popen(['python', '-m', sites[name], 'restart']).wait()
+    site = UwebSites()[name]
+    return subprocess.Popen(['python', '-m', site['router'], 'start'],
+                            cwd=site['workdir']).wait()
 
 
 class Stop(BaseOperation):
@@ -279,31 +277,57 @@ class Stop(BaseOperation):
     return vars(opts), args
 
   def __call__(self, name, *args):
-    sites = UwebSites()
-    return subprocess.Popen(['python', '-m', sites[name], 'stop']).wait()
+    site = UwebSites()[name]
+    return subprocess.Popen(['python', '-m', site['router'], 'stop'],
+                            cwd=site['workdir']).wait()
+
+
+class Restart(BaseOperation):
+  """Restart project router"""
+  def ParseCall(self):
+    parser = OptionParser()
+    opts, args = parser.parse_args()
+    return vars(opts), args
+
+  def __call__(self, name, *args):
+    site = UwebSites()[name]
+    return subprocess.Popen(['python', '-m', site['router'], 'restart'],
+                            cwd=site['workdir']).wait()
 
 
 FUNCTIONS = {'init': Init,
              'genconf': GenerateApacheConfig,
-             'sites':Sites,
-             'add':Add,
-             'remove':Remove,
-             'start':Start,
-             'restart':Restart,
-             'stop':Stop}
+             'list': ListSites,
+             'add': Add,
+             'remove': Remove,
+             'start': Start,
+             'restart': Restart,
+             'stop': Stop}
+
+
+def LongestImportPrefix(package):
+  import sys
+  candidates = []
+  for path in sys.path:
+    if package.startswith(path + os.sep):
+      candidates.append(path)
+  print max(candidates, key=len)
+
+
 
 def main():
   """Main uweb method"""
-  if not os.path.isdir(UWEB_DATA_FOLDER):
-    os.mkdir(UWEB_DATA_FOLDER)
-
   root_logger = logging.getLogger()
   root_logger.setLevel(logging.DEBUG)
   handler = logging.StreamHandler(sys.stdout)
   root_logger.addHandler(handler)
 
-
-  FUNCTIONS[sys.argv[1]]().Run()
+  try:
+    FUNCTIONS[sys.argv[1]]().Run()
+  except Error, err_obj:
+    sys.exit('Error: %s' % err_obj)
+  except (IOError, OSError), err_obj:
+    sys.exit('I/O Error: %s' % err_obj)
 
 if __name__ == '__main__':
   main()
