@@ -5,25 +5,24 @@ from __future__ import with_statement
 __author__ = 'Jan Klopper <jan@underdark.nl>'
 __version__ = '0.1'
 
-import os
 import datetime
 import decimal
-import types
+import inspect
+import os
 
+import uweb
 from uweb import templateparser
 from uweb import model
 
-ALLOWED_CLASS_TYPES = [model.VersionedRecord, model.Record]
 NOT_ALLOWED_METHODS = dir({}) + ['key', 'identifier']
 
-FIELDTYPES = {'datetime':datetime.datetime,
-              'decimal':decimal.Decimal}
+FIELDTYPES = {'datetime': datetime.datetime,
+              'decimal': decimal.Decimal}
 
 class AdminMixin(object):
   """Provides an admin interface based on the available models"""
 
   def _Admin(self, url):
-    self.parser.RegisterFunction('items', lambda d: d.items())
     self.parser.RegisterFunction('classname', lambda cls: type(cls).__name__)
 
     if not self.ADMIN_MODEL:
@@ -92,17 +91,15 @@ class AdminMixin(object):
       table = getattr(self.ADMIN_MODEL, table)
       methodobj = getattr(table, method)
       if methodobj.__doc__:
-        return methodobj.__doc__
-      else:
-        while table:
-          table = table.__bases__[0]
-          methodobj = getattr(table, method)
-          if methodobj.__doc__:
-            return methodobj.__doc__
-        return 'no docs avaiable'
+        return inspect.cleandoc(methodobj.__doc__)
+      while table:
+        table = table.__bases__[0]
+        methodobj = getattr(table, method)
+        if methodobj.__doc__:
+          return inspect.cleandoc(methodobj.__doc__)
+      return 'no docs avaiable'
 
   def __EditRecord(self, table, key):
-    self.parser.RegisterFunction('items', lambda d: d.items())
     self.parser.RegisterFunction('classname', lambda cls: type(cls).__name__)
     edittemplate = templateparser.FileTemplate(
         os.path.join(os.path.dirname(__file__), 'admin', 'edit.html'))
@@ -166,15 +163,9 @@ class AdminMixin(object):
     return False
 
   def __CheckTable(self, table):
-    if (not table.startswith('__')):
-      for allowed_class in ALLOWED_CLASS_TYPES:
-        tableclass = getattr(self.ADMIN_MODEL, table)
-        try:
-          if issubclass(tableclass, allowed_class):
-            return True
-        except TypeError:
-          pass
-    return False
+    """Verfies the given name is that of a model.BaseRecord subclass."""
+    tableclass = getattr(self.ADMIN_MODEL, table)
+    return type(tableclass) == type and issubclass(tableclass, model.Record)
 
   def __AdminTables(self):
     tables = []
@@ -188,10 +179,9 @@ class AdminMixin(object):
       table = getattr(self.ADMIN_MODEL, table)
       methods = []
       for method in dir(table):
-        methodobj = getattr(table, method)
-        if (not method.startswith('_') and
-            method not in NOT_ALLOWED_METHODS and
-            isinstance(methodobj, types.MethodType)):
+        if (not method.startswith('_')
+            and method not in NOT_ALLOWED_METHODS
+            and callable(getattr(table, method))):
           methods.append(method)
       return methods
     return False
@@ -203,8 +193,8 @@ class AdminMixin(object):
       results = method(self.connection)
       resultslist = []
       for result in results:
-        resultslist.append({'result':result.values(),
-                            'key':result.key})
-
-      return (result.keys(), resultslist)
-    return False
+        resultslist.append({'result': result.values(),
+                            'key': result.key})
+      if resultslist:
+        return result.keys(), resultslist
+      return (), ()

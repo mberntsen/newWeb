@@ -273,13 +273,13 @@ class BaseRecord(dict):
     raise NotImplementedError
 
   @classmethod
-  def List(cls, connection, condition=None):
+  def List(cls, connection, conditions=None):
     """Yields a Record object for every table entry.
 
     Arguments:
       @ connection: object
         Database connection to use.
-      % condition: str
+      % conditions: str / iterable ~~ None
         Optional query portion that will be used to limit the list of results
 
     Yields:
