@@ -54,7 +54,6 @@ class ResultRow(dict):
     if not hasattr(self, '_keys'):
       self._keys = []
     super(ResultRow, self).__init__()
-    self._dict = super(ResultRow, self)
     self.update(*args, **kwds)
 
   def __eq__(self, other):
@@ -128,33 +127,33 @@ class ResultRow(dict):
   #
   def __delitem__(self, key):
     """Removes a key and its value from the dictionary."""
-    self._dict.__delitem__(key)
+    super(ResultRow, self).__delitem__(key)
     self._keys.remove(key)
 
   def __setitem__(self, key, value):
     """Sets or updates a dictionary value."""
     if key not in self:
       self._keys.append(key)
-    self._dict.__setitem__(key, value)
+    super(ResultRow, self).__setitem__(key, value)
 
   def clear(self):
     """Clears the contents of the dictionary."""
     del self._keys[:]
-    self._dict.clear()
+    super(ResultRow, self).clear()
 
   def pop(self, key, *default):
     try:
       self._keys.remove(key)
     except ValueError:
       return default[0]
-    return self._dict.pop(key)
+    return super(ResultRow, self).pop(key)
 
   def popitem(self):
     """Pops the key,value pair at the end of the dictionary."""
     if not self:
       raise KeyError
     key = self._keys.pop()
-    return key, self._dict.pop(key)
+    return key, super(ResultRow, self).pop(key)
 
   def setdefault(self, key, default=None):
     try:

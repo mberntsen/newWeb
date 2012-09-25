@@ -171,8 +171,7 @@ class Application(object):
       self.app(**self.config)
       logging.Shutdown()
     except SystemExit:
-      sys.stderr.write('\nSystemExit received, halting execution.\n')
-      logging.LogInfo('SystemExit received, halting execution.')
+      logging.LogInfo('Application finished, shutting down.')
       logging.FlushAll()
       signal.signal(signal.SIGALRM, ForcefulTermination)
       signal.alarm(5)

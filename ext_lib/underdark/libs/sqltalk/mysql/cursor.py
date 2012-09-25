@@ -15,35 +15,7 @@ from underdark.libs.sqltalk import sqlresult
 
 
 class Cursor(object):
-  """A base for Cursor classes. Useful attributes:
-
-  description
-    A tuple of DB API 7-tuples describing the columns in
-    the last executed query; see PEP-249 for details.
-
-  description_flags
-    Tuple of column flags for last query, one entry per column
-    in the result set. Values correspond to those in
-    MySQLdb.constants.FLAG. See MySQL documentation (C API)
-    for more information. Non-standard extension.
-
-  Members:
-    @ _connection: mysql.connection
-      MySQLdb connection instance.
-    @ errors: list
-      MySQL errors for the most recently executed query
-
-  Methods:
-    Delete:           Remove row(s) from table.
-    Describe:         Describe table in database or field in table.
-    Drop:             Drops table(s) in database if it exists.
-    Execute:          Executes a query without any processing
-    Info:             Retrieve MySQL Server info.
-    Insert:           Insert new row into table. Can perform multi-row insert.
-    Select:           Select fields from table.
-    Update:           Update values in table that match conditions.
-    _ProcessWarnings: Processes warnings and messages from the MySQL server.
-  """
+  """Cursor to execute database interaction with, within a transaction."""
   QUERY_DEBUG = '`%s` performed the following query:\n%s'
 
   def __init__(self, connection):
@@ -313,7 +285,7 @@ class Cursor(object):
         self._StringTable(table, self.connection.EscapeField)))
 
   def Update(self, table, values, conditions, order=None,
-             limit=1, offset=None, escape=True):
+             limit=None, offset=None, escape=True):
     """Updates table records to the new values where conditions are met.
 
     Arguments:
@@ -328,8 +300,8 @@ class Cursor(object):
                     list/tuple of two elements:
                       1) string, field name to order by
                       2) bool, revserse; set this to True to reverse the order
-      limit:      integer (optional). Defines update max size in rows.
-                  Default 1, set to 0 for no limit.
+      limit:      integer (optional). Defines max rows to update.
+                  Default value for this is None, meaning no limit.
       offset:     integer (optional). Number of rows to skip, requires limit.
       escape:     boolean. Defines whether table names, fields and values should
                   be escaped. Set this to False if you want to make use of
@@ -358,7 +330,9 @@ class Cursor(object):
     if db_warnings:
       # This is done in two loops in case Warnings are set to raise exceptions.
       for warning in db_warnings:
-        self.connection.logger.LogWarning('%d: %s' % warning[1:])
+        self.connection.logger.LogWarning(
+            '%d: %s\nCaller: %s\nQuery: %s',
+            warning[1], warning[2], logging.ScopeName(3), resultset.query)
         resultset.warnings.append(warning)
       for warning in db_warnings:
         warnings.warn(warning[-1], self.Warning, 3)

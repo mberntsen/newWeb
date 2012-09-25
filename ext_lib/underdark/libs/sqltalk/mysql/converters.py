@@ -40,6 +40,7 @@ import time
 import _mysql
 
 # Application specific modules
+from .. import sqlresult
 import constants
 import times
 
@@ -112,6 +113,8 @@ def Thing2Str(obj, conv_dict=None):
 
 
 CONVERSIONS = {
+  sqlresult.ResultSet: _mysql.escape_sequence,
+  sqlresult.ResultRow: _mysql.escape_dict,
   dict: _mysql.escape_dict,
   list: _mysql.escape_sequence,
   tuple: _mysql.escape_sequence,
