@@ -336,7 +336,9 @@ class BaseRecord(dict):
   @staticmethod
   def _ValueOrPrimary(value):
     """Returns the value, or its primary key value if it's a Record."""
-    return value.key if isinstance(value, BaseRecord) else value
+    while isinstance(value, BaseRecord):
+      value = value.key
+    return value
 
   @classmethod
   def TableName(cls):
@@ -392,6 +394,10 @@ class Record(BaseRecord):
   # ############################################################################
   # Methods enabling auto-loading
   #
+  def GetRaw(self, field):
+    """Returns the value of the field, suppressing auto-loading."""
+    return super(Record, self).__getitem__(field)
+
   def __getitem__(self, field):
     """Returns the value corresponding to a given `field`.
 
@@ -509,6 +515,21 @@ class Record(BaseRecord):
       return self[key]
     except KeyError:
       return default
+
+  def pop(self, field, *default):
+    """Pops the value corresponding to the field from the Record.
+
+    If the field does not exist, either KeyError or an optional default value
+    is returned instead.
+    """
+    try:
+      value = self[field]
+    except KeyError:
+      if not default:
+        raise
+      return default[0]
+    del self[field]
+    return value
 
   def iteritems(self):
     """Yields all field+value pairs in the Record.
@@ -641,6 +662,7 @@ class Record(BaseRecord):
     except cursor.OperationalError, err_obj:
       if err_obj[0] == 1054:
         raise BadFieldError(err_obj[1])
+      raise
 
   def _RecordUpdate(self, cursor):
     """Updates the existing database entry with the record's current values.
