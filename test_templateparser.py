@@ -302,7 +302,6 @@ class TemplateTagFunctions(unittest.TestCase):
 
   def testFunctionChaining(self):
     """[TagFunctions] Multiple functions can be chained after one another"""
-    self.parser.RegisterFunction('len', len)
     self.parser.RegisterFunction('count', lambda x: '%s characters' % x)
     template = 'A replacement processed by two functions: [spam|len|count].'
     result = 'A replacement processed by two functions: 8 characters.'
@@ -346,6 +345,10 @@ class TemplateTagFunctions(unittest.TestCase):
     numbers = [5, 1, 3, 2, 4]
     self.assertEqual(self.parse(template, numbers=numbers), "[1, 2, 3, 4, 5]")
 
+  def testTagFunctionLen(self):
+    """[TagFunctions] The tag function 'len' is present and works"""
+    template = '[numbers|len]'
+    self.assertEqual(self.parse(template, numbers=range(12)), "12")
 
 class TemplateTagFunctionClosures(unittest.TestCase):
   """Tests the functions that are performed on replaced tags."""

@@ -899,4 +899,5 @@ TAG_FUNCTIONS = {
     'url': UrlQuote,
     'items': lambda d: d.items(),
     'values': lambda d: d.values(),
-    'sorted': sorted}
+    'sorted': sorted,
+    'len': len}
