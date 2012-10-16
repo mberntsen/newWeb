@@ -115,11 +115,12 @@ class BaseRecord(dict):
     For record objects where the primary key value is not (always) an integer,
     this function will raise an error in the situations where it is not.
     """
-    if not isinstance(self.key, (int, long)):
+    key_val = self._ValueOrPrimary(self.key)
+    if not isinstance(key_val, (int, long)):
       # We should not truncate floating point numbers.
       # Nor turn strings of numbers into an integer.
       raise ValueError('The primary key is not an integral number.')
-    return self.key
+    return key_val
 
   def __ne__(self, other):
     """Returns the proper inverse of __eq__."""
@@ -134,6 +135,11 @@ class BaseRecord(dict):
     return '%s({%s})' % (
         self.__class__.__name__,
         ', '.join('%r: %r' % item for item in self.iteritems()))
+
+  def copy(self):
+    """Returns a shallow copy of the Record that is a new functional Record."""
+    return self.__class__(
+        self.connection, super(BaseRecord, self).copy(), run_init_hook=False)
 
   # ############################################################################
   # Rich comparators
@@ -575,13 +581,15 @@ class Record(BaseRecord):
     if not isinstance(parent, Record):
       raise TypeError('parent argument should be a Record type.')
     relation_field = relation_field or parent.TableName()
-    relation_value = parent.connection.EscapeValues(parent.key)
+    relation_value = parent.connection.EscapeValues(cls._ValueOrPrimary(parent))
     qry_conditions = ['`%s` = %s' % (relation_field, relation_value)]
     if isinstance(conditions, basestring):
       qry_conditions.append(conditions)
     elif conditions:
       qry_conditions.extend(conditions)
-    return cls.List(parent.connection, conditions=qry_conditions)
+    for record in cls.List(parent.connection, conditions=qry_conditions):
+      record[relation_field] = parent.copy()
+      yield record
 
   def _Children(self, child_class, relation_field=None, conditions=None):
     """Returns all `child_class` objects related to this record.
