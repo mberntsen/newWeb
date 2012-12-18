@@ -13,6 +13,10 @@ from underdark.libs.sqltalk import sqlite
 import uweb
 
 
+class DatabaseError(Exception):
+  """Baseclass for errors returned by the database backend."""
+
+
 class Logging(object):
   """Provides a method to scan a folder recursively for db log files"""
   def __init__(self, paths, mask):
@@ -48,11 +52,11 @@ class LogDb(object):
         The fully qualified path for the SQLite logging database.
     """
     if not os.path.exists(db_path):
-      raise uweb.DatabaseError(db_path)
+      raise DatabaseError(db_path)
     try:
       self.connection = sqlite.Connect(db_path)
     except sqlite.OperationalError, error:
-      raise uweb.DatabaseError(error)
+      raise DatabaseError(error)
 
   def Events(self, offset=0, count=None, query=None, level=0):
     """Lists all the errors in a database's logging table

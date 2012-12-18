@@ -44,7 +44,7 @@ class Viewer(uweb.DebuggingPageMaker):
       raise uweb.ImmediateResponse(self.InvalidDatabase(db_path))
     try:
       return model.LogDb(db_path)
-    except uweb.DatabaseError, error:
+    except model.DatabaseError, error:
       raise uweb.ImmediateResponse(self.InvalidDatabase(error))
 
   def Index(self):
