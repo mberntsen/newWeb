@@ -583,10 +583,11 @@ class Record(BaseRecord):
     relation_field = relation_field or parent.TableName()
     relation_value = parent.connection.EscapeValues(cls._ValueOrPrimary(parent))
     qry_conditions = ['`%s` = %s' % (relation_field, relation_value)]
-    if isinstance(conditions, basestring):
-      qry_conditions.append(conditions)
-    elif conditions:
-      qry_conditions.extend(conditions)
+    if conditions:
+      if isinstance(conditions, basestring):
+        qry_conditions.append(conditions)
+      else:
+        qry_conditions.extend(conditions)
     for record in cls.List(parent.connection, conditions=qry_conditions):
       record[relation_field] = parent.copy()
       yield record
