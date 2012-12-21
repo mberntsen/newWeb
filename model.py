@@ -749,9 +749,39 @@ class Record(BaseRecord):
     return cls(connection, record[0])
 
   @classmethod
-  def List(cls, connection, conditions=None):
+  def List(cls, connection, conditions=None, limit=None, offset=None,
+           order=None, yield_unlimited_total_first=False):
+    """Yields a Record object for every table entry.
+
+    Arguments:
+      @ connection: object
+        Database connection to use.
+      % conditions: str / iterable ~~ None
+        Optional query portion that will be used to limit the list of results.
+        If multiple conditions are provided, they are joined on an 'AND' string.
+      % limit: int ~~ None
+        Specifies a maximum number of items to be yielded. The limit happens on
+        the database side, limiting the query results.
+      % offset: int ~~ None
+        Specifies the offset at which the yielded items should start. Combined
+        with limit this enables proper pagination.
+      % order: iterable of str/2-tuple
+        Defines the fields on which the output should be ordered. This should
+        be a list of strings or 2-tuples. The string or first item indicates the
+        field, the second argument defines descending order (desc. if True).
+      % yield_unlimited_total_first: bool ~~ False
+        Instead of yielding only Record objects, the first item returned is the
+        number of results from the query if it had been executed without limit.
+
+    Yields:
+      Record: Database record abstraction class.
+    """
     with connection as cursor:
-      records = cursor.Select(table=cls.TableName(), conditions=conditions)
+      records = cursor.Select(
+          table=cls.TableName(), conditions=conditions, limit=limit,
+          offset=offset, order=order, totalcount=yield_unlimited_total_first)
+    if yield_unlimited_total_first:
+      yield records.affected
     for record in records:
       yield cls(connection, record)
 
