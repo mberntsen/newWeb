@@ -67,10 +67,14 @@ class Connection(_mysql.connection):
     There are a number of undocumented, non-standard arguments. See the
     documentation for the MySQL C API for some hints on what they do.
     """
+    # _mysql connect args mapping
     kwargs['user'] = user
     kwargs['passwd'] = passwd
     kwargs['host'] = kwargs.get('host', 'localhost')
     kwargs['db'] = kwargs.get('db', user)
+    # Counters
+    self.counter_transactions = 0
+    self.counter_queries = 0
 
     self.logger = logging.GetLogger('mysql_%s' % kwargs['db'])
     if kwargs.pop('debug', False):
@@ -161,6 +165,7 @@ class Connection(_mysql.connection):
   def __enter__(self):
     """Refreshes the connection and returns a cursor, starting a transaction."""
     if self.lock.acquire(False):  # Don't block. fail when it's in use.
+      self.counter_transactions += 1
       self.ping(True)
       self.ping(self.autocommit)
       self.TransactionTimer()
@@ -219,6 +224,7 @@ class Connection(_mysql.connection):
             'server': self.ServerInfo()}
 
   def Query(self, query_string):
+    self.counter_queries += 1
     if isinstance(query_string, unicode):
       # This might not actually be necessary given that EscapeValues does this.
       query_string = query_string.encode(self.charset)
