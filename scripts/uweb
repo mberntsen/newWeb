@@ -12,7 +12,7 @@ import subprocess
 from optparse import OptionParser
 
 # Application specific modules
-import tables
+from uweb.scripts import tables
 
 
 class Error(Exception):
@@ -230,12 +230,22 @@ class Add(BaseOperation):
     opts, args = parser.parse_args()
     return vars(opts), args
 
-  def __call__(self, name, router, directory='/', update=False):
+  def __call__(self, *name_router, **opts):
+    if len(name_router) != 2:
+      sys.exit(self.Help())
     sites = UwebSites()
+    name, router = name_router
+    directory = opts.get('directory', '/')
+    update = opts.get('update', False)
     if name in sites and not update:
       raise Error('Could not add a router with this name, one already exists.'
                   '\n\nTo update the existing, use the --update flag')
-    sites[name] = {'router': router, 'workdir': directory}
+    sites[name] = {'router': router, 'workdir': os.path.expanduser(directory)}
+
+  def Help(self):
+    return ('Please provide a name and the module path for the router.\n'
+            'Example: uweb add cookie_api cookies.router.api '
+            '--directory="~/devel".')
 
 
 class Remove(BaseOperation):
@@ -245,12 +255,18 @@ class Remove(BaseOperation):
     opts, args = parser.parse_args()
     return vars(opts), args
 
-  def __call__(self, name, *args):
+  def __call__(self, *args):
+    if not args:
+      sys.exit(self.Help())
     try:
       sites = UwebSites()
-      del sites[name]
+      del sites[args[0]]
     except ValueError:
-      raise Error('There was no site named %r' % name)
+      raise Error('There was no site named %r' % args[0])
+
+  def Help(self):
+    return ('Please provide a name for the router to remove.\n'
+            'Router names can be retrieved using the "list" command.')
 
 
 # ##############################################################################
@@ -263,10 +279,16 @@ class Start(BaseOperation):
     opts, args = parser.parse_args()
     return vars(opts), args
 
-  def __call__(self, name, *args):
-    site = UwebSites()[name]
+  def __call__(self, *args):
+    if not args:
+      sys.exit(self.Help())
+    site = UwebSites()[args[0]]
     return subprocess.Popen(['python', '-m', site['router'], 'start'],
                             cwd=site['workdir']).wait()
+
+  def Help(self):
+    return ('Please provide a name for the router to start.\n'
+            'Router names can be retrieved using the "list" command.')
 
 
 class Stop(BaseOperation):
@@ -276,10 +298,16 @@ class Stop(BaseOperation):
     opts, args = parser.parse_args()
     return vars(opts), args
 
-  def __call__(self, name, *args):
-    site = UwebSites()[name]
+  def __call__(self, *args):
+    if not args:
+      sys.exit(self.Help())
+    site = UwebSites()[args[0]]
     return subprocess.Popen(['python', '-m', site['router'], 'stop'],
                             cwd=site['workdir']).wait()
+
+  def Help(self):
+    return ('Please provide a name for the router to stop.\n'
+            'Router names can be retrieved using the "list" command.')
 
 
 class Restart(BaseOperation):
@@ -289,10 +317,16 @@ class Restart(BaseOperation):
     opts, args = parser.parse_args()
     return vars(opts), args
 
-  def __call__(self, name, *args):
-    site = UwebSites()[name]
+  def __call__(self, *args):
+    if not args:
+      sys.exit(self.Help())
+    site = UwebSites()[args[0]]
     return subprocess.Popen(['python', '-m', site['router'], 'restart'],
                             cwd=site['workdir']).wait()
+
+  def Help(self):
+    return ('Please provide a name for the router to restart.\n'
+            'Router names can be retrieved using the "list" command.')
 
 
 FUNCTIONS = {'init': Init,
@@ -314,6 +348,26 @@ def LongestImportPrefix(package):
   print max(candidates, key=len)
 
 
+def Help():
+  return """uWeb management tool.
+
+    Usage: `uweb COMMAND [options]`
+
+    Project
+      init    - Starts a new uWeb project with the given name
+      genconf - Generates an Apache configuration file (
+
+    Router management commands:
+      list    - Lists all uWeb projects, their routers and working directories.
+      add     - Adds a new project to the managed routers.
+      remove  - Removes a project from the managed routers.
+
+    Router control commands:
+      start   - Starts a named router (as created with 'add').
+      stop    - Stops a named router (as created with 'add').
+      restart - Convenience command to stop, and then start a router.
+  """
+
 
 def main():
   """Main uweb method"""
@@ -322,6 +376,9 @@ def main():
   handler = logging.StreamHandler(sys.stdout)
   root_logger.addHandler(handler)
 
+  if len(sys.argv) < 2 or sys.argv[1] not in FUNCTIONS:
+    print Help()
+    sys.exit(1)
   try:
     FUNCTIONS[sys.argv[1]]().Run()
   except Error, err_obj:
