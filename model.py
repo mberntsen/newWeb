@@ -502,11 +502,10 @@ class Record(BaseRecord):
                          'Target %r not a subclass of Record' % cls.__name__)
       return cls
 
-    if type(foreign_cls) is dict:
-      f_class = foreign_cls['class']
-      if f_class is None:
-        return value
-      cls = GetRecordClass(f_class)
+    if foreign_cls is None:
+      return value
+    elif type(foreign_cls) is dict:
+      cls = GetRecordClass(foreign_cls['class'])
       loader = foreign_cls.get('loader')
       value = cls._LoadAsForeign(self.connection, value, method=loader)
       return value
