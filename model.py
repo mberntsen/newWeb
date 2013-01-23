@@ -503,7 +503,10 @@ class Record(BaseRecord):
       return cls
 
     if type(foreign_cls) is dict:
-      cls = GetRecordClass(foreign_cls['class'])
+      f_class = foreign_cls['class']
+      if f_class is None:
+        return value
+      cls = GetRecordClass(f_class)
       loader = foreign_cls.get('loader')
       value = cls._LoadAsForeign(self.connection, value, method=loader)
       return value
