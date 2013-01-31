@@ -172,14 +172,14 @@ class Connection(_mysql.connection):
       self.counter_transactions += 1
       self.ping(True)
       self.ping(self.autocommit)
-      if self.debug:
-        self.TransactionTimer()
+      self.StartTransactionTimer()
       return cursor.Cursor(self)
     raise self.OperationalError(
         'A transaction is already open for this connection.')
 
   def __exit__(self, exc_type, exc_value, _exc_traceback):
     """End of transaction: commits on success, or rolls back on failure."""
+    self.ResetTransactionTimer()
     if exc_type:
       self.rollback()
       self.logger.LogWarning(
@@ -190,8 +190,6 @@ class Connection(_mysql.connection):
       self.commit()
       self.logger.LogDebug(
           'Transaction committed (server: %r).', self.get_host_info())
-    if self.debug:
-      self.transaction_timer.cancel()
     self.lock.release()
 
   def CurrentDatabase(self):
@@ -272,15 +270,27 @@ class Connection(_mysql.connection):
     self.query('SHOW WARNINGS')
     return self.store_result().fetch_row(0)
 
-  def TransactionTimer(self, delay=60):
-    caller = logging.ScopeName(2)
+  def SetTransactionTimer(self, delay=60):
+    """Writes a warning to the log if the transaction is open too long.
+
+    N.B. The timer is only set when the connection is in debug mode. Calling
+    this method on a non-debug connection will do nothing.
+    """
     def Warn():
       self.logger.LogWarning(
           'Transaction started by %s is open for more than %s seconds.',
           caller, delay)
-    self.transaction_timer = threading.Timer(delay, Warn)
-    self.transaction_timer.daemon = True
-    self.transaction_timer.start()
+
+    if self.debug:
+      caller = logging.ScopeName(2)
+      self.transaction_timer = threading.Timer(delay, Warn)
+      self.transaction_timer.daemon = True
+      self.transaction_timer.start()
+
+  def ResetTransactionTimer(self):
+    """Resets any existing transaction timer."""
+    if self.transaction_timer:
+      self.transaction_timer.cancel()
 
   def _GetAutocommitState(self):
     """This returns the current setting for autocommiting transactions."""
