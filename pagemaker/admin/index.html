@@ -14,6 +14,9 @@
       float:left;
       padding-right:1em;
     }
+    a{
+      color:#222;
+    }
     nav ul{
       margin:0;
       padding:0;
@@ -28,7 +31,8 @@
     }
     section{
       float:left;
-      width:60%;
+      min-width:60%;
+      max-width:80%;
     }
     h2{
       margin:.5em 0 .5em;
@@ -73,6 +77,9 @@
     nav li:nth-child(2n){
       background:#e4e4c4;
     }
+    table tr:nth-child(2n) td:nth-child(2n){
+      background:#d9d9b9;
+    }
     table tbody tr:hover td,
     nav li:hover{
       background:#ffb;
@@ -88,6 +95,25 @@
     }
     form li label{
       width:150px;
+    }
+    section{
+      overflow:auto;
+      margin-bottom:1em;
+    }
+    footer{
+      display:block;
+      width:100%;
+      clear:both;
+      background-color:#eee;
+      position:fixed;
+      bottom:0;
+      left:0;
+      border-top:1px solid #000;
+    }
+    footer a{
+      padding:6px .4em;
+      font-size:.7em;
+      text-decoration:none;
     }
     </style>
     <title>&micro;Web, Admin interface {{if [table]}}[table]{{ endif }} {{if [method]}} - [method]{{ endif }} </title>
@@ -139,5 +165,8 @@
       <span class="docs"><pre>[docs]</pre></span>
       {{ endif }}
     </section>
+    <footer>
+      <a href="http://uweb-framework.nl">Uweb-framework.nl</a> &ndash; <a href="http://underdark.nl">underdark.nl</a>
+    </footer>
   </body>
 </html>
