@@ -2,7 +2,7 @@
 """SQLTalk MySQL Cursor class.
 """
 __author__ = 'Elmer de Looff <elmer@underdark.nl>'
-__version__ = '0.12'
+__version__ = '0.13'
 
 # Standard modules
 import warnings
@@ -11,7 +11,6 @@ import _mysql
 
 # Custom modules
 from underdark.libs.app import logging
-from underdark.libs.sqltalk import sqlresult
 
 
 class Cursor(object):
@@ -38,31 +37,24 @@ class Cursor(object):
     # query they belong to. This enables proper SelectTables and enables a host
     # of other escaping things to start working properly.
     #   Refer to MySQLdb.cursor code (~line 151) to see how this works.
-    connection = self.connection
-    if isinstance(query, unicode):
-      log_query = query
-    else:
-      log_query = unicode(query, connection.charset, errors='replace')
-    caller = logging.ScopeName(2)
-    connection.logger.LogDebug(self.QUERY_DEBUG, caller, log_query)
-    self.queries.append((caller, log_query))
+    self._LogQuery(query)
     try:
-      field_descriptions, result = connection.Query(query.strip())
-      resultset = sqlresult.ResultSet(
-          affected=connection.affected_rows(),
-          charset=connection.charset,
-          fields=field_descriptions,
-          insertid=connection.insert_id(),
-          query=query,
-          result=result)
+      result = self.connection.Query(query.strip())
     except Exception:
-      queries = '\n\n'.join(self.QUERY_DEBUG % query for query in self.queries)
-      connection.logger.LogException(
-          'Queries in this transaction (last one triggered):\n\n%s', queries)
+      self.connection.logger.LogException(
+          'Queries in this transaction (last one triggered):\n\n%s',
+          '\n\n'.join(self.QUERY_DEBUG % query for query in self.queries))
       raise
-    if connection.warning_count():
-      self._ProcessWarnings(resultset)
-    return resultset
+    if self.connection.warning_count():
+      self._ProcessWarnings(result)
+    return result
+
+  def _LogQuery(self, query):
+    if not isinstance(query, unicode):
+      query = unicode(query, self.connection.charset, errors='replace')
+    caller = logging.ScopeName(3) # Cursor user is three levels up from here.
+    self.connection.logger.LogDebug(self.QUERY_DEBUG, caller, query)
+    self.queries.append((caller, query))
 
   @staticmethod
   def _StringConditions(conditions, _unused_field_escape):

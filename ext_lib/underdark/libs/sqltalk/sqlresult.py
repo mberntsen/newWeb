@@ -11,17 +11,20 @@ Error Classes:
   NotSupportedError: Operation is not supported
 """
 __author__ = 'Elmer de Looff <elmer@underdark.nl>'
-__version__ = '1.2'
+__version__ = '1.3'
 
 # Standard modules
+import itertools
 import operator
+
+GET_FIELD_NAME = operator.itemgetter(0)
 
 
 class Error(Exception):
   """Exception base class."""
 
 
-class FieldError(Error, IndexError, KeyError):
+class FieldError(Error, LookupError):
   """Field- index or name does not exist."""
 
 
@@ -29,32 +32,35 @@ class NotSupportedError(Error, TypeError):
   """Operation is not supported."""
 
 
-class ResultRow(dict):
+class ResultRow(object):
   """SQL Result row - an ordered dictionary-like record abstraction.
 
   ResultRow has two item retrieval interfaces:
     1) Key-based access like that of a dictionary.
     2) Indexed access like a tuple. (field-order is preserved)
 
+  Deleting items from the ResultRow can be done both on index and key. Updating
+  or adding fields to the ResultRow can only be done on a key-basis.
+
   Members:
     % names: tuple (read-only)
       Names for the fields that the ResultRow contains.
   """
-  def __init__(self, *args, **kwds):
+  # We expect many ResultRow instances, __slots__ cuts the memory footprint
+  # in half for small rows. This seems like a reasonable tradeoff.
+  __slots__ = ('_fields', '_values')
+
+  def __init__(self, fields, values):
     """Sets up the ordered dict.
 
     Arguments:
-      @ *args: dict / iterator
-        A dictionary or pairwise iterable object to source the dictionary from.
-      @ **kwds
-        key=value pairs to populate the dictionary from.
+      @ fields: iterable
+        Fieldnames for the SQL result
+      @ values: iterable
+        Values that belong to the provided fields
     """
-    if len(args) > 1:
-      raise TypeError('expected at most 1 argument, got %d' % len(args))
-    if not hasattr(self, '_keys'):
-      self._keys = []
-    super(ResultRow, self).__init__()
-    self.update(*args, **kwds)
+    self._fields = list(fields)
+    self._values = list(values)
 
   def __eq__(self, other):
     """Checks equality of the ResultRow to another ResultRow or object.
@@ -62,19 +68,15 @@ class ResultRow(dict):
     A ResultRow can only be equal to another ResultRow, and then only if both
     fieldnames and fieldvalues are the same (data and order).
     """
-    if self is other:
-      return True
-    elif isinstance(other, self.__class__):
-      return self.items() == other.items()
-    return False
+    return isinstance(other, type(self)) and self.items() == other.items()
 
   def __getitem__(self, key):
     try:
       if isinstance(key, int):
-        return self.values()[key]
+        return self._values[key]
       else:
-        return super(ResultRow, self).__getitem__(key)
-    except (IndexError, KeyError), message:
+        return self._values[self._fields.index(key)]
+    except (LookupError, ValueError), message:
       raise FieldError(message)
 
   def __repr__(self):
@@ -90,96 +92,84 @@ class ResultRow(dict):
 
   @property
   def names(self):
-    """Returns the fieldnames of the ResultRow as a tuple."""
     return self.keys()
 
   # ############################################################################
   # Iteration on dictionary / record entries
   #
+  def __len__(self):
+    """Returns the length of the ResultRow."""
+    return len(self._values)
+
   def __iter__(self):
     """Returns an iterator for the values of the ResultRow."""
-    return self.itervalues()
+    return iter(self._values)
 
   def __reversed__(self):
-    """Returns a reversed key iterator."""
-    return reversed(self._keys)
+    """Returns a reversed value iterator."""
+    return reversed(self._values)
 
   def iterkeys(self):
-    return iter(self._keys)
+    return iter(self._fields)
 
   def itervalues(self):
-    return (self[key] for key in self._keys)
+    return iter(self._values)
 
   def iteritems(self):
-    return ((key, self[key]) for key in self._keys)
+    return itertools.izip(self._fields, self._values)
 
   def keys(self):
-    return list(self.iterkeys())
+    return self._fields[:]
 
   def values(self):
-    return list(self.itervalues())
+    return self._values[:]
 
   def items(self):
-    return list(self.iteritems())
+    return zip(self._fields, self._values)
 
   # ############################################################################
   # Methods to keep the dictionary neat and ordered
   #
   def __delitem__(self, key):
-    """Removes a key and its value from the dictionary."""
-    super(ResultRow, self).__delitem__(key)
-    self._keys.remove(key)
+    """Removes a key or index from the ResultRow."""
+    try:
+      index = key if isinstance(key, int) else self._fields.index(key)
+      del self._fields[index]
+      del self._values[index]
+    except (LookupError, ValueError):
+      raise FieldError('The ResultRow has no field %r' % key)
 
-  def __setitem__(self, key, value):
-    """Sets or updates a dictionary value."""
-    if key not in self:
-      self._keys.append(key)
-    super(ResultRow, self).__setitem__(key, value)
+  def __setitem__(self, field, value):
+    """Sets or updates a dictionary value.
 
-  def clear(self):
-    """Clears the contents of the dictionary."""
-    del self._keys[:]
-    super(ResultRow, self).clear()
+    N.B. The implementation for this is slow for large ResultRow objects.
+    """
+    try:
+      self._values[self._fields.index(field)] = value
+    except ValueError:
+      # The field does not already occur in the ResultRow, add it at the end
+      self._fields.append(field)
+      self._values.append(value)
 
   def pop(self, key, *default):
     try:
-      self._keys.remove(key)
+      index = self._fields.index(key)
+      del self._fields[index]
+      return self._values.pop(index)
     except ValueError:
-      return default[0]
-    return super(ResultRow, self).pop(key)
+      if default:
+        return default[0]
+      raise FieldError('No field %r in this ResultRow', key)
 
   def popitem(self):
     """Pops the key,value pair at the end of the dictionary."""
     if not self:
       raise KeyError
-    key = self._keys.pop()
-    return key, super(ResultRow, self).pop(key)
-
-  def setdefault(self, key, default=None):
-    try:
-      return self[key]
-    except KeyError:
-      self[key] = default
-      return default
-
-  def update(self, other=(), **kwds):
-    try:
-      # Tuple has no attribute iteritems; correct but not relevant
-      # pylint: disable=E1103
-      for key, value in other.iteritems():
-        self[key] = value
-      # pylint: enable=E1103
-    except AttributeError:
-      for key, value in other:
-        self[key] = value
-    for key, value in kwds.iteritems():
-      self[key] = value
+    return self._fields.pop(), self._values.pop()
 
 
 class ResultSet(object):
   """SQL Result set - stores the query, the returned result, and other info.
-
-  !! This class defines __slots__.
 
   ResultSet is created from immutable objects. Once defined, none of its
   attributes can be altered or overwritten. The exception to this is the private
@@ -195,8 +185,6 @@ class ResultSet(object):
       by the Python DB API (v2).
     @ insertid - int
       Auto-increment ID that was generated upon the last insert.
-    @ pivoted - bool
-      states whether the result set has been pivoted.
     @ query - str
       The executed query that gave this result set.
     @ result:   tuple
@@ -206,11 +194,9 @@ class ResultSet(object):
     % fieldnames - tuple (read-only)
       Names of the fields in the result.
   """
-  __slots__ = ('affected', 'charset', 'fields', 'insertid',
-               'pivoted', 'query', 'result', 'warnings', '_fieldnames')
 
   def __init__(self, query='', charset='', result=None, fields=None,
-               affected=0, insertid=0, pivoted=False):
+               affected=0, insertid=0, row_class=ResultRow):
     """Initializes a new ResultSet.
 
     Arguments:
@@ -227,35 +213,27 @@ class ResultSet(object):
         The query that was executed for this operation.
       % result ~~ None
         SQL Result set for the this operation.
-      % pivoted ~~ False
-        Flags whether the result argument is pivoted or not.
     """
     self.affected = affected
     self.charset = charset
     self.insertid = insertid
-    self.pivoted = pivoted
     self.query = query
     self.warnings = []
 
     if result:
-      self.fields = tuple(fields)
-      get_name = operator.itemgetter(0)
-      self._fieldnames = map(get_name, fields)
-      if pivoted:
-        self.result = ResultRow(zip(self._fieldnames, result))
-      else:
-        self.result = tuple(ResultRow(zip(self._fieldnames, row))
-                            for row in result)
+      self.fields = fields
+      self._fieldnames = fieldnames = map(GET_FIELD_NAME, fields)
+      self.result = [row_class(fieldnames, row) for row in result]
     else:
       self.fields = ()
       self._fieldnames = []
-      self.result = ()
+      self.result = []
 
   def __eq__(self, other):
     """Checks equality of the ResultSet to another ResultSet or object.
 
     A ResultSet can only be equal to another ResultSet, and then only if all
-    their public members (except pivot state) compare equal.
+    their public members compare equal.
     """
     if self is other:
       return True
@@ -275,17 +253,16 @@ class ResultSet(object):
         Rownumber or fieldname:
         - If given a rownumber, the corresponding ResultRow is returned.
         - If given a fieldname, a tuple with the field's values is returned.
-        If performed on a pivoted ResultSet, the result if not yet defined.
 
     Returns:
       ResultRow / tuple: As detailed in the Arguments section.
     """
     try:
       return self.result[item]
-    except FieldError:
-      raise
     except IndexError:
       raise FieldError('Bad field index: %r.' % item)
+    except FieldError:
+      raise
     except TypeError:
       # The item type is incorrect, try grabbing a column for this fieldname.
       try:
@@ -304,19 +281,15 @@ class ResultSet(object):
 
   def __nonzero__(self):
     """Boolean truthness of the ResultSet. True if it has 1+ ResultRow"""
-    return any(self.result)
+    return bool(self.result)
 
   def __repr__(self):
     """Returns a string representation of the ResultSet."""
-    info = (('Result: %d row%s', 'Pivoted result: %d field%s')[self.pivoted] %
-            (len(self.result), 's'[len(self.result) == 1:]))
-    return '%s instance at %s. %s' % (
-        self.__class__.__name__, hex(id(self)).rstrip('L'), info)
+    return '%s instance: %d rows%s' % (
+        self.__class__.__name__, len(self.result), 's'[len(self.result) == 1:])
 
   def FilterRowsByFields(self, *fields):
     """Yields ResultRows containing only selected fields.
-
-    N.B. This method does not work for Pivoted ResultSet objects.
 
     Arguments:
       @ *fields: list of str
@@ -324,13 +297,10 @@ class ResultSet(object):
 
     Raises:
       BadFieldError: One of the given fieldnames did not exist.
-      NotSupportedError: A pivoted ResultSet does not support this method.
 
     Yields:
       ResultRow: Each ResultRow contains only the filtered fields.
     """
-    if self.pivoted:
-      raise NotSupportedError('Operation is not supported on pivoted ResultSet')
     try:
       indices = tuple(self._fieldnames.index(field) for field in fields)
     except ValueError:
@@ -338,23 +308,15 @@ class ResultSet(object):
     for row in self:
       yield ResultRow(zip(fields, tuple(row[index] for index in indices)))
 
-  def Pivot(self):
-    """Returns a new QueryResult object with a pivoted data-set.
+  def PopField(self, field):
+    try:
+      self._fieldnames.remove(field)
+    except ValueError:
+      raise FieldError('Fieldname %r does not occur in the ResultSet.' % field)
+    return [row.pop(field) for row in self]
 
-    All the other portions of the object are left as-is. This means that
-    pivoting a QueryResult object twice yields the same object you started with.
-
-    Returns:
-      ResultSet: same as original but with pivoted result set.
-    """
-    return self.__class__(affected=self.affected,
-                          charset=self.charset,
-                          fields=self.fields,
-                          insertid=self.insertid,
-                          pivoted=not self.pivoted,
-                          query=self.query,
-                          result=zip(*self.result),
-                          warnings=self.warnings)
+  def PopRow(self, row_index):
+    return self.result.pop(row_index)
 
   @property
   def fieldnames(self):

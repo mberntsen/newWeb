@@ -31,7 +31,11 @@ class ResultRowBasicOperation(unittest.TestCase):
     """Set up a persistent test environment."""
     names = ['name', 'nationality', 'age']
     values = ('Elmer', 'Dutch', 24)
-    self.row = sqlresult.ResultRow(zip(names, values))
+    self.row = sqlresult.ResultRow(names, values)
+
+  def testFieldErrorIsLookupError(self):
+    """SqlResult's FieldError is a subclass of LookupError"""
+    self.assertTrue(issubclass(sqlresult.FieldError, LookupError))
 
   def testRepresentation(self):
     """ResultRow has representation methods that work."""
@@ -40,7 +44,7 @@ class ResultRowBasicOperation(unittest.TestCase):
 
   def testFalseWhenEmpty(self):
     """ResultRow is boolean False when empty."""
-    row = sqlresult.ResultRow({})
+    row = sqlresult.ResultRow([], [])
     self.assertFalse(row)
 
   def testTrueWhenFilled(self):
@@ -62,14 +66,9 @@ class ResultRowBasicOperation(unittest.TestCase):
     self.assertEquals(self.row['age'], 24)
 
   def testGetIndexError(self):
-    """ResultRow throws FieldError, IndexError when a bad index is requested."""
+    """ResultRow throws FieldError when a bad index or bad key is requested."""
     self.assertRaises(sqlresult.FieldError, self.row.__getitem__, 4)
-    self.assertRaises(IndexError, self.row.__getitem__, 4)
-
-  def testGetKeyError(self):
-    """ResultRow throws FieldError, KeyError when a bad key is requested."""
     self.assertRaises(sqlresult.FieldError, self.row.__getitem__, 'badkey')
-    self.assertRaises(KeyError, self.row.__getitem__, 'badkey')
 
   def testGetMethodIndex(self):
     """ResultRow's Get method works properly for indices."""
@@ -81,6 +80,38 @@ class ResultRowBasicOperation(unittest.TestCase):
     self.assertEquals(self.row.get('age'), 24)
     self.assertEquals(self.row.get('badkey', 'raargh'), 'raargh')
 
+  def testUpdateKey(self):
+    """ResultRow can have its values updated using dictionary assignment"""
+    self.row['age'] = 28
+    self.assertEquals(self.row['age'], 28)
+
+  def testAddKey(self):
+    """ResultRow can have field + value combinations added, like a dict"""
+    self.row['role'] = 'developer'
+    self.assertEquals(self.row['role'], 'developer')
+    self.assertEquals(self.row[3], 'developer')
+    self.assertEquals(self.row.popitem(), ('role', 'developer'))
+
+  def testDeleteIndex(self):
+    """ResultRow entries can be deleted using the index"""
+    del self.row[1]
+    self.assertEquals(self.row.items(), [('name', 'Elmer'), ('age', 24)])
+    self.assertRaises(sqlresult.FieldError, self.row.__getitem__, 'nationality')
+
+  def testDeleteIndexError(self):
+    """ResultRow throws a FieldError when attempting to delete a bad index"""
+    self.assertRaises(sqlresult.FieldError, self.row.__delitem__, 100)
+
+  def testDeleteKey(self):
+    """ResultRow entries can be deleted using the fieldname"""
+    del self.row['nationality']
+    self.assertEquals(self.row.items(), [('name', 'Elmer'), ('age', 24)])
+    self.assertRaises(sqlresult.FieldError, self.row.__getitem__, 'nationality')
+
+  def testDeleteKeyError(self):
+    """ResultRow throws a FieldError when attempting to delete a bad key"""
+    self.assertRaises(sqlresult.FieldError, self.row.__delitem__, 'badkey')
+
 
 class ResultRowDataExtraction(unittest.TestCase):
   """Ensure that all name/value/item collecting methods work as intended."""
@@ -89,7 +120,7 @@ class ResultRowDataExtraction(unittest.TestCase):
     self.names = ['name', 'project', 'age', 'language',
                   'character', 'distro-of-choice']
     self.values = ('Elmer', 'Underdark', 24, 'python', 'geek', u'Ubuntu')
-    self.row = sqlresult.ResultRow(zip(self.names, self.values))
+    self.row = sqlresult.ResultRow(self.names, self.values)
 
   def testGetIterator(self):
     """ResultRow's iterator yields all the values stored."""
@@ -113,11 +144,11 @@ class ResultRowEquality(unittest.TestCase):
     """Set up a persistent test environment."""
     self.names = ['name', 'nationality', 'age']
     self.values = ('Elmer', 'Dutch', 24)
-    self.row = sqlresult.ResultRow(names=self.names, values=self.values)
+    self.row = sqlresult.ResultRow(self.names, self.values)
 
   def testEqualityWithResultRow(self):
     """ResultRow is equal to another ResultRow with the same contents."""
-    other = sqlresult.ResultRow(names=self.names, values=self.values)
+    other = sqlresult.ResultRow(self.names, self.values)
     self.assertNotEqual(id(self.row), id(other))
     self.assertEquals(self.row, other)
 
@@ -130,14 +161,14 @@ class ResultRowEquality(unittest.TestCase):
     """ResultRow is not equal to a ResultRow with different fieldnames."""
     names_copy = self.names[:]
     names_copy[1] = 'not the same'
-    other_names = sqlresult.ResultRow(names=names_copy, values=self.values)
+    other_names = sqlresult.ResultRow(names_copy, self.values)
     self.assertNotEqual(self.row, other_names)
 
   def testNonEqualityWithDifferentValues(self):
     """ResultRow is not equal to a ResultRow with different values."""
     values_copy = list(self.values)
     values_copy[1] = 'Bob'
-    other_values = sqlresult.ResultRow(names=self.names, values=values_copy)
+    other_values = sqlresult.ResultRow(self.names, values_copy)
     self.assertNotEqual(self.row, other_values)
 
   def testNonEqualityWithDifferentSize(self):
@@ -145,7 +176,7 @@ class ResultRowEquality(unittest.TestCase):
     self.names.append('animal')
     values_copy = list(self.values)
     values_copy.append('pink ponies')
-    bigger = sqlresult.ResultRow(names=self.names, values=values_copy)
+    bigger = sqlresult.ResultRow(self.names, values_copy)
     self.assertNotEqual(self.row, bigger)
     self.assertNotEqual(bigger, self.row)
 

@@ -4,7 +4,7 @@ a MySQL database. From this connection, cursor objects can be created, which
 use the escaping and character encoding facilities offered by the connection.
 """
 __author__ = 'Elmer de Looff <elmer@underdark.nl>'
-__version__ = '0.15'
+__version__ = '0.16'
 
 # Standard modules
 import _mysql
@@ -18,6 +18,7 @@ from underdark.libs.app import logging
 import constants
 import converters
 import cursor
+from .. import sqlresult
 
 
 class Connection(_mysql.connection):
@@ -75,11 +76,14 @@ class Connection(_mysql.connection):
     # Counters
     self.counter_transactions = 0
     self.counter_queries = 0
+    self.transaction_timer = None
 
     self.logger = logging.GetLogger('mysql_%s' % kwargs['db'])
     if kwargs.pop('debug', False):
+      self.debug = True
       self.logger.SetLevel(logging.DEBUG)
     else:
+      self.debug = False
       self.logger.SetLevel(logging.WARNING)
     if kwargs.pop('disable_log', False):
       self.logger.disable_logger = True
@@ -168,7 +172,8 @@ class Connection(_mysql.connection):
       self.counter_transactions += 1
       self.ping(True)
       self.ping(self.autocommit)
-      self.TransactionTimer()
+      if self.debug:
+        self.TransactionTimer()
       return cursor.Cursor(self)
     raise self.OperationalError(
         'A transaction is already open for this connection.')
@@ -185,7 +190,8 @@ class Connection(_mysql.connection):
       self.commit()
       self.logger.LogDebug(
           'Transaction committed (server: %r).', self.get_host_info())
-    self.transaction_timer.cancel()
+    if self.debug:
+      self.transaction_timer.cancel()
     self.lock.release()
 
   def CurrentDatabase(self):
@@ -232,8 +238,19 @@ class Connection(_mysql.connection):
     self.query(query_string)
     stored_result = self.store_result()
     if stored_result:
-      return stored_result.describe(), stored_result.fetch_row(0)
-    return None, None
+      fields = stored_result.describe()
+      # fetch_row call has a limit and type (0: tuples, 1: dicts)
+      result = stored_result.fetch_row(0, 0)
+    else:
+      fields = []
+      result = []
+    return sqlresult.ResultSet(
+        affected=self.affected_rows(),
+        charset=self.charset,
+        fields=fields,
+        insertid=self.insert_id(),
+        query=query_string,
+        result=result)
 
   def ServerInfo(self):
     """Returns a mysql specific set of server information"""
