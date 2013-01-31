@@ -1,6 +1,7 @@
 <h2>Editing: <a href="/[basepath]/table/[table]">[table]</a>, key: [key]</h2>
 <form action="/[basepath]/table/[table]/save" method="post">
   <input type="hidden" name="key" value="[key]" />
+  <ul>
 {{ for key, value in [fields|items] }}
   <li><label for="edit_[key]" >[key]</label>
   {{ if isinstance([value], basestring) }}
@@ -18,4 +19,5 @@
    </li>
 {{ endfor }}
   <li><input type="submit" value="Save changes" /></li>
+  </ul>
 </form>

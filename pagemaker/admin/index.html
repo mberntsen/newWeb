@@ -37,26 +37,31 @@
     h2{
       margin:.5em 0 .5em;
       line-height:.7em;
+      clear:both;
     }
     ol + h2 {
       margin-top: 0;
     }
     p,
     .message,
-    .docs{
+    .docs,
+    section form{
       margin:0.5em;
     }
     .message,
-    .docs{
+    .docs,
+    section form{
       padding:1em;
       display:block;
     }
     table,
     .message,
-    .docs{
+    .docs,
+    section form{
       background:#eed;
       border-collapse:collapse;
       border:1px solid #888;
+      border-radius:.5em;
     }
     table thead td{
       background:#888;
@@ -74,7 +79,8 @@
       text-align:right;
     }
     table tr:nth-child(2n),
-    nav li:nth-child(2n){
+    nav li:nth-child(2n),
+    form li:nth-child(2n){
       background:#e4e4c4;
     }
     table tr:nth-child(2n) td:nth-child(2n){
@@ -85,6 +91,15 @@
       background:#ffb;
       background:rgba(255,255,0,.3)
     }
+    form,
+    form li{
+      overflow:auto;
+      padding:.2em .5em;
+    }
+    form ul{
+      margin:0;
+      padding:0;
+    }
     form li{
       list-style-type:none;
       clear:both;
@@ -94,7 +109,7 @@
       float:left;
     }
     form li label{
-      width:150px;
+      width:30%;
     }
     section{
       overflow:auto;
@@ -162,7 +177,7 @@
       <span class="message">[message]</span>
       {{ endif }}
       {{ if [docs]}}
-      <h2>Documentation  {{ if not [results] }} for [method] on <a href="/[basepath]/table/[table]">[table]</a> {{ endif }}</h2>
+      <h2>Documentation  {{ if not [results] and not [edit]}} for [method] on <a href="/[basepath]/table/[table]">[table]</a> {{ endif }}</h2>
       <span class="docs"><pre>[docs]</pre></span>
       {{ endif }}
     </section>
