@@ -160,8 +160,9 @@
        [edit|raw]
       {{ elif [message]}}
       <span class="message">[message]</span>
-      {{ elif [docs]}}
-      <h2>Documentation for [method] on <a href="/[basepath]/table/[table]">[table]</a></h2>
+      {{ endif }}
+      {{ if [docs]}}
+      <h2>Documentation  {{ if not [results] }} for [method] on <a href="/[basepath]/table/[table]">[table]</a> {{ endif }}</h2>
       <span class="docs"><pre>[docs]</pre></span>
       {{ endif }}
     </section>

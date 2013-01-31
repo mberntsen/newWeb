@@ -46,6 +46,7 @@ class AdminMixin(object):
       if urlparts[1] == 'table':
         table = urlparts[2]
         methods = self.__AdminTablesMethods(table)
+        docs = self.__GetClassDocs(table)
         if len(urlparts) > 3:
           method = urlparts[3]
           if method == 'edit':
@@ -98,6 +99,20 @@ class AdminMixin(object):
           methodobj = getattr(table, method)
           if methodobj.__doc__:
             return inspect.cleandoc(methodobj.__doc__)
+      except AttributeError:
+        pass
+      return 'No documentation avaiable'
+
+  def __GetClassDocs(self, table):
+    if self.__CheckTable(table):
+      table = getattr(self.ADMIN_MODEL, table)
+      if table.__doc__:
+        return inspect.cleandoc(table.__doc__)
+      try:
+        while table:
+          table = table.__bases__[0]
+          if table.__doc__:
+            return inspect.cleandoc(table.__doc__)
       except AttributeError:
         pass
       return 'No documentation avaiable'
