@@ -92,12 +92,15 @@ class AdminMixin(object):
       methodobj = getattr(table, method)
       if methodobj.__doc__:
         return inspect.cleandoc(methodobj.__doc__)
-      while table:
-        table = table.__bases__[0]
-        methodobj = getattr(table, method)
-        if methodobj.__doc__:
-          return inspect.cleandoc(methodobj.__doc__)
-      return 'no docs avaiable'
+      try:
+        while table:
+          table = table.__bases__[0]
+          methodobj = getattr(table, method)
+          if methodobj.__doc__:
+            return inspect.cleandoc(methodobj.__doc__)
+      except AttributeError:
+        pass
+      return 'No documentation avaiable'
 
   def __EditRecord(self, table, key):
     self.parser.RegisterFunction('classname', lambda cls: type(cls).__name__)
