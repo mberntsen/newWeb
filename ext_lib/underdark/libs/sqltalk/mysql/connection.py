@@ -270,7 +270,7 @@ class Connection(_mysql.connection):
     self.query('SHOW WARNINGS')
     return self.store_result().fetch_row(0)
 
-  def SetTransactionTimer(self, delay=60):
+  def StartTransactionTimer(self, delay=60):
     """Writes a warning to the log if the transaction is open too long.
 
     N.B. The timer is only set when the connection is in debug mode. Calling
