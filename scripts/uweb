@@ -12,6 +12,7 @@ import subprocess
 from optparse import OptionParser
 
 # Application specific modules
+import uweb
 from uweb.scripts import tables
 
 
@@ -20,12 +21,12 @@ class Error(Exception):
 
 
 class UwebSites(object):
+  """Abstraction for the uWeb site managing JSON file."""
   SITES_BASE = {'uweb_info': {'router': 'uweb.uweb_info.router.uweb_info',
                               'workdir': '/'},
                 'logviewer': {'router': 'uweb.logviewer.router.logging',
                               'workdir': '/'}}
 
-  """Abstraction for the uWeb site managing JSON file."""
   def __init__(self):
     self.sites_file = os.path.expanduser('~/.uweb/sites.json')
     self.sites = self._LoadSites()
@@ -106,7 +107,6 @@ class BaseOperation(object):
 class Init(BaseOperation):
   """Inintialize uweb generator which create new uweb instance"""
   # Base directory where the uWeb library lives
-  LIBRARY_PATH = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
   ROUTER_PATH = 'router'
   ROUTER_NAME = 'router.py'
   APACHE_CONFIG_NAME = 'apache.conf'
@@ -129,7 +129,7 @@ class Init(BaseOperation):
     if name is None:
       raise Error('Initialization requires a project name.')
     project_path = os.path.abspath(name)
-    source_path = os.path.dirname('%s/base_project/' % self.LIBRARY_PATH)
+    source_path = os.path.dirname('%s/base_project/' % uweb.__path__[0])
     apache_path = os.path.join(project_path, self.APACHE_CONFIG_NAME)
 
     print self.Banner('initializing new uWeb project %r' % name)
@@ -154,8 +154,9 @@ class Init(BaseOperation):
                                            project_path)
 
     # Make sure we add the project to the sites list
-#    sites = UwebSites()
-#    sites[name] = router
+    sites = UwebSites()
+    sites[name] = {'router': '%s.router.%s' % (name, name),
+                   'workdir':  os.path.abspath('.')}
     print self.Banner('initialization complete - have fun with uWeb')
 
 
@@ -340,7 +341,6 @@ FUNCTIONS = {'init': Init,
 
 
 def LongestImportPrefix(package):
-  import sys
   candidates = []
   for path in sys.path:
     if package.startswith(path + os.sep):
