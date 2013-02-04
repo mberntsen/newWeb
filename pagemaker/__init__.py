@@ -196,6 +196,8 @@ class BasePageMaker(object):
     try:
       local_file = sys.modules[cls.__module__].__file__
     except KeyError:
+      #XXX(Elmer): This happens for old-style mod_python solutions only.
+      # This code path should be cleaned up once it's verified to be redundant.
       frame = sys._getframe()
       initial = frame.f_code.co_filename
       # pylint: enable=W0212
@@ -204,7 +206,15 @@ class BasePageMaker(object):
           break  # This happens during exception handling of DebuggingPageMaker
         frame = frame.f_back
       local_file = frame.f_code.co_filename
-    cls.LOCAL_DIR = cls_dir = os.path.dirname(local_file)
+    if local_file.startswith('/'):
+      # mod_python always returns '/' as working directory. It also returns the
+      # local_file as absolute path. Using the local_file we can determine the
+      # directory in which is exists.
+      cls.LOCAL_DIR = cls_dir = os.path.dirname(local_file)
+    else:
+      # Using new-style standalone, the current directory information provided
+      # by Python is correct, so we can use that without using local_file
+      cls.LOCAL_DIR = cls_dir = os.getcwd()
     cls.PUBLIC_DIR = os.path.join(cls_dir, cls.PUBLIC_DIR)
     cls.TEMPLATE_DIR = os.path.join(cls_dir, cls.TEMPLATE_DIR)
 
