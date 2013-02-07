@@ -28,7 +28,7 @@
           <ul class="nodot">
             <li>
                 <label for="example_post">ExamplePost:</label>
-                <input id="example_post" name="ExamplePost">
+                <input type="text" id="example_post" name="ExamplePost">
                 <input type="submit" value="Submit">
             </li>
           </ul>
@@ -58,19 +58,19 @@
           <ul class="nodot horizontal">
             <li>
               <label for="cookie_name">Cookie name:</label>
-              <input id="cookie_name" name="uweb_cookie_name">
+              <input type="text" id="cookie_name" name="uweb_cookie_name">
             </li>
             <li>
               <label for="cookie_value">Cookie value:</label>
-              <input id="cookie_value" name="uweb_cookie_value">
+              <input type="text" id="cookie_value" name="uweb_cookie_value">
             </li>
             <li>
                 <label for="cookie_path">Cookie path:</label>
-                <input id="cookie_path" name="uweb_cookie_path" value="/">
+                <input type="text" id="cookie_path" name="uweb_cookie_path" value="/">
             </li>
             <li>
               <label for="cookie_max_age">Cookie max-age:</label>
-              <input id="cookie_max_age" name="uweb_cookie_max_age" value="60">
+              <input type="text" id="cookie_max_age" name="uweb_cookie_max_age" value="60">
               <input type="submit" value="Set cookie">
             </li>
           </ul>
@@ -79,7 +79,7 @@
         <h2>OpenID login</h2>
         <form method="post" action="/OpenIDLogin">
           <label for="openid_provider">Provider URL:</label>
-          <input id="openid_provider" name="openid_provider" value="">
+          <input type="text" id="openid_provider" name="openid_provider" value="">
           <input type="submit" value="Log in"><br>
         </form>
         <br>
@@ -88,11 +88,11 @@
           <ul class="nodot">
             <li>
               <label for="plain_user">Username: </label>
-              <input name="username" id="plain_user">
+              <input type="text" name="username" id="plain_user">
             </li>
             <li>
               <label for="plain_pass">Password: </label>
-              <input name="password" id="plain_pass" type="password">
+              <input type="password"  name="password" id="plain_pass">
               <input type="submit" value="Log me in">
             </li>
           </ul>
@@ -103,7 +103,7 @@
           <ul class="nodot">
             <li>
               <label for="secure_user">Username: </label>
-              <input name="username" id="secure_user">
+              <input type="text" name="username" id="secure_user">
             </li>
             <li>
               <label for="secure_pass">Password: </label>
