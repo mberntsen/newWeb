@@ -141,22 +141,19 @@ class Init(BaseOperation):
         raise Error('Target already exists, use -f (force) to overwrite.')
     print '* copying uWeb base project directory'
     shutil.copytree(source_path, project_path)
-    os.chdir(project_path)
     print '* setting up router'
     router_path = os.path.join(self.ROUTER_PATH, self.ROUTER_NAME)
     router_destination = os.path.join(self.ROUTER_PATH, '%s.py' % name)
     shutil.move(router_path, router_destination)
 
     print '* setting up apache config'
-    GenerateApacheConfig.WriteApacheConfig(name,
-                                           host,
-                                           apache_path,
-                                           project_path)
+    GenerateApacheConfig.WriteApacheConfig(
+        name, host, apache_path, project_path)
 
     # Make sure we add the project to the sites list
     sites = UwebSites()
     sites[name] = {'router': '%s.router.%s' % (name, name),
-                   'workdir':  os.path.abspath('.')}
+                   'workdir':  os.getcwd()}
     print self.Banner('initialization complete - have fun with uWeb')
 
 

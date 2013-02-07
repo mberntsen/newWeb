@@ -1,10 +1,6 @@
 #!/usr/bin/python
 """Html generators for the base uweb server"""
 
-__author__ = 'Jan Kopper <jan@underdark.nl>'
-__version__ = '0.1'
-
-# Custom modules
 import uweb
 
 class PageMaker(uweb.DebuggingPageMaker):

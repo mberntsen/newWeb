@@ -1,12 +1,8 @@
 #!/usr/bin/python
-"""An uweb base project."""
+"""A uWeb base project."""
 
-# Custom modules
 import uweb
-from uweb.base_project import pages
-
-__author__ = 'Jan Klopper <jan@underdark.nl>'
-__version__ = '0.1'
+from .. import pages
 
 CONFIG = '../base.conf'
 PACKAGE = 'uweb_base'
