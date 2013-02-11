@@ -142,9 +142,10 @@ class Init(BaseOperation):
     print '* copying uWeb base project directory'
     shutil.copytree(source_path, project_path)
     print '* setting up router'
-    router_path = os.path.join(self.ROUTER_PATH, self.ROUTER_NAME)
-    router_destination = os.path.join(self.ROUTER_PATH, '%s.py' % name)
-    shutil.move(router_path, router_destination)
+    # Rename default name 'router' to that of the project.
+    shutil.move(
+        os.path.join(project_path, self.ROUTER_PATH, self.ROUTER_NAME),
+        os.path.join(project_path, self.ROUTER_PATH, '%s.py' % name))
 
     print '* setting up apache config'
     GenerateApacheConfig.WriteApacheConfig(
