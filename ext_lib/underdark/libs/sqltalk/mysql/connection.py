@@ -68,16 +68,17 @@ class Connection(_mysql.connection):
     There are a number of undocumented, non-standard arguments. See the
     documentation for the MySQL C API for some hints on what they do.
     """
+    # Counters, transaction lock & timer
+    self.counter_transactions = 0
+    self.counter_queries = 0
+    self.transaction_timer = None
+    self.lock = threading.Lock()
+
     # _mysql connect args mapping
     kwargs['user'] = user
     kwargs['passwd'] = passwd
     kwargs['host'] = kwargs.get('host', 'localhost')
     kwargs['db'] = kwargs.get('db', user)
-    # Counters
-    self.counter_transactions = 0
-    self.counter_queries = 0
-    self.transaction_timer = None
-
     self.logger = logging.GetLogger('mysql_%s' % kwargs['db'])
     if kwargs.pop('debug', False):
       self.debug = True
@@ -105,8 +106,7 @@ class Connection(_mysql.connection):
     sql_mode = kwargs.pop('sql_mode', None)
     use_unicode = kwargs.pop('use_unicode', False) or bool(charset)
 
-    client_version = tuple(int(n) for n in
-                           _mysql.get_client_info().split('.')[:2])
+    client_version = tuple(map(int, _mysql.get_client_info().split('.')[:2]))
     kwargs.setdefault('client_flag', 0)
     if client_version >= (4, 1):
       kwargs['client_flag'] |= constants.CLIENT.MULTI_STATEMENTS
@@ -116,9 +116,7 @@ class Connection(_mysql.connection):
     # Done redefining variables for initialization. Engage _mysql!
     super(Connection, self).__init__(*args, **kwargs)
 
-    self.server_version = tuple(
-        map(int, self.get_server_info().split('.')[:2]))
-
+    self.server_version = tuple(map(int, self.get_server_info().split('.')[:2]))
     if sql_mode:
       self.SetSqlMode(sql_mode)
 
@@ -148,7 +146,7 @@ class Connection(_mysql.connection):
     self.encoders[unicode] = self.unicode_literal = _GetUnicodeLiteral()
 
     if use_unicode:
-      decoder = (None, self.string_decoder)
+      decoder = None, self.string_decoder
       self.converter[constants.FIELD_TYPE.STRING].append(decoder)
       self.converter[constants.FIELD_TYPE.VAR_STRING].append(decoder)
       self.converter[constants.FIELD_TYPE.VARCHAR].append(decoder)
@@ -163,8 +161,6 @@ class Connection(_mysql.connection):
       self.autocommit = autocommit
     else:
       self.autocommit = not self.transactional
-    self.lock = threading.Lock()
-    self.messages = []
 
   def __enter__(self):
     """Refreshes the connection and returns a cursor, starting a transaction."""
@@ -194,9 +190,7 @@ class Connection(_mysql.connection):
 
   def CurrentDatabase(self):
     """Return the name of the currently used database"""
-    _description, result = self.Query('SELECT DATABASE()')
-    if result:
-      return result[0][0]
+    return self.Query('SELECT DATABASE()')[0][0]
 
   def EscapeField(self, field):
     """Returns a SQL escaped field or table name."""
@@ -258,8 +252,7 @@ class Connection(_mysql.connection):
     """Set the connection sql_mode. See MySQL documentation for legal values."""
     if self.server_version < (4, 1):
       raise self.NotSupportedError('server is too old to set sql_mode')
-    self.query('SET SESSION sql_mode="%s"' % sql_mode)
-    self.store_result()
+    self.Query('SET SESSION sql_mode=%s' % self.EscapeValues(sql_mode))
 
   def ShowWarnings(self):
     """Return detailed information about warnings as a sequence of tuples of
@@ -267,8 +260,7 @@ class Connection(_mysql.connection):
     If your server is an earlier version, an empty sequence is returned."""
     if self.server_version < (4, 1):
       return ()
-    self.query('SHOW WARNINGS')
-    return self.store_result().fetch_row(0)
+    return self.Query('SHOW WARNINGS')
 
   def StartTransactionTimer(self, delay=60):
     """Writes a warning to the log if the transaction is open too long.
@@ -276,14 +268,14 @@ class Connection(_mysql.connection):
     N.B. The timer is only set when the connection is in debug mode. Calling
     this method on a non-debug connection will do nothing.
     """
-    def Warn():
+    def Warn(caller, delay=delay):
       self.logger.LogWarning(
           'Transaction started by %s is open for more than %s seconds.',
           caller, delay)
 
     if self.debug:
-      caller = logging.ScopeName(2)
-      self.transaction_timer = threading.Timer(delay, Warn)
+      self.transaction_timer = threading.Timer(
+          delay, Warn, [logging.ScopeName(2)])
       self.transaction_timer.daemon = True
       self.transaction_timer.start()
 
