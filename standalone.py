@@ -88,14 +88,16 @@ class StandAloneHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     """Logs an error both to logging module (as ERROR) and to sys.stderr."""
     if self.server.error_logging:
       logline = logmsg % args
-      logging.LogError('Origin [%s] - - %s', self.address_string(), logline)
-      sys.stderr.write('%s [%s] - - %s\n' % (
-          self.log_date_time_string(), self.client_address[0], logline))
+      logging.LogError('[%s] %s', self.client_address[0], logline)
+      sys.stderr.write('%s [%s] %s\n' % (
+          datetime.datetime.now().strftime('%F %T.%f'),
+          self.client_address[0], logline))
 
   def log_message(self, logmsg, *args):
     """Logs messages both to logging module (as DEBUG) and to sys.stdout."""
     if self.server.access_logging:
       logline = logmsg % args
-      logging.LogDebug('Origin [%s] - - %s', self.address_string(), logline)
-      sys.stdout.write('%s [%s] - - %s\n' % (
-          self.log_date_time_string(), self.client_address[0], logline))
+      logging.LogDebug('[%s] %s', self.client_address[0], logline)
+      sys.stdout.write('%s [%s] %s\n' % (
+          datetime.datetime.now().strftime('%F %T.%f'),
+          self.client_address[0], logline))
