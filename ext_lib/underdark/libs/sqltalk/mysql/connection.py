@@ -224,9 +224,7 @@ class Connection(_mysql.connection):
   def Query(self, query_string):
     self.counter_queries += 1
     if isinstance(query_string, unicode):
-      # This might not actually be necessary given that EscapeValues does this.
       query_string = query_string.encode(self.charset)
-
     self.query(query_string)
     stored_result = self.store_result()
     if stored_result:
@@ -241,7 +239,7 @@ class Connection(_mysql.connection):
         charset=self.charset,
         fields=fields,
         insertid=self.insert_id(),
-        query=query_string,
+        query=query_string.decode(self.charset),
         result=result)
 
   def ServerInfo(self):
