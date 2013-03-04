@@ -239,7 +239,7 @@ class Connection(_mysql.connection):
         charset=self.charset,
         fields=fields,
         insertid=self.insert_id(),
-        query=query_string.decode(self.charset),
+        query=query_string.decode(self.charset, errors='ignore'),
         result=result)
 
   def ServerInfo(self):
