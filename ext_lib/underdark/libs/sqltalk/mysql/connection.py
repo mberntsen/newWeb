@@ -23,6 +23,8 @@ from .. import sqlresult
 
 class Connection(_mysql.connection):
   """MySQL Database Connection Object"""
+  QUERY_DEBUG = '`%s` performed the following query:\n%s'
+
   def __init__(self, user, passwd, *args, **kwargs):
     """Create a connection to the database. It is strongly recommended
     that you only use keyword parameters. Consult the MySQL C API
@@ -71,6 +73,7 @@ class Connection(_mysql.connection):
     # Counters, transaction lock & timer
     self.counter_transactions = 0
     self.counter_queries = 0
+    self.queries = []
     self.transaction_timer = None
     self.lock = threading.Lock()
 
@@ -166,6 +169,7 @@ class Connection(_mysql.connection):
     """Refreshes the connection and returns a cursor, starting a transaction."""
     if self.lock.acquire(False):  # Don't block. fail when it's in use.
       self.counter_transactions += 1
+      del self.queries[:]
       self.ping(True)
       self.ping(self.autocommit)
       self.StartTransactionTimer()
@@ -178,10 +182,11 @@ class Connection(_mysql.connection):
     self.ResetTransactionTimer()
     if exc_type:
       self.rollback()
-      self.logger.LogWarning(
-          'The transaction was rolled back after the following exception '
-          'occurred:\n  %s\nConnected to server: %r',
-          logging.ExceptionLine(exc_type, exc_value), self.get_host_info())
+      self.logger.LogException(
+          'The transaction was rolled back after an exception.\n'
+          'Server: %s\nQueries in transaction (last one triggered):\n\n%s',
+          self.get_host_info(),
+          '\n\n'.join(self.QUERY_DEBUG % query for query in self.queries))
     else:
       self.commit()
       self.logger.LogDebug(
@@ -239,7 +244,7 @@ class Connection(_mysql.connection):
         charset=self.charset,
         fields=fields,
         insertid=self.insert_id(),
-        query=query_string.decode(self.charset, errors='ignore'),
+        query=query_string.decode(self.charset, 'ignore'),
         result=result)
 
   def ServerInfo(self):

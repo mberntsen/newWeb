@@ -15,11 +15,8 @@ from underdark.libs.app import logging
 
 class Cursor(object):
   """Cursor to execute database interaction with, within a transaction."""
-  QUERY_DEBUG = '`%s` performed the following query:\n%s'
-
   def __init__(self, connection):
     self._connection = weakref.ref(connection)
-    self.queries = []
 
   def _Execute(self, query):
     """Actually executes the query and returns the result of it.
@@ -38,23 +35,18 @@ class Cursor(object):
     # of other escaping things to start working properly.
     #   Refer to MySQLdb.cursor code (~line 151) to see how this works.
     self._LogQuery(query)
-    try:
-      result = self.connection.Query(query.strip())
-    except Exception:
-      self.connection.logger.LogException(
-          'Queries in this transaction (last one triggered):\n\n%s',
-          '\n\n'.join(self.QUERY_DEBUG % query for query in self.queries))
-      raise
+    result = self.connection.Query(query.strip())
     if self.connection.warning_count():
       self._ProcessWarnings(result)
     return result
 
   def _LogQuery(self, query):
+    connection = self.connection
     if not isinstance(query, unicode):
-      query = unicode(query, self.connection.charset, errors='replace')
+      query = unicode(query, connection.charset, errors='replace')
     caller = logging.ScopeName(3) # Cursor user is three levels up from here.
-    self.connection.logger.LogDebug(self.QUERY_DEBUG, caller, query)
-    self.queries.append((caller, query))
+    connection.logger.LogDebug(connection.QUERY_DEBUG, caller, query)
+    connection.queries.append((caller, query))
 
   @staticmethod
   def _StringConditions(conditions, _unused_field_escape):
