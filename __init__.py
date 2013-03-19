@@ -60,6 +60,7 @@ class Error(Exception):
 class ImmediateResponse(Exception):
   """Used to trigger an immediate repsonse, foregoing the regular returns."""
 
+
 class NoRouteError(Error):
   """The server does not know how to route this request"""
 

@@ -15,9 +15,9 @@ import os
 import simplejson
 
 # Package modules
+import login_openid
 import uweb
 from uweb import model
-from uweb import uwebopenid
 
 OPENID_PROVIDERS = {'google': 'https://www.google.com/accounts/o8/id',
                     'yahoo': 'http://yahoo.com/',
@@ -222,7 +222,7 @@ class OpenIdMixin(object):
     else:
       openid_url = self.post.getfirst('openid_provider')
 
-    consumer = uwebopenid.OpenId(self.req)
+    consumer = login_openid.OpenId(self.req)
     # set the realm that we want to ask to user to verify to
     trustroot = 'http://%s' % self.req.env['HTTP_HOST']
     # set the return url that handles the validation
@@ -230,18 +230,18 @@ class OpenIdMixin(object):
 
     try:
       return consumer.Verify(openid_url, trustroot, returnurl)
-    except uwebopenid.InvalidOpenIdUrl, error:
+    except login_openid.InvalidOpenIdUrl, error:
       return self.OpenIdProviderBadLink(error)
-    except uwebopenid.InvalidOpenIdService, error:
+    except login_openid.InvalidOpenIdService, error:
       return self.OpenIdProviderError(error)
 
   def _OpenIdValidate(self):
     """Handles the return url that openId uses to send the user to"""
     try:
-      auth_dict = uwebopenid.OpenId(self.req).doProcess()
-    except uwebopenid.VerificationFailed, error:
+      auth_dict = login_openid.OpenId(self.req).doProcess()
+    except login_openid.VerificationFailed, error:
       return self.OpenIdAuthFailure(error)
-    except uwebopenid.VerificationCanceled, error:
+    except login_openid.VerificationCanceled, error:
       return self.OpenIdAuthCancel(error)
     return self.OpenIdAuthSuccess(auth_dict)
 
