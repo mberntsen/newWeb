@@ -284,7 +284,7 @@ def ServerSetup(apache_logging=True):
       server = standalone.StandAloneServer(router, router_name, router_config)
       server.serve_forever()
 
-    app.Service(stack_depth=3, app=main, working_dir=package_dir,
+    app.Service(stack_depth=3, app=main, working_dir=os.getcwd(),
                 package=package_name)
   else:
     router.f_globals['handler'] = handler

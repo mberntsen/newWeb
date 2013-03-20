@@ -194,10 +194,12 @@ class BasePageMaker(object):
     # filename using sys.modules. In those cases we need to query the stack.
     # pylint: disable=W0212
     try:
-      local_file = sys.modules[cls.__module__].__file__
+      local_file = os.path.abspath(sys.modules[cls.__module__].__file__)
     except KeyError:
-      #XXX(Elmer): This happens for old-style mod_python solutions only.
-      # This code path should be cleaned up once it's verified to be redundant.
+      # This happens for old-style mod_python solutions: The pages file is
+      # imported through the mechanics of mod_python (not package imports) and
+      # isn't known in sys modules. We use the CPython implementation details
+      # to get the correct executing file.
       frame = sys._getframe()
       initial = frame.f_code.co_filename
       # pylint: enable=W0212
@@ -206,15 +208,7 @@ class BasePageMaker(object):
           break  # This happens during exception handling of DebuggingPageMaker
         frame = frame.f_back
       local_file = frame.f_code.co_filename
-    if local_file.startswith('/'):
-      # mod_python always returns '/' as working directory. It also returns the
-      # local_file as absolute path. Using the local_file we can determine the
-      # directory in which is exists.
-      cls.LOCAL_DIR = cls_dir = os.path.dirname(local_file)
-    else:
-      # Using new-style standalone, the current directory information provided
-      # by Python is correct, so we can use that without using local_file
-      cls.LOCAL_DIR = cls_dir = os.getcwd()
+    cls.LOCAL_DIR = cls_dir = os.path.dirname(local_file)
     cls.PUBLIC_DIR = os.path.join(cls_dir, cls.PUBLIC_DIR)
     cls.TEMPLATE_DIR = os.path.join(cls_dir, cls.TEMPLATE_DIR)
 
@@ -312,7 +306,7 @@ class DebuggerMixin(object):
     frames = []
     while stack:
       frame = stack.tb_frame
-      frames.append({'file': frame.f_code.co_filename,
+      frames.append({'file': os.path.abspath(frame.f_code.co_filename),
                      'scope': frame.f_code.co_name,
                      'locals': frame.f_locals,
                      'source': self._SourceLines(
@@ -326,7 +320,7 @@ class DebuggerMixin(object):
 
     Arguments:
       @ filename: str
-        The filename of the
+        The filename (path) of which we should print lines of source.
       @ line_num: int
         The line number for the offending line.
       % context: int ~~ 3
