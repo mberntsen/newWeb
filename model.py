@@ -712,12 +712,12 @@ class Record(BaseRecord):
     The constraint with which the record is updated is the name and value of
     the Record's primary key (`self._PRIMARY_KEY` and `self.key` resp.)
     """
+    self._PreSave(cursor)
     difference = self._Changes()
     if difference:
-      self._PreSave(cursor)
       self._RecordUpdate(cursor)
-      self._PostSave(cursor)
       self._record.update(difference)
+    self._PostSave(cursor)
 
   # ############################################################################
   # Public methods for creation, deletion and storing Record objects.
