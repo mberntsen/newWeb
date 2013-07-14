@@ -65,7 +65,7 @@ class NoRouteError(Error):
   """The server does not know how to route this request"""
 
 
-def Handler(page_class, routes, config=None):
+def Handler(page_class, router, config):
   """Returns a configured closure for handling page requests.
 
   This closure is configured with a precomputed set of routes and handlers using
@@ -73,24 +73,21 @@ def Handler(page_class, routes, config=None):
   to the correct PageMaker handler.
 
   The url in the received `req` object is taken and matches against the
-  available `routes` (refer to Router() for more documentation on this).
+  `router`` (refer to Router() for more documentation on this).
 
 
   Takes:
     @ page_class: PageMaker
       Class that holds request handling methods as defined in the `routes`
-    @ routes: iterable of 2-tuple
-      Each tuple is a pair of pattern and handler name. More info in Router().
-    % config: dict ~~ None
+    @ router: request router
+      The result of the Router() function.
+    @ config: dict
       Configuration for the PageMaker. Typically contains entries for database
       connections, default search paths etc.
 
   Returns:
     RequestHandler: Configured closure that is ready to process requests.
   """
-  router = Router(routes)
-  del routes
-
   def RequestHandler(req):
     """Closure to handle incoming web requests.
 
@@ -145,7 +142,7 @@ def Handler(page_class, routes, config=None):
   return RequestHandler
 
 
-def Router(routes):
+def Router(routes, prefix=''):
   """Returns the first request handler that matches the request URL.
 
   The `routes` argument is an iterable of 2-tuples, each of which contain a
@@ -163,7 +160,7 @@ def Router(routes):
   """
   req_routes = []
   for pattern, method in routes:
-    req_routes.append((re.compile(pattern + '$', re.UNICODE), method))
+    req_routes.append((re.compile(prefix + pattern + '$', re.UNICODE), method))
 
   def RequestRouter(url):
     """Returns the appropriate handler and arguments for the given `url`.
@@ -265,15 +262,16 @@ def ServerSetup(apache_logging=True):
 
   # Configuration based on constants provided
   package_name = router.f_globals.get('PACKAGE')
-  router_pages = router.f_globals['PAGE_CLASS']
-  router_routes = router.f_globals['ROUTES']
+  pages_class = router.f_globals['PAGE_CLASS']
+  routes = router.f_globals['ROUTES']
   config_file = router.f_globals.get('CONFIG')
   if config_file:
     router_config = app.ParseConfig(os.path.join(
         os.path.dirname(router_file), config_file))
   else:
     router_config = {}
-  handler = Handler(router_pages, router_routes, config=router_config)
+  router = Router(routes, prefix=router.f_globals.get('ROUTE_PREFIX'))
+  handler = Handler(pages_class, router, router_config)
   if not apache:
     package_dir = os.path.abspath(os.path.join(
         os.path.dirname(router_file), os.path.pardir))
