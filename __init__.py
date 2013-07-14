@@ -142,7 +142,7 @@ def Handler(page_class, router, config):
   return RequestHandler
 
 
-def Router(routes, prefix=''):
+def Router(routes, prefix=None):
   """Returns the first request handler that matches the request URL.
 
   The `routes` argument is an iterable of 2-tuples, each of which contain a
@@ -158,6 +158,8 @@ def Router(routes, prefix=''):
   Returns:
     RequestRouter: Configured closure that processes urls.
   """
+  if prefix is None:
+    prefix = ''
   req_routes = []
   for pattern, method in routes:
     req_routes.append((re.compile(prefix + pattern + '$', re.UNICODE), method))
@@ -255,37 +257,37 @@ def ServerSetup(apache_logging=True):
   """
   # We need _getframe here, there's not really a neater way to do this.
   # pylint: disable=W0212
-  router = sys._getframe(1)
+  entrypoint = sys._getframe(1)
   # pylint: enable=W0212
-  router_file = router.f_code.co_filename
+  router_file = entrypoint.f_code.co_filename
   router_name = os.path.splitext(os.path.basename(router_file))[0]
 
   # Configuration based on constants provided
-  package_name = router.f_globals.get('PACKAGE')
-  pages_class = router.f_globals['PAGE_CLASS']
-  routes = router.f_globals['ROUTES']
-  config_file = router.f_globals.get('CONFIG')
+  package_name = entrypoint.f_globals.get('PACKAGE')
+  pages_class = entrypoint.f_globals['PAGE_CLASS']
+  routes = entrypoint.f_globals['ROUTES']
+  config_file = entrypoint.f_globals.get('CONFIG')
   if config_file:
     router_config = app.ParseConfig(os.path.join(
         os.path.dirname(router_file), config_file))
   else:
     router_config = {}
-  router = Router(routes, prefix=router.f_globals.get('ROUTE_PREFIX'))
-  handler = Handler(pages_class, router, router_config)
+  req_router = Router(routes, prefix=entrypoint.f_globals.get('ROUTE_PREFIX'))
+  handler = Handler(pages_class, req_router, router_config)
   if not apache:
     package_dir = os.path.abspath(os.path.join(
         os.path.dirname(router_file), os.path.pardir))
     package_name = package_name or os.path.basename(package_dir)
 
-    def main(router=handler):
+    def main(handler=handler):
       """Sets up a closure that is compatible with the UD app framework."""
-      server = standalone.StandAloneServer(router, router_name, router_config)
+      server = standalone.StandAloneServer(handler, router_name, router_config)
       server.serve_forever()
 
     app.Service(stack_depth=3, app=main, working_dir=os.getcwd(),
                 package=package_name)
   else:
-    router.f_globals['handler'] = handler
+    entrypoint.f_globals['handler'] = handler
     if apache_logging:
       package = package_name or 'uweb_project'
       log_dir = app.FirstWritablePath(app.MakePaths(app.LOGGING_PATHS, package))
