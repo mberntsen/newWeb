@@ -1,0 +1,11 @@
+<h3>Modules</h3>
+{{ for directory in [logfiles] }}
+  {{ if [directory:files] }}
+  <h4>[directory:name]</h4>
+  <ul>
+    {{ for file in [directory:files] }}
+    <li><a href="/db/[directory:name]/[file]" title="View logs for [file]">[file]</a></li>
+    {{ endfor }}
+  </ul>
+  {{ endif }}
+{{ endfor }}

@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>µWeb base project</title>
+  </head>
+  <body>
+    <h2>This is not the page you're looking for (HTTP 404)</h2>
+    <p>
+      The URL you requested (&quot;[path]&quot;) doesn't exist.
+    </p>
+  </body>
+</html>

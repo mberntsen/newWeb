@@ -1,0 +1,37 @@
+<li class="[event:logLevel] closed" id="entry_[event:ID]">
+  <table>
+    <thead>
+      <tr class="closed_row">
+        <td>[event:logTime|timeago]&nbsp;ago</td>
+        <td>[event:logMessage|80cols]</td>
+      </tr>
+      <tr class="open_row">
+        <td colspan="2">[event:logTime|datetime] UTC<span class="log_level">[event:logLevel]</span></td>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>
+          <ul class="metadata">
+            <li><span>Runtime:</span> [event:logTimeRelative|timedelta]</li>
+            <li><span title="Thread number [event:threadNumber]">Thread:</span> [event:threadName]</li>
+            <li><span>Scope:</span> [event:functionName]</li>
+            <li><span>Line:</span> [event:lineNumber]</li>
+            <li><span title="Path: [event:filePath]">File:</span> [event:fileName]</li>
+          </ul>
+        </td>
+        <td>
+          <p>[event:logMessage]</p>
+        </td>
+      </tr>
+      {{ if [event:traceback] }}
+      <tr>
+        <td class="traceback" colspan="2">
+          <h3>Traceback</h3>
+          <pre>[event:traceback]</pre>
+        </td>
+      </tr>
+      {{ endif }}
+    </tbody>
+  </table>
+</li>

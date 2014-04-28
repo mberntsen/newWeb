@@ -1,0 +1,152 @@
+[header]
+    <div id="content">
+      <div>
+        <h2>Request info</h2>
+        <ul>
+          <li><em>Method: <strong>[method]</strong></em></li>
+          <li><em>ConnectionID: <strong>[conn_id]</strong></em></li>
+        </ul>
+        <br>
+        <h2>Query arguments (GET):</h2>
+        <ul class="query">
+          {{ for name, value in [query|items|sorted] }} {{ inline varlisting.html }} {{ endfor }}
+        </ul>
+        <br>
+        <h2>POST data:</h2>
+        <ul class="varlist">
+          {{ for name, value in [postvars|items|sorted] }} {{ inline varlisting.html }} {{ endfor }}
+        </ul>
+        <br>
+        <h2>Cookies:</h2>
+        <ul class="varlist">
+          {{ for name, value in [cookies|items|sorted] }} {{ inline varlisting.html }} {{ endfor }}
+        </ul>
+      </div>
+      <div>
+        <h2>Test POST data</h2>
+        <form action="#" method="post">
+          <ul class="nodot">
+            <li>
+                <label for="example_post">ExamplePost:</label>
+                <input type="text" id="example_post" name="ExamplePost">
+                <input type="submit" value="Submit">
+            </li>
+          </ul>
+        </form>
+        <h2>Test Upload form / dragdrop</h2>
+        <form action="/upload" method="post" id="uploadbox" enctype="multipart/form-data" >
+          <ul class="nodot">
+            <li>
+                <label for="example_upload">Upload a file:</label>
+                <input type="file" multiple="true" id="example_upload" name="ExampleUpload">
+            </li>
+            <li>
+                <label for="example_async">Upload async</label>
+                <input type="checkbox" id="example_async" name="async">
+            </li>
+            <li>
+                <input type="submit" value="Submit">
+            </li>
+          </ul>
+          <div class="status"></div>
+        </form>
+        <br>
+        <h2>Create a custom cookie</h2>
+        <p>
+          These cookies will be posted to this very same page. They will then be added to the outgoing headers. They will *not* show up on the resulting page, though they will on every other request after that, until their max-age expires.
+        <form action="#" method="post">
+          <ul class="nodot horizontal">
+            <li>
+              <label for="cookie_name">Cookie name:</label>
+              <input type="text" id="cookie_name" name="uweb_cookie_name">
+            </li>
+            <li>
+              <label for="cookie_value">Cookie value:</label>
+              <input type="text" id="cookie_value" name="uweb_cookie_value">
+            </li>
+            <li>
+                <label for="cookie_path">Cookie path:</label>
+                <input type="text" id="cookie_path" name="uweb_cookie_path" value="/">
+            </li>
+            <li>
+              <label for="cookie_max_age">Cookie max-age:</label>
+              <input type="text" id="cookie_max_age" name="uweb_cookie_max_age" value="60">
+              <input type="submit" value="Set cookie">
+            </li>
+          </ul>
+        </form>
+        <br>
+        <h2>OpenID login</h2>
+        <form method="post" action="/OpenIDLogin">
+          <label for="openid_provider">Provider URL:</label>
+          <input type="text" id="openid_provider" name="openid_provider" value="">
+          <input type="submit" value="Log in"><br>
+        </form>
+        <br>
+        <h2>ULF - Plaintext login</h2>
+        <form method="post" action="/ULF-Login?debug">
+          <ul class="nodot">
+            <li>
+              <label for="plain_user">Username: </label>
+              <input type="text" name="username" id="plain_user">
+            </li>
+            <li>
+              <label for="plain_pass">Password: </label>
+              <input type="password"  name="password" id="plain_pass">
+              <input type="submit" value="Log me in">
+            </li>
+          </ul>
+        </form>
+        <br>
+        <h2>ULF - Handshake login</h2>
+        <form method="post" action="/ULF-Login?debug">
+          <ul class="nodot">
+            <li>
+              <label for="secure_user">Username: </label>
+              <input type="text" name="username" id="secure_user">
+            </li>
+            <li>
+              <label for="secure_pass">Password: </label>
+              <input name="password" id="secure_pass" type="password">
+              <input type="submit" value="Log me in" onclick="LoginDigest();">
+            </li>
+          </ul>
+        </form>
+      </div>
+      <div>
+        <h2>Client headers:</h2>
+        <ul class="varlist">
+          {{ for name, value in [headers|items|sorted] }} {{ inline varlisting.html }} {{ endfor }}
+        </ul>
+      </div>
+      <div>
+        <h2>Environment variables:</h2>
+        <ul class="varlist">
+          {{ for name, value in [env|items|sorted] }} {{ inline varlisting.html }} {{ endfor }}
+        </ul>
+      </div>
+      <div>
+        <h2>Extended environment variables:</h2>
+        <ul class="varlist">
+          {{ for name, value in [ext_env|items|sorted] }} {{ inline varlisting.html }} {{ endfor }}
+        </ul>
+      </div>
+    </div>
+    <script src="//ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js" type="text/javascript"></script>
+
+    <script src="http://underdark.nl/js/upload.js" type="text/javascript"></script>
+
+    <script src="" type="text/javascript"></script>
+    <script src="http://underdark.nl/js/login.js" type="text/javascript"></script>
+    <script type="text/javascript">
+      // <![CDATA[
+      $(document).ready(function() {
+        InitLoginFields({user:'#secure_user',
+                         pass:'#secure_pass'});
+        $('#uploadbox').each( function(){
+          new uploader($(this), $(this).find('.status'));
+        });
+      });
+      // ]]>
+    </script>
+[footer]

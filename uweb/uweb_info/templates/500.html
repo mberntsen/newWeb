@@ -1,0 +1,24 @@
+[header]
+    <div id="content">
+      <div>
+        <h2>We're sorry, our server broke. (HTTP 500)</h2>
+        <p>
+          Something went wrong with your request (&quot;[path]&quot;).
+        </p>
+        {{ if [path] == '/haltandcatchfire' }}
+        <h3>This is just a test</h3>
+        <p>
+          You got to this page by requesting  &quot;/haltandcatchfire&quot;. This is the <em>production</em> result page for an Internal Server Error. This was raised because the requested <code>PageMaker</code> method generated an error (though it also happens when no route is defined for a request).
+        </p>
+        <p>The <code>InternalServerError</code> method from <code>uweb.DebuggingPageMaker</code> has been overridden here to bring you this somewhat user-friendly page. For the raw debugging page, this method has a check for the presence of <em>debug</em> in the query string. Give it a try: <a href="?debug">debug HTTP 500</a>.
+        </p>
+        <p>If you find ways to trigger this page for requests other than <code>haltandcatchfire</code>, those are bugs and we'd <a href="http://bugs.underdark.nl/projects/uweb">like to know</a> about them.</p>
+        {{ else }}
+        <h3>This is NOT a test</h3>
+        <p>
+          You just stumbled across a (possible) error in &micro;Web. Please take a look at the <a href="?debug">full debug page</a> and verify that this is not an error of your own creation. If it isn't, please <a href="http://bugs.underdark.nl/projects/uweb">report this bug</a>, so we can fix this as soon as possible.
+        </p>
+        {{ endif }}
+      </div>
+    </div>
+[footer]
