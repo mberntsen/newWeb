@@ -1,2 +1,3 @@
 include README.md LICENSE
 recursive-include uweb *.js *.css *.html *.conf *.txt *.utp
+recursive-include uweb/ext_lib *.py
