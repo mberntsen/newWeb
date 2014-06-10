@@ -57,7 +57,7 @@ class Request(object):
                                 Cookie(self.env.get('HTTP_COOKIE')).items()),
                  'get': QueryArgsDict(cgi.parse_qs(self.env['QUERY_STRING']))}
     if self.env['REQUEST_METHOD'] == 'POST':
-      self.vars['post'] = ParseForm(post_data_fp, self.env)
+      self.vars['post'] = ParseForm(env['wsgi.input'], env)
     else:
       self.vars['post'] = IndexedFieldStorage()
 
