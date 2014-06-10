@@ -104,10 +104,7 @@ class NewWeb(object):
     status = response.httpcode
     if isinstance(status, int):
       status = '%d %s' % (status, httplib.responses[status])
-    headers = []
-    for key, value in response.headers.items():
-      headers.append((key, value.encode('utf8')))
-    start_response(status, headers)
+    start_response(status, response.headers)
     return [response.content]
 
 

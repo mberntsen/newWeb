@@ -34,8 +34,15 @@ class Response(object):
     else:
       self.content = str(content)
     self.httpcode = httpcode
-    self.headers = headers or {}
+    self._headers = headers or {}
     self.content_type = content_type
+
+  @property
+  def headers(self):
+    headers = [('content-type', self.content_type)]
+    for name, value in self._headers.iteritems():
+      headers.append((name, value))
+    return headers
 
   def __repr__(self):
     return '<%s instance at %#x>' % (self.__class__.__name__, id(self))
