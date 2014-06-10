@@ -6,11 +6,10 @@ __version__ = '0.14'
 
 
 # Standard modules
-import htmlentitydefs
+import httplib
 import os
 import re
 import sys
-import warnings
 
 # Underdark package module
 #
@@ -25,19 +24,6 @@ except ImportError:
 from underdark.libs import app
 from underdark.libs.app import logging
 
-try:
-  # Import this module to check uWeb runmode (success means MOD_PYTHON)
-  from mod_python import apache
-except ImportError:
-  # uWeb will run in STANDALONE mode
-  class _MockApache(object):
-    def __nonzero__(self):
-      return False
-  # Make sure we have a global `apache` we can test for truthness later on.
-  # pylint: disable=C0103
-  apache = _MockApache()
-  # pylint: enable=C0103
-
 # Package modules
 from . import pagemaker
 from . import request
@@ -48,9 +34,6 @@ from .response import Response
 from .response import Redirect
 from .pagemaker import PageMaker
 from .pagemaker import DebuggingPageMaker
-
-# Regex to match HTML entities and character references with.
-HTML_ENTITY_SEARCH = re.compile('&#?\w+;')
 
 
 class Error(Exception):
@@ -65,7 +48,7 @@ class NoRouteError(Error):
   """The server does not know how to route this request"""
 
 
-def Handler(page_class, router, config):
+class NewWeb(object):
   """Returns a configured closure for handling page requests.
 
   This closure is configured with a precomputed set of routes and handlers using
@@ -88,7 +71,12 @@ def Handler(page_class, router, config):
   Returns:
     RequestHandler: Configured closure that is ready to process requests.
   """
-  def RequestHandler(req):
+  def __init__(self, page_class, router, config):
+    self.page_class = page_class
+    self.router = router
+    self.config = config
+
+  def __call__(self, req, start_response):
     """Closure to handle incoming web requests.
 
     Incoming requests are transformed to a proper uWeb Request object, and then
@@ -113,16 +101,16 @@ def Handler(page_class, router, config):
                    This is ignored by the standalone version of uWeb.
     """
     req = request.Request(req)
-    pages = page_class(req, config=config)
+    pages = self.page_class(req, config=self.config)
     try:
       # We're specifically calling _PostInit here as promised in documentation.
       # pylint: disable=W0212
       pages._PostInit()
       # pylint: enable=W0212
-      method, args = router(req.env['PATH_INFO'])
+      method, args = self.router(req.env['PATH_INFO'])
       response = getattr(pages, method)(*args)
     except pagemaker.ReloadModules, message:
-      reload_message = reload(sys.modules[page_class.__module__])
+      reload_message = reload(sys.modules[self.page_class.__module__])
       response = Response(
           content='%s\n%s' % (message, reload_message))
     except ImmediateResponse, response:
@@ -132,14 +120,14 @@ def Handler(page_class, router, config):
 
     if not isinstance(response, Response):
       response = Response(content=response)
-    req.SetHttpCode(response.httpcode)
-    req.SetContentType(response.content_type)
-    for header_pair in response.headers.iteritems():
-      req.AddHeader(*header_pair)
-    req.Write(response.content)
-    if apache:
-      return apache.DONE
-  return RequestHandler
+    status = response.httpcode
+    if isinstance(status, int):
+      status = '%d %s' % (status, httplib.responses[status])
+    headers = []
+    for key, value in response.headers.items():
+      headers.append((key, value.encode('utf8')))
+    start_response(status, headers)
+    return [response.content]
 
 
 def Router(routes, prefix=None):
@@ -222,15 +210,14 @@ def ServerSetup(apache_logging=True):
       will cause the log-database to be opened and closed with every request.
       This might significantly affect performance.
   """
+
   # We need _getframe here, there's not really a neater way to do this.
   # pylint: disable=W0212
   entrypoint = sys._getframe(1)
   # pylint: enable=W0212
   router_file = entrypoint.f_code.co_filename
-  router_name = os.path.splitext(os.path.basename(router_file))[0]
 
   # Configuration based on constants provided
-  package_name = entrypoint.f_globals.get('PACKAGE')
   pages_class = entrypoint.f_globals['PAGE_CLASS']
   routes = entrypoint.f_globals['ROUTES']
   config_file = entrypoint.f_globals.get('CONFIG')
@@ -240,22 +227,8 @@ def ServerSetup(apache_logging=True):
   else:
     router_config = {}
   req_router = Router(routes, prefix=entrypoint.f_globals.get('ROUTE_PREFIX'))
-  handler = Handler(pages_class, req_router, router_config)
-  if not apache:
-    package_dir = os.path.abspath(os.path.join(
-        os.path.dirname(router_file), os.path.pardir))
-    package_name = package_name or os.path.basename(package_dir)
+  application = NewWeb(pages_class, req_router, router_config)
 
-    def main(handler=handler):
-      """Sets up a closure that is compatible with the UD app framework."""
-      server = standalone.StandAloneServer(handler, router_name, router_config)
-      server.serve_forever()
-
-    app.Service(stack_depth=3, app=main, working_dir=os.getcwd(),
-                package=package_name)
-  else:
-    entrypoint.f_globals['handler'] = handler
-    if apache_logging:
-      package = package_name or 'uweb_project'
-      log_dir = app.FirstWritablePath(app.MakePaths(app.LOGGING_PATHS, package))
-      app.SetUpLogging(os.path.join(log_dir, '%s.sqlite' % router_name))
+  from wsgiref.simple_server import make_server
+  wsgi_server = make_server('localhost', 8001, application)
+  wsgi_server.serve_forever()

@@ -43,20 +43,12 @@ class Cookie(cookie.SimpleCookie):
 
 
 class Request(object):
-  def __init__(self, request):
-    self._request = request
-    if hasattr(request, 'path'):
-      self._modpython = False
-      self.env = EnvironBaseHttp(request)
-      self.headers = request.headers
-      self._out_headers = []
-      self._out_status = 200
-      post_data_fp = request.rfile
-    else:
-      self._modpython = True
-      self.env = EnvironModPython(request)
-      self.headers = request.headers_in
-      post_data_fp = request
+  def __init__(self, env):
+    self._modpython = False
+    self.env = env
+    self.headers = self.headers_from_env(env)
+    self._out_headers = []
+    self._out_status = 200
 
     try:
       self.env['PATH_INFO'] = self.env['PATH_INFO'].decode('UTF8')
@@ -71,6 +63,15 @@ class Request(object):
       self.vars['post'] = ParseForm(post_data_fp, self.env)
     else:
       self.vars['post'] = IndexedFieldStorage()
+
+  def headers_from_env(self, env):
+    headers = {}
+    for key, value in env.iteritems():
+      if key.startswith('HTTP_'):
+        name = key[5:].lower().replace('_', '-')
+        headers[name] = value
+    return headers
+
 
   def AddCookie(self, key, value, **attrs):
     """Adds a new cookie header to the repsonse.
@@ -115,6 +116,7 @@ class Request(object):
       self._out_headers.append((name, value))
 
   def ExtendedEnvironment(self):
+    return self.env
     if self._modpython:
       return ExtendEnvironModPython(self.env, self._request)
     else:
