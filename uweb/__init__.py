@@ -66,7 +66,7 @@ class NewWeb(object):
   def __init__(self, page_class, routes, config):
     self.page_class = page_class
     self.router = Router(routes)
-    self.config = config
+    self.config = config if config is not None else {}
 
   def __call__(self, env, start_response):
     """WSGI request handler.
@@ -161,14 +161,7 @@ def Router(routes):
 def ServerSetup(page_class, routes, config=None):
   """Sets up and starts serving a WSGI application based on wsgiref."""
   # Configuration based on constants provided
-  if config is not None:
-    entrypoint = sys._getframe(1)
-    router_file = entrypoint.f_code.co_filename
-    router_config = ParseConfig(os.path.join(
-        os.path.dirname(router_file), config))
-  else:
-    router_config = {}
-  application = NewWeb(page_class, routes, router_config)
+  application = NewWeb(page_class, routes, config=config)
 
   from wsgiref.simple_server import make_server
   wsgi_server = make_server('localhost', 8001, application)

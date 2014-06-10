@@ -33,4 +33,5 @@ ROUTES = (
     ('/(.*)', 'NonWordCatchall'))
 
 
-uweb.ServerSetup(pages.PageMaker, ROUTES, config='../example.conf')
+uweb.ServerSetup(
+    pages.PageMaker, ROUTES, config=uweb.ParseConfig('../example.conf'))
