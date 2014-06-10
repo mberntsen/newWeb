@@ -4,6 +4,9 @@
 __author__ = 'Elmer de Looff <elmer@underdark.nl>'
 __version__ = '0.2'
 
+# Standard modules
+import httplib
+
 
 class Response(object):
   """Defines a full HTTP response.
@@ -45,6 +48,10 @@ class Response(object):
   @property
   def headers(self):
     return list(self.headers_iter())
+
+  @property
+  def status(self):
+    return '%d %s' % (self.httpcode, httplib.responses[self.httpcode])
 
   def __repr__(self):
     return '<%s instance at %#x>' % (self.__class__.__name__, id(self))

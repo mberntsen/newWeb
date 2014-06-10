@@ -7,7 +7,6 @@ __version__ = '0.14'
 
 # Standard modules
 import ConfigParser
-import httplib
 import os
 import re
 import sys
@@ -101,10 +100,7 @@ class NewWeb(object):
 
     if not isinstance(response, Response):
       response = Response(content=response)
-    status = response.httpcode
-    if isinstance(status, int):
-      status = '%d %s' % (status, httplib.responses[status])
-    start_response(status, response.headers)
+    start_response(response.status, response.headers)
     return [response.content]
 
 
