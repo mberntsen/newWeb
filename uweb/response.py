@@ -37,12 +37,14 @@ class Response(object):
     self._headers = headers or {}
     self.content_type = content_type
 
+  def headers_iter(self):
+    yield 'content-type', self.content_type
+    for name, value in self._headers.iteritems():
+      yield name, value
+
   @property
   def headers(self):
-    headers = [('content-type', self.content_type)]
-    for name, value in self._headers.iteritems():
-      headers.append((name, value))
-    return headers
+    return list(self.headers_iter())
 
   def __repr__(self):
     return '<%s instance at %#x>' % (self.__class__.__name__, id(self))
