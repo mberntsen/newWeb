@@ -193,39 +193,6 @@ def Router(routes, prefix=None):
   return RequestRouter
 
 
-def HtmlUnescape(html):
-  """Replaces html named entities and character references with raw characters.
-
-  Unlike its HtmlEscape counterpart, this function supports all named entities
-  and every character reference possible, through use of a regular expression.
-
-  Takes:
-    @ html: str
-      The html string with html named entities and character references.
-
-  Returns:
-    str: The input, with all entities and references replaces by unicode chars.
-  """
-  def _FixEntities(match):
-    text = match.group(0)
-    if text[:2] == "&#":
-      # character reference
-      try:
-        if text[2] == 'x':
-          return unichr(int(text[3:-1], 16))
-        return unichr(int(text[2:-1]))
-      except ValueError:
-        pass
-    else:
-      # named entity
-      try:
-        return unichr(htmlentitydefs.name2codepoint[text[1:-1]])
-      except KeyError:
-        pass
-    return text # leave as is
-  return HTML_ENTITY_SEARCH.sub(_FixEntities, html)
-
-
 def ServerSetup(apache_logging=True):
   """Sets up a the runtime environment of the webserver.
 
