@@ -11,17 +11,11 @@ import os
 import re
 import sys
 
-# Underdark package module
-#
-# If the underdark package is not directly available, add the 'ud_lib'
-# directory to the module path.
-try:
-  import underdark
-except ImportError:
-  sys.path.append(
-      os.path.abspath(os.path.join(os.path.dirname(__file__), 'ext_lib')))
-# Underdark modules
-from underdark.libs.app import logging
+# Add the ext_lib directory to the path
+# This ensures the logging module can be loaded
+sys.path.append(
+    os.path.abspath(os.path.join(os.path.dirname(__file__), 'ext_lib')))
+from underdark.libs import logging
 
 # Package modules
 from . import pagemaker

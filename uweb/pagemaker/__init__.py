@@ -14,7 +14,7 @@ import threading
 import warnings
 
 # Custom modules
-from underdark.libs.app import logging
+from underdark.libs import logging
 
 # Package modules
 from .. import response
