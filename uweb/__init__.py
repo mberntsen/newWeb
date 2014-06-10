@@ -114,7 +114,6 @@ class NewWeb(object):
 def ParseConfig(config_file):
   """Parses the given `config_file` and returns it as a nested dictionary."""
   parser = ConfigParser.SafeConfigParser()
-  config_file = os.path.join(os.getcwd(), config_file)
   try:
     parser.read(config_file)
   except ConfigParser.ParsingError:
