@@ -27,7 +27,6 @@ from underdark.libs.app import logging
 # Package modules
 from . import pagemaker
 from . import request
-from . import standalone
 
 # Package classes
 from .response import Response
@@ -76,31 +75,13 @@ class NewWeb(object):
     self.router = router
     self.config = config
 
-  def __call__(self, req, start_response):
-    """Closure to handle incoming web requests.
+  def __call__(self, env, start_response):
+    """WSGI request handler.
 
-    Incoming requests are transformed to a proper uWeb Request object, and then
-    processed by the `router`, which is provided by the outer scope.
-
-    The router may return in two ways:
-      1) Returns a handler and arguments, in which case these are used to
-         create a regular response for the client.
-      2) Raise `NoRouteError`, in which case `InternalServerError` on the
-         pagemaker is returned instead.
-
-    During processing of a request, two additional error situations may come up:
-      1) `ReloadModules`
-         This halts any running execution of web-requests and reloads the
-         `pageclass`. The response will be a text/plain page with the result of
-         the reload statement
-      2) Any other Exception
-         Like NoRouteError this will return `InternalServerError` to the client.
-
-    Returns:
-      apache.DONE: signal for Apache to send the page to the client.
-                   This is ignored by the standalone version of uWeb.
+    Accpepts the WSGI `environment` dictionary and a function to start the
+    response and returns a response iterator.
     """
-    req = request.Request(req)
+    req = request.Request(env)
     pages = self.page_class(req, config=self.config)
     try:
       # We're specifically calling _PostInit here as promised in documentation.
@@ -182,11 +163,7 @@ def Router(routes, prefix=None):
 
 
 def ServerSetup(apache_logging=True):
-  """Sets up a the runtime environment of the webserver.
-
-  If the router (the caller of this function) runs in `standalone` mode (defined
-  by absence of the `apache` module), the runtime environment will be a service
-  as defined by the app framework.
+  """Sets up and starts serving a WSGI application based on wsgiref
 
   If provided through the CONFIG constant, the configuration file will be read
   and parsed. This configuration will be used for the `StandAloneServer` for
@@ -203,12 +180,6 @@ def ServerSetup(apache_logging=True):
       there will be access and error logs, again sharing the base name with the
       router itself. The default directory name to bundle these files under will
       be the name of the directory one up from where the router runs.
-
-  Arguments:
-    % apache_logging: bool ~~ True
-      Whether or not to log when running from inside Apache. Enabling logging
-      will cause the log-database to be opened and closed with every request.
-      This might significantly affect performance.
   """
 
   # We need _getframe here, there's not really a neater way to do this.
