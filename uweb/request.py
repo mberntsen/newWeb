@@ -109,9 +109,6 @@ class Request(object):
   def AddHeader(self, name, value):
     self._out_headers.append((name, value))
 
-  def ExtendedEnvironment(self):
-    return self.env
-
 
 class IndexedFieldStorage(cgi.FieldStorage):
   """Adaption of cgi.FieldStorage with a few specific changes.
