@@ -6,6 +6,7 @@ __version__ = '0.14'
 
 
 # Standard modules
+import ConfigParser
 import httplib
 import os
 import re
@@ -21,7 +22,6 @@ except ImportError:
   sys.path.append(
       os.path.abspath(os.path.join(os.path.dirname(__file__), 'ext_lib')))
 # Underdark modules
-from underdark.libs import app
 from underdark.libs.app import logging
 
 # Package modules
@@ -111,6 +111,18 @@ class NewWeb(object):
     return [response.content]
 
 
+def ParseConfig(config_file):
+  """Parses the given `config_file` and returns it as a nested dictionary."""
+  parser = ConfigParser.SafeConfigParser()
+  config_file = os.path.join(os.getcwd(), config_file)
+  try:
+    parser.read(config_file)
+  except ConfigParser.ParsingError:
+    raise ValueError('Not a valid config file: %r.' % config_file)
+  return dict((section, dict(parser.items(section)))
+              for section in parser.sections())
+
+
 def Router(routes, prefix=None):
   """Returns the first request handler that matches the request URL.
 
@@ -193,7 +205,7 @@ def ServerSetup(apache_logging=True):
   routes = entrypoint.f_globals['ROUTES']
   config_file = entrypoint.f_globals.get('CONFIG')
   if config_file:
-    router_config = app.ParseConfig(os.path.join(
+    router_config = ParseConfig(os.path.join(
         os.path.dirname(router_file), config_file))
   else:
     router_config = {}
