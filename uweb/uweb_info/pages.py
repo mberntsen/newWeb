@@ -56,7 +56,6 @@ class PageMaker(login.LoginMixin, login.OpenIdMixin, uweb.DebuggingPageMaker):
         cookies=self.cookies,
         headers=self.req.headers,
         env=self.req.env,
-        ext_env=self.req.ExtendedEnvironment(),
         **self.CommonBlocks('main'))
 
   def Json(self):

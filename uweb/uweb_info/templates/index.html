@@ -125,12 +125,6 @@
           {{ for name, value in [env|items|sorted] }} {{ inline varlisting.html }} {{ endfor }}
         </ul>
       </div>
-      <div>
-        <h2>Extended environment variables:</h2>
-        <ul class="varlist">
-          {{ for name, value in [ext_env|items|sorted] }} {{ inline varlisting.html }} {{ endfor }}
-        </ul>
-      </div>
     </div>
     <script src="//ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js" type="text/javascript"></script>
 
