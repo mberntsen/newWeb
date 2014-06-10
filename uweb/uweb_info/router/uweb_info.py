@@ -8,13 +8,6 @@ from uweb.uweb_info import pages
 __author__ = 'Elmer de Looff <elmer@underdark.nl>'
 __version__ = '0.3'
 
-CONFIG = '../example.conf'
-PACKAGE = 'uweb_info'
-
-# PAGE_CLASS is the constant that defines the class that should handle requests
-# from clients. The method to call is defined by the ROUTES constant below.
-PAGE_CLASS = pages.PageMaker
-
 # This router uses the constant `ROUTES` to provide a request router for the
 # uWeb Handler. `ROUTES` is an iterable consisting of 2-tuples, each of which
 # defines a regular expression and a method name. The regular expressions are
@@ -40,4 +33,4 @@ ROUTES = (
     ('/(.*)', 'NonWordCatchall'))
 
 
-uweb.ServerSetup(apache_logging=True)
+uweb.ServerSetup(pages.PageMaker, ROUTES, config='../example.conf')

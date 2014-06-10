@@ -174,43 +174,18 @@ def Router(routes, prefix=None):
   return RequestRouter
 
 
-def ServerSetup(apache_logging=True):
-  """Sets up and starts serving a WSGI application based on wsgiref
-
-  If provided through the CONFIG constant, the configuration file will be read
-  and parsed. This configuration will be used for the `StandAloneServer` for
-  host and port configurations, and the PageMaker will use it for all sorts of
-  configuration, for example database connection into and default search paths.
-
-  Logging:
-    For both `standalone` and `apache` mode, the PACKAGE constant will set the
-    directory under which log files should be accumulated.
-    * For `apache` this will create a log database 'apache.sqlite' only, and if
-      the PACKAGE constant is not available, this will default to 'uweb_project'
-    * For `standalone` mode, there will be '.sqlite' log files for each router,
-      and the base-name will be the same as that of the router. Additionally
-      there will be access and error logs, again sharing the base name with the
-      router itself. The default directory name to bundle these files under will
-      be the name of the directory one up from where the router runs.
-  """
-
-  # We need _getframe here, there's not really a neater way to do this.
-  # pylint: disable=W0212
-  entrypoint = sys._getframe(1)
-  # pylint: enable=W0212
-  router_file = entrypoint.f_code.co_filename
-
+def ServerSetup(page_class, routes, config=None):
+  """Sets up and starts serving a WSGI application based on wsgiref."""
   # Configuration based on constants provided
-  pages_class = entrypoint.f_globals['PAGE_CLASS']
-  routes = entrypoint.f_globals['ROUTES']
-  config_file = entrypoint.f_globals.get('CONFIG')
-  if config_file:
+  if config is not None:
+    entrypoint = sys._getframe(1)
+    router_file = entrypoint.f_code.co_filename
     router_config = ParseConfig(os.path.join(
-        os.path.dirname(router_file), config_file))
+        os.path.dirname(router_file), config))
   else:
     router_config = {}
   req_router = Router(routes, prefix=entrypoint.f_globals.get('ROUTE_PREFIX'))
-  application = NewWeb(pages_class, req_router, router_config)
+  application = NewWeb(page_class, req_router, router_config)
 
   from wsgiref.simple_server import make_server
   wsgi_server = make_server('localhost', 8001, application)
