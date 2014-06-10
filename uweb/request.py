@@ -8,10 +8,8 @@ __version__ = '0.8'
 import cgi
 import cStringIO
 import Cookie as cookie
-import os
 import re
 import socket
-import urllib
 
 
 class Cookie(cookie.SimpleCookie):
@@ -44,7 +42,6 @@ class Cookie(cookie.SimpleCookie):
 
 class Request(object):
   def __init__(self, env):
-    self._modpython = False
     self.env = env
     self.headers = self.headers_from_env(env)
     self._out_headers = []
@@ -110,10 +107,7 @@ class Request(object):
     self.AddHeader('Set-Cookie', new_cookie[key].OutputString())
 
   def AddHeader(self, name, value):
-    if self._modpython:
-      self._request.headers_out.add(name, value)
-    else:
-      self._out_headers.append((name, value))
+    self._out_headers.append((name, value))
 
   def ExtendedEnvironment(self):
     return self.env
@@ -174,73 +168,6 @@ class QueryArgsDict(dict):
       return []
 
 
-def EnvironBaseHttp(request):
-  path_info, _sep, query_string = request.path.partition('?')
-  environ = {'CONTENT_TYPE': request.headers.get('content-type', ''),
-             'CONTENT_LENGTH': request.headers.get('content-length', 0),
-             'HTTP_COOKIE': request.headers.get('cookie', ''),
-             'HTTP_HOST': request.headers.get('host', ''),
-             'HTTP_REFERER': request.headers.get('referer', ''),
-             'HTTP_USER_AGENT': request.headers.get('user-agent', ''),
-             'PATH_INFO': urllib.unquote_plus(path_info),
-             'QUERY_STRING': query_string,
-             'REMOTE_ADDR': request.client_address[0],
-             'REQUEST_METHOD': request.command,
-             'UWEB_MODE': 'STANDALONE'}
-  return HeadersIntoEnviron(environ, request.headers)
-
-
-def EnvironModPython(request):
-  environ = {'CONTENT_TYPE': request.headers_in.get('content-type', ''),
-             'CONTENT_LENGTH': request.headers_in.get('content-length', 0),
-             'HTTP_COOKIE': request.headers_in.get('cookie', ''),
-             'HTTP_HOST': request.hostname,
-             'HTTP_REFERER': request.headers_in.get('referer', ''),
-             'HTTP_USER_AGENT': request.headers_in.get('user-agent', ''),
-             'PATH_INFO': urllib.unquote_plus(request.uri),
-             'QUERY_STRING': request.args or '',
-             'REMOTE_ADDR': request.connection.remote_ip,
-             'REQUEST_METHOD': request.method,
-             'UWEB_MODE': 'MOD_PYTHON'}
-  return HeadersIntoEnviron(environ, request.headers_in)
-
-
-def ExtendEnvironBaseHttp(environ, request):
-  environ.update(
-      {'AUTH_TYPE': None,
-       'CONNECTION_ID': None,
-       'DOCUMENT_ROOT': os.getcwd(),
-       'RAW_REQUEST': request.raw_requestline,
-       'REMOTE_HOST': socket.getfqdn(environ['REMOTE_ADDR']),
-       'REMOTE_USER': None,
-       'SERVER_NAME': request.server.server_name,
-       'SERVER_PORT': request.server.server_port,
-       'SERVER_LOCAL_NAME': socket.gethostname(),
-       'SERVER_LOCAL_IP': GetLocalIp(environ['REMOTE_ADDR']),
-       'SERVER_PROTOCOL': request.request_version})
-  return environ
-
-
-def ExtendEnvironModPython(environ, request):
-  environ.update(
-      {'AUTH_TYPE': request.ap_auth_type,
-       'CONNECTION_ID': request.connection.id,
-       'DOCUMENT_ROOT': request.document_root(),
-       'RAW_REQUEST': request.the_request,
-       'REMOTE_HOST': socket.getfqdn(environ['REMOTE_ADDR']),
-       'REMOTE_USER': request.user,
-       'SERVER_NAME': request.server.server_hostname,
-       'SERVER_PORT': request.connection.local_addr[1],
-       'SERVER_LOCAL_NAME': socket.gethostname(),
-       'SERVER_LOCAL_IP': request.connection.local_ip,
-       'SERVER_PROTOCOL': request.protocol,
-       # Some specific mod_python love
-       'MODPYTHON_HANDLER': request.handler,
-       'MODPYTHON_INTERPRETER': request.interpreter,
-       'MODPYTHON_PHASE': request.phase})
-  return environ
-
-
 def GetLocalIp(remote_addr):
   """Returns the local IP address of the server.
 
@@ -264,40 +191,6 @@ def GetLocalIp(remote_addr):
   # The port is irrelevant as we're not going to transfer any data.
   sock.connect((remote_addr, 80))
   return sock.getsockname()[0]
-
-
-def HeadersIntoEnviron(environ, headers, skip_pre_existing_http=True):
-  """Adds the headers into the environment.
-
-  If a header is already present, it's skipped, otherwise it's added with a
-  leading 'HTTP_'.
-
-  Arguments:
-    @ environ: dict
-      Dictionary of environment variables as (roughly) defined in CGI spec.
-    @ headers: dict-like
-      Dictionary of HTTP-response headers. Any object with a tuple-iterator
-      on .items() method will do.
-    % skip_pre_existing_http: boolean ~~ True
-      A list of pre-existing 'HTTP_*' environment vars is made, and any headers
-      that match, will *not* be added to the environment again.
-
-  Returns
-   dict: the environ as passed in, with added HTTP environment variables.
-  """
-  pre_existing_http = ()
-  if skip_pre_existing_http:
-    pre_existing_http = set(var[5:] for var in environ if var[:5] == 'HTTP_')
-  for name, value in headers.items():
-    name = name.replace('-', '_').upper()
-    if name in environ or name in pre_existing_http:
-      continue  # Skip headers we already have in environ
-    if 'HTTP_' + name in environ:
-      # Comma-separate headers that occur more than once
-      environ['HTTP_' + name] += ',' + value
-    else:
-      environ['HTTP_' + name] = value
-  return environ
 
 
 def ParseForm(file_handle, environ):
