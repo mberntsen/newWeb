@@ -1,6 +1,9 @@
 #!/usr/bin/python
 """An uweb info page and testcase."""
 
+# Standard modules
+import os
+
 # Custom modules
 import uweb
 from uweb.uweb_info import pages
@@ -33,5 +36,6 @@ ROUTES = (
     ('/(.*)', 'NonWordCatchall'))
 
 
-uweb.ServerSetup(
-    pages.PageMaker, ROUTES, config=uweb.ParseConfig('../example.conf'))
+HERE = os.path.dirname(__file__)
+CONFIG = os.path.join(HERE, '../example.conf')
+uweb.ServerSetup(pages.PageMaker, ROUTES, config=uweb.ParseConfig(CONFIG))

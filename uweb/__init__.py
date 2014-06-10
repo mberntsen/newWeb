@@ -10,6 +10,7 @@ import ConfigParser
 import os
 import re
 import sys
+from wsgiref.simple_server import make_server
 
 # Add the ext_lib directory to the path
 # This ensures the logging module can be loaded
@@ -160,9 +161,11 @@ def Router(routes):
 
 def ServerSetup(page_class, routes, config=None):
   """Sets up and starts serving a WSGI application based on wsgiref."""
-  # Configuration based on constants provided
+  # Build application
   application = NewWeb(page_class, routes, config=config)
-
-  from wsgiref.simple_server import make_server
-  wsgi_server = make_server('localhost', 8001, application)
+  # Set up WSGI server
+  host = application.config.get('development', {}).get('host', 'localhost')
+  port = application.config.get('development', {}).get('port', 8001)
+  wsgi_server = make_server(host, int(port), application)
+  print 'Running server on http://%s:%s' % wsgi_server.server_address
   wsgi_server.serve_forever()
