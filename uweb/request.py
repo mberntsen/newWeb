@@ -117,39 +117,6 @@ class Request(object):
 
   def ExtendedEnvironment(self):
     return self.env
-    if self._modpython:
-      return ExtendEnvironModPython(self.env, self._request)
-    else:
-      return ExtendEnvironBaseHttp(self.env, self._request)
-
-  def SetContentType(self, content_type):
-    """Sets outgoing header 'content-type' to the given value."""
-    if self._modpython:
-      self._request.content_type = '%s; charset=utf-8' % content_type
-    else:
-      self.AddHeader('content-type', '%s; charset=utf-8' % content_type)
-
-  def SetHttpCode(self, http_status_code):
-    if self._modpython:
-      self._request.status = http_status_code
-    else:
-      self._out_status = http_status_code
-
-  def Write(self, data):
-    """Writes the HTTP reply to the requesting party.
-
-    N.B. For the BaseHTTP variant, this is where status and headers are written.
-    """
-    if self._modpython:
-      if self.env['REQUEST_METHOD'] != 'HEAD':
-        self._request.write(data)
-    else:
-      self._request.send_response(self._out_status)
-      for name, value in self._out_headers:
-        self._request.send_header(name, value)
-      self._request.end_headers()
-      if self.env['REQUEST_METHOD'] != 'HEAD':
-        self._request.wfile.write(data)
 
 
 class IndexedFieldStorage(cgi.FieldStorage):
