@@ -122,7 +122,7 @@ def ParseConfig(config_file):
               for section in parser.sections())
 
 
-def Router(routes, prefix=None):
+def Router(routes):
   """Returns the first request handler that matches the request URL.
 
   The `routes` argument is an iterable of 2-tuples, each of which contain a
@@ -138,11 +138,9 @@ def Router(routes, prefix=None):
   Returns:
     RequestRouter: Configured closure that processes urls.
   """
-  if prefix is None:
-    prefix = ''
   req_routes = []
   for pattern, method in routes:
-    req_routes.append((re.compile(prefix + pattern + '$', re.UNICODE), method))
+    req_routes.append((re.compile(pattern + '$', re.UNICODE), method))
 
   def RequestRouter(url):
     """Returns the appropriate handler and arguments for the given `url`.
@@ -183,7 +181,7 @@ def ServerSetup(page_class, routes, config=None):
         os.path.dirname(router_file), config))
   else:
     router_config = {}
-  req_router = Router(routes, prefix=entrypoint.f_globals.get('ROUTE_PREFIX'))
+  req_router = Router(routes)
   application = NewWeb(page_class, req_router, router_config)
 
   from wsgiref.simple_server import make_server
