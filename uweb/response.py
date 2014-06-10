@@ -43,7 +43,7 @@ class Response(object):
   def headers_iter(self):
     yield 'content-type', self.content_type
     for name, value in self._headers.iteritems():
-      yield name, value
+      yield name, value.encode('ascii')
 
   @property
   def headers(self):
