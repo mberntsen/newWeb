@@ -70,9 +70,9 @@ class NewWeb(object):
   Returns:
     RequestHandler: Configured closure that is ready to process requests.
   """
-  def __init__(self, page_class, router, config):
+  def __init__(self, page_class, routes, config):
     self.page_class = page_class
-    self.router = router
+    self.router = Router(routes)
     self.config = config
 
   def __call__(self, env, start_response):
@@ -181,8 +181,7 @@ def ServerSetup(page_class, routes, config=None):
         os.path.dirname(router_file), config))
   else:
     router_config = {}
-  req_router = Router(routes)
-  application = NewWeb(page_class, req_router, router_config)
+  application = NewWeb(page_class, routes, router_config)
 
   from wsgiref.simple_server import make_server
   wsgi_server = make_server('localhost', 8001, application)
