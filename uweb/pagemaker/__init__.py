@@ -11,10 +11,9 @@ import mimetypes
 import os
 import sys
 import threading
-import warnings
 
 # Custom modules
-from underdark.libs import logging
+from uweb import logging
 
 # Package modules
 from .. import response

@@ -10,7 +10,6 @@ import decimal
 import inspect
 import os
 
-import uweb
 from uweb import templateparser
 from uweb import model
 
