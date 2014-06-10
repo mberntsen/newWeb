@@ -36,6 +36,11 @@ ROUTES = (
     ('/(.*)', 'NonWordCatchall'))
 
 
-HERE = os.path.dirname(__file__)
-CONFIG = os.path.join(HERE, '../example.conf')
-uweb.ServerSetup(pages.PageMaker, ROUTES, config=uweb.ParseConfig(CONFIG))
+def application():
+  here = os.path.dirname(__file__)
+  config = os.path.join(here, '../example.conf')
+  return uweb.NewWeb(pages.PageMaker, ROUTES, config=uweb.ParseConfig(config))
+
+
+if __name__ == '__main__':
+  uweb.dev_server(application())

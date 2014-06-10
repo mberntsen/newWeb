@@ -159,11 +159,8 @@ def Router(routes):
   return RequestRouter
 
 
-def ServerSetup(page_class, routes, config=None):
-  """Sets up and starts serving a WSGI application based on wsgiref."""
-  # Build application
-  application = NewWeb(page_class, routes, config=config)
-  # Set up WSGI server
+def dev_server(application):
+  """Sets up and starts serving a WSGI server for the given application."""
   host = application.config.get('development', {}).get('host', 'localhost')
   port = application.config.get('development', {}).get('port', 8001)
   wsgi_server = make_server(host, int(port), application)
