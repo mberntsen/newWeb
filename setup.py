@@ -19,7 +19,6 @@ def version():
 
 requires = [
     'decorator',
-    'lockfile',
     'mysql-python',
     'python-magic',
     'python-openid',
