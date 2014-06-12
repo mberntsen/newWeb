@@ -1,7 +1,7 @@
 #!/usr/bin/python
 """Underdark Web Framework -- uWeb"""
 
-__version__ = '0.3.0'
+__version__ = '0.4.0-dev'
 
 # Standard modules
 import ConfigParser
