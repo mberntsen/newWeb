@@ -1,9 +1,7 @@
 #!/usr/bin/python
 """Underdark Web Framework -- uWeb"""
 
-__author__ = 'Elmer de Looff <elmer@underdark.nl>'
-__version__ = '0.14'
-
+__version__ = '0.3.0'
 
 # Standard modules
 import ConfigParser

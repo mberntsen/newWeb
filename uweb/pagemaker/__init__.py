@@ -1,10 +1,6 @@
+
 #!/usr/bin/python
 """Underdark uWeb PageMaker class and its various Mixins."""
-from __future__ import with_statement
-
-__author__ = 'Elmer de Looff <elmer@underdark.nl>'
-__version__ = '0.11'
-
 # Standard modules
 import datetime
 import mimetypes

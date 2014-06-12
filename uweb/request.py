@@ -1,9 +1,6 @@
 #!/usr/bin/python2.6
 """Underdark micro-Web framework, uWeb, Request module."""
 
-__author__ = 'Elmer de Looff <elmer@underdark.nl>'
-__version__ = '0.8'
-
 # Standard modules
 import cgi
 import cStringIO

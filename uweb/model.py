@@ -1,9 +1,5 @@
 #!/usr/bin/python
 """uWeb model base classes."""
-from __future__ import with_statement
-
-__author__ = 'Elmer de Looff <elmer@underdark.nl>'
-__version__ = '0.17'
 
 # Standard modules
 import datetime

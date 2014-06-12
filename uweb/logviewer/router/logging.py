@@ -5,9 +5,6 @@
 import uweb
 from uweb.logviewer import viewer
 
-__author__ = 'Elmer de Looff'
-__version__ = '0.3'
-
 CONFIG = '../logging.conf'
 PACKAGE = 'logviewer'
 

@@ -1,9 +1,6 @@
 #!/usr/bin/python
 """Underdark uWeb PageMaker Mixins for session management purposes."""
 
-__author__ = 'Niek Bergman <niek@underdark.nl>'
-__version__ = '0.1'
-
 # Standard modules
 import binascii
 import os

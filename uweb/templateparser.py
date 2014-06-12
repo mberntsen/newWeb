@@ -9,8 +9,6 @@ Error classes:
   TemplateKeyError: A tagname
   TemplateReadError: Template file could not be read or found.
 """
-__author__ = 'Elmer de Looff <elmer@underdark.nl'
-__version__ = '1.5'
 
 # Standard modules
 import os

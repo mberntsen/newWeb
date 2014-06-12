@@ -1,7 +1,5 @@
 #!/usr/bin/python2.5
 """Tests for the request module."""
-__author__ = 'Elmer de Looff <elmer@underdark.nl>'
-__version__ = '0.3'
 
 # Method could be a function
 # pylint: disable-msg=R0201

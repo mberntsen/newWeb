@@ -1,9 +1,6 @@
 #!/usr/bin/python
 """Underdark uWeb Response object."""
 
-__author__ = 'Elmer de Looff <elmer@underdark.nl>'
-__version__ = '0.2'
-
 # Standard modules
 import httplib
 

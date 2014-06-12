@@ -1,9 +1,6 @@
 #!/usr/bin/python
 """module to support OpenID login in uWeb"""
 
-__author__ = 'Jan Klopper <jan@underdark.nl>'
-__version__ = '0.4'
-
 # Standard modules
 import base64
 import os

@@ -3,10 +3,6 @@
 
 Contains both the Underdark Login Framework and OpenID implementations
 """
-from __future__ import with_statement
-
-__author__ = 'Elmer de Looff <elmer@underdark.nl>'
-__version__ = '0.5'
 
 # Standard modules
 import binascii

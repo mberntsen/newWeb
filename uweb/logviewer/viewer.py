@@ -1,7 +1,6 @@
 #!/usr/bin/python
 """HTML generators for the logging web frontend"""
 
-__author__ = 'Elmer de Looff <elmer@underdark.nl>'
 __version__ = '0.5'
 
 # Standard modules

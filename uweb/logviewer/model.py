@@ -1,14 +1,11 @@
 #!/usr/bin/python2.5
 """This module scans for logging files and delivers them as objects"""
 
-__author__ = 'Elmer de Looff <elmer@underdark.nl>'
-__version__ = '0.3'
-
 # standard modules
 import os
 import fnmatch
 
-# custom modules
+# uWeb modules
 from underdark.libs.sqltalk import sqlite
 import uweb
 

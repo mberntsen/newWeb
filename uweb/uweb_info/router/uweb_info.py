@@ -8,9 +8,6 @@ import os
 import uweb
 from uweb.uweb_info import pages
 
-__author__ = 'Elmer de Looff <elmer@underdark.nl>'
-__version__ = '0.3'
-
 # This router uses the constant `ROUTES` to provide a request router for the
 # uWeb Handler. `ROUTES` is an iterable consisting of 2-tuples, each of which
 # defines a regular expression and a method name. The regular expressions are

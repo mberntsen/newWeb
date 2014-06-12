@@ -1,15 +1,13 @@
 #!/usr/bin/python
 """Underdark uWeb PageMaker Mixins for admin purposes."""
-from __future__ import with_statement
 
-__author__ = 'Jan Klopper <jan@underdark.nl>'
-__version__ = '0.1'
-
+# Standard modules
 import datetime
 import decimal
 import inspect
 import os
 
+# Package modules
 from uweb import templateparser
 from uweb import model
 
