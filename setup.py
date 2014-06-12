@@ -2,10 +2,20 @@
 
 # Standard modules
 import os
+import re
 from setuptools import setup, find_packages
 
-HERE = os.path.abspath(os.path.dirname(__file__))
-README = open(os.path.join(HERE, 'README.md')).read()
+
+def description():
+  with file(os.path.join(os.path.dirname(__file__), 'README.md')) as r_file:
+    return r_file.read()
+
+
+def version():
+  main_lib = os.path.join(os.path.dirname(__file__), 'uweb', '__init__.py')
+  with file(main_lib) as v_file:
+    return re.match(".*__version__ = '(.*?)'", v_file.read(), re.S).group(1)
+
 
 requires = [
     'decorator',
@@ -19,9 +29,9 @@ requires = [
 
 setup(
     name='uWeb',
-    version='0.3.0',
+    version=version(),
     description='Underdark\'s minimal web-framework',
-    long_description=README,
+    long_description=description(),
     license='ISC',
     classifiers=[
         'Development Status :: 3 - Alpha',
