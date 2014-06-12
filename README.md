@@ -1,14 +1,22 @@
 # Handle with care
 
-This fork of uWeb is very much a work in progress to fix some of the bad design decisions made during its development. For a full description of the rough edges of it, refer to the two relevant blog posts:
+This fork of µWeb is very much a work in progress to fix some of the bad design decisions made during its development. For a full description of the rough edges of it, refer to the two relevant blog posts:
 
-* [uWeb analysis part 1](http://variable-scope.com/posts/reflection-and-introspection-an-analysis-of-uweb) - general design and template system
-* [uWeb analysis part 2](http://variable-scope.com/posts/reflection-and-introspection-an-analysis-of-uweb-part-2) - presenter, database layer and debug server
+* [µWeb analysis part 1](http://variable-scope.com/posts/reflection-and-introspection-an-analysis-of-uweb) - general design and template system
+* [µWeb analysis part 2](http://variable-scope.com/posts/reflection-and-introspection-an-analysis-of-uweb-part-2) - presenter, database layer and debug server
 
 ## Work so far
 
 * Cut tons of code for the **standalone** module
-* Started work on making uWeb a WSGI application framework
+* Started work on making newWeb a WSGI application framework
+
+## Included (demo) projects
+
+The following µWeb applications are included in the project:
+
+* `uweb_info`: This demonstrates most µWeb/newWeb features, and gives you examples on how to use most of them.
+* `base_project`: this is a bare bones, Hello World-like application and provides a scaffold for your own projects -- ***broken***
+* `logviewer`: This allows you to see and browse errors reported by your µWeb applications -- ***broken***
 
 # newWeb installation
 
