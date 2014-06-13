@@ -38,9 +38,10 @@ class Cookie(cookie.SimpleCookie):
 
 
 class Request(object):
-  def __init__(self, env):
+  def __init__(self, env, registry):
     self.env = env
     self.headers = self.headers_from_env(env)
+    self.registry = registry
     self._out_headers = []
     self._out_status = 200
 

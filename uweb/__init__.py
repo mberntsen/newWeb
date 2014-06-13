@@ -5,16 +5,15 @@ __version__ = '0.4.0-dev'
 
 # Standard modules
 import ConfigParser
+import logging
 import os
 import re
 import sys
 from wsgiref.simple_server import make_server
 
 # Add the ext_lib directory to the path
-# This ensures the logging module can be loaded
 sys.path.append(
     os.path.abspath(os.path.join(os.path.dirname(__file__), 'ext_lib')))
-from underdark.libs import logging
 
 # Package modules
 from . import pagemaker
@@ -37,6 +36,10 @@ class ImmediateResponse(Exception):
 
 class NoRouteError(Error):
   """The server does not know how to route this request"""
+
+
+class Registry(object):
+  """Something to hook stuff to"""
 
 
 class NewWeb(object):
@@ -64,6 +67,8 @@ class NewWeb(object):
   """
   def __init__(self, page_class, routes, config):
     self.page_class = page_class
+    self.registry = Registry()
+    self.registry.logger = logging.getLogger('root')
     self.router = Router(routes)
     self.config = config if config is not None else {}
 
@@ -73,7 +78,7 @@ class NewWeb(object):
     Accpepts the WSGI `environment` dictionary and a function to start the
     response and returns a response iterator.
     """
-    req = request.Request(env)
+    req = request.Request(env, self.registry)
     pages = self.page_class(req, config=self.config)
     try:
       # We're specifically calling _PostInit here as promised in documentation.
