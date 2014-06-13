@@ -153,7 +153,7 @@ class PageMaker(login.LoginMixin, login.OpenIdMixin, uweb.DebuggingPageMaker):
   def FourOhFour(self, path):
     """The request could not be fulfilled, this returns a 404."""
     content = self.parser.Parse(
-        '404.html', path=path, **self.CommonBlocks('http404')),
+        '404.html', path=path, **self.CommonBlocks('http404'))
     return uweb.Response(content, httpcode=404)
 
   def InternalServerError(self, *exc_info):
@@ -170,7 +170,7 @@ class PageMaker(login.LoginMixin, login.OpenIdMixin, uweb.DebuggingPageMaker):
       logging.warning(
           'Execution of %r triggered an exception', path, exc_info=exc_info)
       content = self.parser.Parse(
-          '500.html', path=path, **self.CommonBlocks('http500')),
+          '500.html', path=path, **self.CommonBlocks('http500'))
       return uweb.Response(content, httpcode=500)
 
   # ############################################################################
