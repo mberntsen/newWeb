@@ -6,7 +6,6 @@ import cgi
 import cStringIO
 import Cookie as cookie
 import re
-import socket
 
 
 class Cookie(cookie.SimpleCookie):
@@ -159,31 +158,6 @@ class QueryArgsDict(dict):
       return self[key]
     except KeyError:
       return []
-
-
-def GetLocalIp(remote_addr):
-  """Returns the local IP address of the server.
-
-  BaseHTTP itself only knows the IP address it's bound to. This is likely to be
-  a bogus address, such as '0.0.0.0'. Unfortunately, with BaseHTTP, it's
-  impossible to know which internal address rreceived the incoming request.
-
-  What is done to make a best guess:
-  - A UDP socket to the `remote_addr` is set up. Opening a UDP socket does not
-    initiate a handshake, transfers no data, and is super-fast.
-  - The name of the socket is retrieved, which is the local address and port.
-
-  Arguments:
-    @ remote_addr: str
-      The content of the REMOTE_ADDR as present in the requests' environment.
-
-  Returns:
-    str: the local IP address, dot separated.
-  """
-  sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-  # The port is irrelevant as we're not going to transfer any data.
-  sock.connect((remote_addr, 80))
-  return sock.getsockname()[0]
 
 
 def ParseForm(file_handle, environ):
