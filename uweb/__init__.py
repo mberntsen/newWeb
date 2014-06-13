@@ -79,27 +79,29 @@ class NewWeb(object):
     response and returns a response iterator.
     """
     req = request.Request(env, self.registry)
-    pages = self.page_class(req, config=self.config)
+    page_maker = self.page_class(req, config=self.config)
+    response = self.get_response(page_maker, req.env['PATH_INFO'])
+    start_response(response.status, response.headers)
+    yield response.content
+
+  def get_response(self, page_maker, path):
     try:
       # We're specifically calling _PostInit here as promised in documentation.
       # pylint: disable=W0212
-      pages._PostInit()
+      page_maker._PostInit()
       # pylint: enable=W0212
-      method, args = self.router(req.env['PATH_INFO'])
-      response = getattr(pages, method)(*args)
+      method, args = self.router(path)
+      response = getattr(page_maker, method)(*args)
     except pagemaker.ReloadModules, message:
       reload_message = reload(sys.modules[self.page_class.__module__])
-      response = Response(
-          content='%s\n%s' % (message, reload_message))
-    except ImmediateResponse, response:
-      response = response[0]
+      return Response(content='%s\n%s' % (message, reload_message))
+    except ImmediateResponse as err:
+      return err[0]
     except (NoRouteError, Exception):
-      response = pages.InternalServerError(*sys.exc_info())
-
-    if not isinstance(response, Response):
-      response = Response(content=response)
-    start_response(response.status, response.headers)
-    return [response.content]
+      return page_maker.InternalServerError(*sys.exc_info())
+    if isinstance(response, Response):
+      return response
+    return Response(content=response)
 
 
 def ParseConfig(config_file):
