@@ -65,5 +65,7 @@ class Redirect(Response):
 
   def __init__(self, location, httpcode=307):
     super(Redirect, self).__init__(
-        self.REDIRECT_PAGE % location, content_type='text/html',
-        httpcode=httpcode, headers={'Location': location})
+        self.REDIRECT_PAGE % location,
+        content_type='text/html',
+        httpcode=httpcode,
+        headers={'Location': location})

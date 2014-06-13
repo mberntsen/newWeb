@@ -88,7 +88,7 @@ class Viewer(uweb.DebuggingPageMaker):
 
   def Invalidcommand(self, command):
     """Returns an error message"""
-    uweb.logging.LogWarning('Bad page %r requested', command)
+    self.req.registry.logger.warning('Bad page %r requested', command)
     return uweb.Response(
         httpcode=404,
         content=self.parser.Parse(
@@ -97,7 +97,7 @@ class Viewer(uweb.DebuggingPageMaker):
 
   def InvalidDatabase(self, database):
     """Returns an error message"""
-    uweb.logging.LogWarning('Bad database %r requested', database)
+    self.req.registry.logger.warning('Bad database %r requested', database)
     return uweb.Response(
         httpcode=404,
         content=self.parser.Parse(
