@@ -40,7 +40,7 @@ class Cookie(cookie.SimpleCookie):
 class Request(object):
   def __init__(self, env, registry):
     self.env = env
-    self.headers = self.headers_from_env(env)
+    self.headers = dict(self.headers_from_env(env))
     self.registry = registry
     self._out_headers = []
     self._out_status = 200
@@ -60,13 +60,9 @@ class Request(object):
       self.vars['post'] = IndexedFieldStorage()
 
   def headers_from_env(self, env):
-    headers = {}
     for key, value in env.iteritems():
       if key.startswith('HTTP_'):
-        name = key[5:].lower().replace('_', '-')
-        headers[name] = value
-    return headers
-
+        yield key[5:].lower().replace('_', '-'), value
 
   def AddCookie(self, key, value, **attrs):
     """Adds a new cookie header to the repsonse.
