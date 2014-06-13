@@ -1,15 +1,12 @@
-
 #!/usr/bin/python
 """Underdark uWeb PageMaker class and its various Mixins."""
+
 # Standard modules
 import datetime
 import mimetypes
 import os
 import sys
 import threading
-
-# Custom modules
-from uweb import logging
 
 # Package modules
 from .. import response
@@ -224,7 +221,8 @@ class BasePageMaker(object):
     """Returns a plain text notification about an internal server error."""
     error = 'INTERNAL SERVER ERROR (HTTP 500) DURING PROCESSING OF %r' % (
                 self.req.env['PATH_INFO'])
-    logging.LogError(error, exc_info=(exc_type, exc_value, traceback))
+    self.req.registry.logger.error(
+        error, exc_info=(exc_type, exc_value, traceback))
     return response.Response(
         content=error, content_type='text/plain', httpcode=500)
 
@@ -330,7 +328,7 @@ class DebuggerMixin(object):
 
   def InternalServerError(self, exc_type, exc_value, traceback):
     """Returns a HTTP 500 response with detailed failure analysis."""
-    logging.LogError(
+    self.req.registry.logger.error(
         'INTERNAL SERVER ERROR (HTTP 500) DURING PROCESSING OF %r',
         self.req.env['PATH_INFO'], exc_info=(exc_type, exc_value, traceback))
     exception_data = {
@@ -346,7 +344,7 @@ class DebuggerMixin(object):
           self.ERROR_TEMPLATE.Parse(**exception_data), httpcode=500)
     except Exception:
       exc_type, exc_value, traceback = sys.exc_info()
-      logging.LogCritical(
+      self.req.registry.logger.critical(
           'INTERNAL SERVER ERROR (HTTP 500) DURING PROCESSING OF ERROR PAGE',
           exc_info=(exc_type, exc_value, traceback))
       exception_data['error_for_error'] = True

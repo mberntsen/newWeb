@@ -4,6 +4,7 @@
 # Standard modules
 import base64
 import json
+import logging
 import os
 import time
 
@@ -151,9 +152,9 @@ class PageMaker(login.LoginMixin, login.OpenIdMixin, uweb.DebuggingPageMaker):
 
   def FourOhFour(self, path):
     """The request could not be fulfilled, this returns a 404."""
-    return uweb.Response(self.parser.Parse('404.html', path=path,
-                                           **self.CommonBlocks('http404')),
-                         httpcode=404)
+    content = self.parser.Parse(
+        '404.html', path=path, **self.CommonBlocks('http404')),
+    return uweb.Response(content, httpcode=404)
 
   def InternalServerError(self, *exc_info):
     """Returns a HTTP 500 page, since the request failed elsewhere."""
@@ -166,11 +167,11 @@ class PageMaker(login.LoginMixin, login.OpenIdMixin, uweb.DebuggingPageMaker):
       # Return our custom styled HTTP 500 handler instead, this is what you'll
       # want to serve during production; the debugging one gives too much info.
       path = self.req.env['PATH_INFO']
-      uweb.logging.LogError('Execution of %r triggered an exception',
-                       path, exc_info=exc_info)
-      return uweb.Response(self.parser.Parse('500.html', path=path,
-                                             **self.CommonBlocks('http500')),
-                           httpcode=500)
+      logging.warning(
+          'Execution of %r triggered an exception', path, exc_info=exc_info)
+      content = self.parser.Parse(
+          '500.html', path=path, **self.CommonBlocks('http500')),
+      return uweb.Response(content, httpcode=500)
 
   # ############################################################################
   # OpenID result handlers.
