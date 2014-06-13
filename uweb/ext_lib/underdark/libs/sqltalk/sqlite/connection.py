@@ -10,12 +10,10 @@ __version__ = '0.3'
 
 # Standard modules
 import _sqlite3
+import logging
 import os
 import Queue
 import threading
-
-# Custom modules
-from underdark.libs.app import logging
 
 # Application specific modules
 import converters
@@ -28,28 +26,28 @@ NAMED_TYPE_SELECT = 'SELECT `name` FROM `sqlite_master` where `type`=?'
 class Connection(_sqlite3.Connection):
   def __init__(self, *args, **kwds):
     db_name = os.path.splitext(os.path.split(args[0])[1])[0]
-    self.logger = logging.GetLogger('sqlite_%s' % db_name)
+    self.logger = logging.getLogger('sqlite_%s' % db_name)
     if kwds.pop('debug', False):
-      self.logger.SetLevel(logging.DEBUG)
+      self.logger.setLevel(logging.DEBUG)
     else:
-      self.logger.SetLevel(logging.WARNING)
+      self.logger.setLevel(logging.WARNING)
     if kwds.pop('disable_log', False):
       self.logger.disable_logger = True
     _sqlite3.Connection.__init__(self, *args, **kwds)
 
   def __enter__(self):
     """Starts a transaction."""
-    self.logger.LogDebug('Beginning new transaction.')
+    self.logger.debug('Beginning new transaction.')
     return cursor.Cursor(self)
 
   def __exit__(self, exc_type, _exc_value, _exc_traceback):
     """End of transaction: commits , or rolls back on failure."""
     if exc_type:
       self.rollback()
-      self.logger.LogWarning('Transaction was rolled back.')
+      self.logger.warning('Transaction was rolled back.')
     else:
       self.commit()
-      self.logger.LogDebug('Transaction committed.')
+      self.logger.debug('Transaction committed.')
 
   def commit(self):
     _sqlite3.Connection.commit(self)
@@ -78,11 +76,11 @@ class ThreadedConnection(threading.Thread):
     super(ThreadedConnection, self).__init__()
     # Set up a logger
     db_name = os.path.splitext(os.path.split(args[0])[1])[0]
-    self.logger = logging.GetLogger('sqlite_%s' % db_name)
+    self.logger = logging.getLogger('sqlite_%s' % db_name)
     if kwds.pop('debug', False):
-      self.logger.SetLevel(logging.DEBUG)
+      self.logger.setLevel(logging.DEBUG)
     else:
-      self.logger.SetLevel(logging.WARNING)
+      self.logger.setLevel(logging.WARNING)
     if kwds.pop('disable_log', False):
       self.logger.disable_logger = True
 
@@ -102,10 +100,10 @@ class ThreadedConnection(threading.Thread):
     """End of transaction: commits, or rolls back on failure."""
     if exc_type:
       self.rollback()
-      self.logger.LogWarning('Transaction was rolled back.')
+      self.logger.warning('Transaction was rolled back.')
     else:
       self.commit()
-      self.logger.LogDebug('Transaction committed.')
+      self.logger.debug('Transaction committed.')
     self.transaction_lock.release()
 
   def commit(self):

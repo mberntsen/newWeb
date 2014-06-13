@@ -9,9 +9,6 @@ import warnings
 import weakref
 import _mysql
 
-# Custom modules
-from underdark.libs.app import logging
-
 
 class Cursor(object):
   """Cursor to execute database interaction with, within a transaction."""
@@ -44,9 +41,8 @@ class Cursor(object):
     connection = self.connection
     if not isinstance(query, unicode):
       query = unicode(query, connection.charset, errors='replace')
-    caller = logging.ScopeName(3) # Cursor user is three levels up from here.
-    connection.logger.LogDebug(connection.QUERY_DEBUG, caller, query)
-    connection.queries.append((caller, query))
+    connection.logger.debug(query)
+    connection.queries.append(query)
 
   @staticmethod
   def _StringConditions(conditions, _unused_field_escape):
@@ -314,14 +310,13 @@ class Cursor(object):
     if db_warnings:
       # This is done in two loops in case Warnings are set to raise exceptions.
       for warning in db_warnings:
-        self.connection.logger.LogWarning(
-            '%d: %s\nCaller: %s\nQuery: %s',
-            warning[1], warning[2], logging.ScopeName(3), resultset.query)
+        self.connection.logger.warning(
+            '%d: %s\nQuery: %s', warning[1], warning[2], resultset.query)
         resultset.warnings.append(warning)
       for warning in db_warnings:
         warnings.warn(warning[-1], self.Warning, 3)
     elif db_info:
-      self.connection.logger.LogWarning('%d: %s' % db_info[1:])
+      self.connection.logger.warning('%d: %s' % db_info[1:])
       resultset.warnings.append(db_info)
       warnings.warn(db_info, self.Warning, 3)
 

@@ -19,7 +19,7 @@ class Cursor(object):
       else:
         result = self.connection.execute(query, args)
     except Exception:
-      self.connection.logger.LogException('Exception during query execution')
+      self.connection.logger.exception('Exception during query execution')
       raise
     return sqlresult.ResultSet(
         affected=result.rowcount,

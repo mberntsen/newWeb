@@ -8,11 +8,9 @@ __version__ = '0.16'
 
 # Standard modules
 import _mysql
+import logging
 import threading
 import weakref
-
-# Custom modules
-from underdark.libs.app import logging
 
 # Application specific modules
 import constants
@@ -23,7 +21,6 @@ from .. import sqlresult
 
 class Connection(_mysql.connection):
   """MySQL Database Connection Object"""
-  QUERY_DEBUG = '`%s` performed the following query:\n%s'
 
   def __init__(self, user, passwd, *args, **kwargs):
     """Create a connection to the database. It is strongly recommended
@@ -82,13 +79,13 @@ class Connection(_mysql.connection):
     kwargs['passwd'] = passwd
     kwargs['host'] = kwargs.get('host', 'localhost')
     kwargs['db'] = kwargs.get('db', user)
-    self.logger = logging.GetLogger('mysql_%s' % kwargs['db'])
+    self.logger = logging.getLogger('mysql_%s' % kwargs['db'])
     if kwargs.pop('debug', False):
       self.debug = True
-      self.logger.SetLevel(logging.DEBUG)
+      self.logger.setLevel(logging.DEBUG)
     else:
       self.debug = False
-      self.logger.SetLevel(logging.WARNING)
+      self.logger.setLevel(logging.WARNING)
     if kwargs.pop('disable_log', False):
       self.logger.disable_logger = True
 
@@ -182,14 +179,14 @@ class Connection(_mysql.connection):
     self.ResetTransactionTimer()
     if exc_type:
       self.rollback()
-      self.logger.LogException(
+      self.logger.exception(
           'The transaction was rolled back after an exception.\n'
           'Server: %s\nQueries in transaction (last one triggered):\n\n%s',
           self.get_host_info(),
-          '\n\n'.join(self.QUERY_DEBUG % query for query in self.queries))
+          '\n\n'.join(self.queries))
     else:
       self.commit()
-      self.logger.LogDebug(
+      self.logger.debug(
           'Transaction committed (server: %r).', self.get_host_info())
     self.lock.release()
 
@@ -272,13 +269,10 @@ class Connection(_mysql.connection):
     this method on a non-debug connection will do nothing.
     """
     def Warn(caller, delay=delay):
-      self.logger.LogWarning(
-          'Transaction started by %s is open for more than %s seconds.',
-          caller, delay)
+      self.logger.warning('Transaction open for more than %s seconds.', delay)
 
     if self.debug:
-      self.transaction_timer = threading.Timer(
-          delay, Warn, [logging.ScopeName(2)])
+      self.transaction_timer = threading.Timer(delay, Warn)
       self.transaction_timer.daemon = True
       self.transaction_timer.start()
 
