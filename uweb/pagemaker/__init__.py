@@ -333,7 +333,7 @@ class DebuggerMixin(object):
         self.req.env['PATH_INFO'], exc_info=(exc_type, exc_value, traceback))
     exception_data = {
         'cookies': self.cookies,
-        'environ': self.req.ExtendedEnvironment(),
+        'environ': self.req.env,
         'query_args': self.get,
         'post_data': self.post,
         'error_for_error': False,
