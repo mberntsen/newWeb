@@ -9,6 +9,7 @@ This fork of µWeb is very much a work in progress to fix some of the bad design
 
 * Cut tons of code for the **standalone** module
 * Started work on making newWeb a WSGI application framework
+* Cut all but one of the packages from ext_lib
 
 ## Included (demo) projects
 
