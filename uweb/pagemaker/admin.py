@@ -166,7 +166,7 @@ class AdminMixin(object):
     return False
 
   def __BasePath(self):
-    return self.req.env['PATH_INFO'].split('/')[1]
+    return self.req.path.split('/')[1]
 
   def __EditRecordFields(self, table, key):
     if self.__CheckTable(table):

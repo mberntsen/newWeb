@@ -80,7 +80,7 @@ class NewWeb(object):
     """
     req = request.Request(env, self.registry)
     page_maker = self.page_class(req, config=self.config)
-    response = self.get_response(page_maker, req.env['PATH_INFO'])
+    response = self.get_response(page_maker, req.path)
     start_response(response.status, response.headers)
     yield response.content
 

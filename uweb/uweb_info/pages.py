@@ -159,14 +159,14 @@ class PageMaker(login.LoginMixin, login.OpenIdMixin, uweb.DebuggingPageMaker):
   def InternalServerError(self, *exc_info):
     """Returns a HTTP 500 page, since the request failed elsewhere."""
     if ('debug' in self.req.env['QUERY_STRING'].lower() or
-        'openid' in self.req.env['PATH_INFO'].lower()):
+        'openid' in self.req.path.lower()):
       # Returns the default HTTP 500 handler result. For this class, since we
       # subclassed DebuggingPageMaker, it has all sorts of debug info.
       return super(PageMaker, self).InternalServerError(*exc_info)
     else:
       # Return our custom styled HTTP 500 handler instead, this is what you'll
       # want to serve during production; the debugging one gives too much info.
-      path = self.req.env['PATH_INFO']
+      path = self.req.path
       logging.warning(
           'Execution of %r triggered an exception', path, exc_info=exc_info)
       content = self.parser.Parse(

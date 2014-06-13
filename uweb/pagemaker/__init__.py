@@ -220,7 +220,7 @@ class BasePageMaker(object):
   def InternalServerError(self, exc_type, exc_value, traceback):
     """Returns a plain text notification about an internal server error."""
     error = 'INTERNAL SERVER ERROR (HTTP 500) DURING PROCESSING OF %r' % (
-                self.req.env['PATH_INFO'])
+                self.req.path)
     self.req.registry.logger.error(
         error, exc_info=(exc_type, exc_value, traceback))
     return response.Response(
@@ -266,7 +266,7 @@ class BasePageMaker(object):
 
   def _StaticNotFound(self, _path):
     message = 'This is not the path you\'re looking for. No such file %r' % (
-      self.req.env['PATH_INFO'])
+      self.req.path)
     return response.Response(message, content_type='text/plain', httpcode=404)
 
 
@@ -330,7 +330,7 @@ class DebuggerMixin(object):
     """Returns a HTTP 500 response with detailed failure analysis."""
     self.req.registry.logger.error(
         'INTERNAL SERVER ERROR (HTTP 500) DURING PROCESSING OF %r',
-        self.req.env['PATH_INFO'], exc_info=(exc_type, exc_value, traceback))
+        self.req.path, exc_info=(exc_type, exc_value, traceback))
     exception_data = {
         'cookies': self.cookies,
         'environ': self.req.env,

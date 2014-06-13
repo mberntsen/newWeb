@@ -45,11 +45,6 @@ class Request(object):
     self._out_headers = []
     self._out_status = 200
 
-    try:
-      self.env['PATH_INFO'] = self.env['PATH_INFO'].decode('UTF8')
-    except UnicodeDecodeError:
-      pass # Work with possibly borky encoding on PATH_INFO
-
     # `self.vars` setup, will contain keys 'cookie', 'get' and 'post'
     self.vars = {'cookie': dict((name, value.value) for name, value in
                                 Cookie(self.env.get('HTTP_COOKIE')).items()),
@@ -58,6 +53,13 @@ class Request(object):
       self.vars['post'] = ParseForm(env['wsgi.input'], env)
     else:
       self.vars['post'] = IndexedFieldStorage()
+
+  @property
+  def path(self):
+    try:
+      return self.env['PATH_INFO'].decode('UTF8')
+    except UnicodeDecodeError:
+      return self.env['PATH_INFO']
 
   def headers_from_env(self, env):
     for key, value in env.iteritems():
