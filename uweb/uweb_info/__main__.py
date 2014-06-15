@@ -35,7 +35,7 @@ def application():
       ('/ULF-Login', '_ULF_Verify'),
       ('/([\w\-_/]*)', 'Index'),
       ('/(.*)', 'NonWordCatchall')]
-  return uweb.NewWeb(pages.PageMaker, routes, config=uweb.ParseConfig(config))
+  return uweb.NewWeb(pages.PageMaker, routes, config=uweb.read_config(config))
 
 
 if __name__ == '__main__':

@@ -24,4 +24,4 @@ def main():
   routes = [
       ('/', 'Index'),
       ('/(.*)', 'FourOhFour')]
-  return uweb.NewWeb(pages.PageMaker, routes, config=uweb.ParseConfig(config))
+  return uweb.NewWeb(pages.PageMaker, routes, config=uweb.read_config(config))

@@ -69,7 +69,7 @@ class NewWeb(object):
     self.page_class = page_class
     self.registry = Registry()
     self.registry.logger = logging.getLogger('root')
-    self.router = Router(routes)
+    self.router = router(routes)
     self.config = config if config is not None else {}
 
   def __call__(self, env, start_response):
@@ -112,7 +112,7 @@ class NewWeb(object):
     server.serve_forever()
 
 
-def ParseConfig(config_file):
+def read_config(config_file):
   """Parses the given `config_file` and returns it as a nested dictionary."""
   parser = ConfigParser.SafeConfigParser()
   try:
@@ -123,7 +123,7 @@ def ParseConfig(config_file):
               for section in parser.sections())
 
 
-def Router(routes):
+def router(routes):
   """Returns the first request handler that matches the request URL.
 
   The `routes` argument is an iterable of 2-tuples, each of which contain a
@@ -137,13 +137,13 @@ def Router(routes):
       Each tuple is a pair of `pattern` and `handler`, both are strings.
 
   Returns:
-    RequestRouter: Configured closure that processes urls.
+    request_router: Configured closure that processes urls.
   """
   req_routes = []
   for pattern, method in routes:
     req_routes.append((re.compile(pattern + '$', re.UNICODE), method))
 
-  def RequestRouter(url):
+  def request_router(url):
     """Returns the appropriate handler and arguments for the given `url`.
 
     The`url` is matched against the compiled patterns in the `req_routes`
@@ -169,4 +169,4 @@ def Router(routes):
       if match:
         return handler, match.groups()
     raise NoRouteError(url +' cannot be handled')
-  return RequestRouter
+  return request_router
