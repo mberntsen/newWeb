@@ -39,4 +39,4 @@ def application():
 
 
 if __name__ == '__main__':
-  uweb.dev_server(application())
+  application().serve()
