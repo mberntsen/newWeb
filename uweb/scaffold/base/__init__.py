@@ -1,5 +1,8 @@
 """A uWeb base project."""
 
+# Standard modules
+import os
+
 # Third-party modules
 import uweb
 
@@ -20,5 +23,5 @@ def main():
   config = os.path.join(os.path.dirname(__file__), 'config.ini')
   routes = [
       ('/', 'Index'),
-      ('/(.*)', 'FourOhFour'))
+      ('/(.*)', 'FourOhFour')]
   return uweb.NewWeb(pages.PageMaker, routes, config=uweb.ParseConfig(config))
