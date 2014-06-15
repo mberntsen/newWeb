@@ -103,6 +103,14 @@ class NewWeb(object):
       return response
     return Response(content=response)
 
+  def serve(self):
+    """Sets up and starts WSGI development server for the current app."""
+    host = self.config['development'].get('host', 'localhost')
+    port = self.config['development'].get('port', 8001)
+    server = make_server(host, int(port), self)
+    print 'Running server on http://%s:%s' % server.server_address
+    server.serve_forever()
+
 
 def ParseConfig(config_file):
   """Parses the given `config_file` and returns it as a nested dictionary."""
@@ -162,12 +170,3 @@ def Router(routes):
         return handler, match.groups()
     raise NoRouteError(url +' cannot be handled')
   return RequestRouter
-
-
-def dev_server(application):
-  """Sets up and starts serving a WSGI server for the given application."""
-  host = application.config.get('development', {}).get('host', 'localhost')
-  port = application.config.get('development', {}).get('port', 8001)
-  wsgi_server = make_server(host, int(port), application)
-  print 'Running server on http://%s:%s' % wsgi_server.server_address
-  wsgi_server.serve_forever()
