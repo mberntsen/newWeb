@@ -21,7 +21,7 @@ def application():
     name of a presenter method which should handle it.
   - The configuration file (ini format) from which settings should be read.
   """
-  config = os.path.join(os.path.dirname(__file__), 'example.conf')
+  config = os.path.join(os.path.dirname(__file__), 'config.ini')
   routes = [
       ('/static/(.*)', 'Static'),
       ('/(broken.*)', 'FourOhFour'),
