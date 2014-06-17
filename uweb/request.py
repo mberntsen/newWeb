@@ -7,6 +7,9 @@ import cStringIO
 import Cookie as cookie
 import re
 
+# newWeb modules
+from . import response
+
 
 class Cookie(cookie.SimpleCookie):
   """Cookie class that uses the most specific value for a cookie name.
@@ -43,6 +46,7 @@ class Request(object):
     self.registry = registry
     self._out_headers = []
     self._out_status = 200
+    self._response = None
 
     # `self.vars` setup, will contain keys 'cookie', 'get' and 'post'
     self.vars = {'cookie': dict((name, value.value) for name, value in
@@ -59,6 +63,12 @@ class Request(object):
       return self.env['PATH_INFO'].decode('UTF8')
     except UnicodeDecodeError:
       return self.env['PATH_INFO']
+
+  @property
+  def response(self):
+    if self._response is None:
+      self._response = response.Response()
+    return self._response
 
   def headers_from_env(self, env):
     for key, value in env.iteritems():

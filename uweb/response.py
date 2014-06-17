@@ -14,7 +14,7 @@ class Response(object):
   # Default content-type for Page objects
   CONTENT_TYPE = 'text/html'
 
-  def __init__(self, content, content_type=CONTENT_TYPE,
+  def __init__(self, content='', content_type=CONTENT_TYPE,
                httpcode=200, headers=None):
     """Initializes a Page object.
 
@@ -32,7 +32,7 @@ class Response(object):
     if isinstance(content, unicode):
       self.content = content.encode('utf8')
     else:
-      self.content = str(content)
+      self.content = content
     self.httpcode = httpcode
     self._headers = headers or {}
     self.content_type = content_type
