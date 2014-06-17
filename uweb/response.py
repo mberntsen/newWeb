@@ -15,7 +15,7 @@ class Response(object):
   CONTENT_TYPE = 'text/html'
 
   def __init__(self, content='', content_type=CONTENT_TYPE,
-               httpcode=200, headers=None):
+               httpcode=200, headers=None, **kwds):
     """Initializes a Page object.
 
     Arguments:
@@ -29,22 +29,44 @@ class Response(object):
       % headers: dict ~~ None
         A dictionary with header names and their associated values.
     """
+    self.charset = kwds.get('charset', 'utf8')
     if isinstance(content, unicode):
-      self.content = content.encode('utf8')
+      self.text = content.encode(self.charset)
     else:
       self.content = content
     self.httpcode = httpcode
-    self._headers = headers or {}
+    self.headers = headers or {}
+    if ';' not in content_type:
+      content_type = '%s; charset=%s' % (content_type, self.charset)
     self.content_type = content_type
+    print self.status
+    print self.headerlist
 
-  def headers_iter(self):
-    yield 'content-type', self.content_type
-    for name, value in self._headers.iteritems():
-      yield name, value.encode('ascii')
-
+  # Get and set content-type header
   @property
-  def headers(self):
-    return list(self.headers_iter())
+  def content_type(self):
+    return self.headers['Content-Type']
+
+  @content_type.setter
+  def content_type(self, content_type):
+    current = self.headers.get('Content-Type', '')
+    if ';' in current:
+      content_type = '%s; %s' % (content_type, current.split(';', 1)[-1])
+    self.headers['Content-Type'] = content_type
+
+  # Get and set body text
+  @property
+  def text(self):
+    return self.content
+
+  @text.setter
+  def text(self, content):
+    self.content = content.encode(self.charset)
+
+  # Retrieve a header list
+  @property
+  def headerlist(self):
+    return [(key, val.encode('ascii')) for key, val in self.headers.iteritems()]
 
   @property
   def status(self):
@@ -65,7 +87,7 @@ class Redirect(Response):
 
   def __init__(self, location, httpcode=307):
     super(Redirect, self).__init__(
-        self.REDIRECT_PAGE % location,
+        content=self.REDIRECT_PAGE % location,
         content_type='text/html',
         httpcode=httpcode,
         headers={'Location': location})

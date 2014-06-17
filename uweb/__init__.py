@@ -81,7 +81,10 @@ class NewWeb(object):
     req = request.Request(env, self.registry)
     page_maker = self.page_class(req, config=self.config)
     response = self.get_response(page_maker, req.path)
-    start_response(response.status, response.headers)
+    if not isinstance(response, Response):
+      req.response.text = response
+      response = req.response
+    start_response(response.status, response.headerlist)
     yield response.content
 
   def get_response(self, page_maker, path):
@@ -91,7 +94,7 @@ class NewWeb(object):
       page_maker._PostInit()
       # pylint: enable=W0212
       method, args = self.router(path)
-      response = getattr(page_maker, method)(*args)
+      return getattr(page_maker, method)(*args)
     except pagemaker.ReloadModules, message:
       reload_message = reload(sys.modules[self.page_class.__module__])
       return Response(content='%s\n%s' % (message, reload_message))
@@ -99,9 +102,6 @@ class NewWeb(object):
       return err[0]
     except (NoRouteError, Exception):
       return page_maker.InternalServerError(*sys.exc_info())
-    if isinstance(response, Response):
-      return response
-    return Response(content=response)
 
   def serve(self):
     """Sets up and starts WSGI development server for the current app."""
