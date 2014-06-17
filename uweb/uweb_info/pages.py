@@ -37,7 +37,10 @@ class PageMaker(login.LoginMixin, login.OpenIdMixin, uweb.DebuggingPageMaker):
                        max_age=self.post.getfirst('uweb_cookie_max_age', 60))
     # We send a 303 instead of a 307 because the latter would repeat the POST.
     # This would trigger a redirect loop, which is a bad bad thing :-)
-    raise uweb.ImmediateResponse(uweb.Redirect('/', httpcode=303))
+
+    #XXX ImmediateResponse drops the current response we're making, thereby
+    # destroying any cookies we're setting :(
+    #raise uweb.ImmediateResponse(uweb.Redirect('/', httpcode=303))
 
   def Index(self, _path):
     """Returns the index.html template"""

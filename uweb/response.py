@@ -30,17 +30,12 @@ class Response(object):
         A dictionary with header names and their associated values.
     """
     self.charset = kwds.get('charset', 'utf8')
-    if isinstance(content, unicode):
-      self.text = content.encode(self.charset)
-    else:
-      self.content = content
+    self.text = content
     self.httpcode = httpcode
     self.headers = headers or {}
     if ';' not in content_type:
       content_type = '%s; charset=%s' % (content_type, self.charset)
     self.content_type = content_type
-    print self.status
-    print self.headerlist
 
   # Get and set content-type header
   @property
@@ -61,7 +56,10 @@ class Response(object):
 
   @text.setter
   def text(self, content):
-    self.content = content.encode(self.charset)
+    if isinstance(content, unicode):
+      self.content = content.encode(self.charset)
+    else:
+      self.content = str(content)
 
   # Retrieve a header list
   @property

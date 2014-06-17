@@ -112,7 +112,7 @@ class Request(object):
     self.AddHeader('Set-Cookie', new_cookie[key].OutputString())
 
   def AddHeader(self, name, value):
-    self._out_headers.append((name, value))
+    self.response.headers[name] = value
 
 
 class IndexedFieldStorage(cgi.FieldStorage):
