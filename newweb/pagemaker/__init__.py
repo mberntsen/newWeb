@@ -1,5 +1,5 @@
 #!/usr/bin/python
-"""Underdark uWeb PageMaker class and its various Mixins."""
+"""newWeb PageMaker class and its various Mixins."""
 
 # Standard modules
 import datetime

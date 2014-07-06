@@ -1,5 +1,5 @@
 #!/usr/bin/python
-"""module to support OpenID login in uWeb"""
+"""module to support OpenID login in newWeb"""
 
 # Standard modules
 import base64
@@ -11,14 +11,9 @@ from openid.extensions import sreg
 # Package modules
 from . import response
 
-# Constants used for OpenID provider services.
-OPENID_PROVIDER_NAME = 'uweb OpenID'
-OPENID_PROVIDER_URL = (
-    'https://www.myopenid.com/affiliate_signup?affiliate_id=39')
-
 
 class Error(Exception):
-  """A uweb OpenID error has occured"""
+  """An OpenID error has occured"""
 
 
 class InvalidOpenIdUrl(Error):
@@ -39,13 +34,13 @@ class VerificationCanceled(Error):
 
 class OpenId(object):
   """Provides OpenId verification and processing of return values"""
-  def __init__(self, request, cookiename='uwebopenid'):
+  def __init__(self, request, cookiename='nw_openid'):
     """Sets up the openId class
 
     Arguments:
-      @ request: uweb.request.Request
-        The uweb request object.
-      % cookiename: str ~~ 'uwebopenid'
+      @ request: request.Request
+        The request object.
+      % cookiename: str ~~ 'nw_openid'
         The name of the cookie that holds the OpenID session token.
     """
     self.request = request
@@ -74,7 +69,7 @@ class OpenId(object):
     return self.session
 
   def setSessionCookie(self):
-    """Sets the session cookie on the uweb request"""
+    """Sets the session cookie on the request object"""
     self.request.AddCookie(self.cookiename, self.session['id'])
 
   def Verify(self, openid_url, trustroot, returnurl):
@@ -91,9 +86,6 @@ class OpenId(object):
       @ returnurl: str
         The url that will handle the Process step for the user being returned
         to us by the openId supplier
-
-    Returns either an uweb Page object redirectnig the user to the OpenId
-    provider or page with some variabeles
     """
     oidconsumer = self.getConsumer()
     if openid_url.strip() == '':
@@ -113,9 +105,6 @@ class OpenId(object):
 
   def doProcess(self):
     """Handle the redirect from the OpenID server.
-
-    Consumes the query part of the url by reading the get property on the uweb
-    request object
 
     Returns:
       tuple: userId

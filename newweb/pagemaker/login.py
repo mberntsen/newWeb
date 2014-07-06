@@ -1,5 +1,5 @@
 #!/usr/bin/python
-"""Underdark uWeb PageMaker Mixins for login/authentication purposes.
+"""newWeb PageMaker Mixins for login/authentication purposes.
 
 Contains both the Underdark Login Framework and OpenID implementations
 """
@@ -8,12 +8,14 @@ Contains both the Underdark Login Framework and OpenID implementations
 import binascii
 import hashlib
 import os
+
+# Third-party modules
 import simplejson
 
 # Package modules
-import login_openid
-import uweb
-from uweb import model
+from . import login_openid
+from .. import model
+from .. import response
 
 OPENID_PROVIDERS = {'google': 'https://www.google.com/accounts/o8/id',
                     'yahoo': 'http://yahoo.com/',
@@ -23,8 +25,6 @@ OPENID_PROVIDERS = {'google': 'https://www.google.com/accounts/o8/id',
 # ##############################################################################
 # Record classes for Underdark Login Framework
 #
-# Model classes have many methods, this is acceptable
-# pylint: disable=R0904
 class Challenge(model.Record):
   """Abstraction for the `challenge` table."""
   _PRIMARY_KEY = 'user', 'remote'
@@ -95,14 +95,13 @@ class User(model.Record):
     """Verifies a given plaintext password."""
     salted = hashlib.sha1(plaintext + binascii.hexlify(self['salt'])).digest()
     return salted == self['password']
-# pylint: enable=R0904
 
 
 # ##############################################################################
 # Actual Pagemaker mixin class
 #
 class LoginMixin(object):
-  """Provides the Underdark Login Framework for uWeb."""
+  """Provides the Login Framework for newWeb."""
   ULF_CHALLENGE = Challenge
   ULF_USER = User
 
@@ -130,8 +129,9 @@ class LoginMixin(object):
       challenge = self.ULF_CHALLENGE.ChallengeBytes()
     content = {'salt': binascii.hexlify(salt),
                'challenge': binascii.hexlify(challenge)}
-    return uweb.Response(content_type='application/json',
-                         content=simplejson.dumps(content))
+    return response.Response(
+        content_type='application/json',
+        content=simplejson.dumps(content))
 
   def _ULF_Verify(self):
     """Verifies the authentication request and dispatches to result renderers.
