@@ -1,9 +1,17 @@
-#!/usr/bin/python
+"""newWeb installer."""
 
-# Standard modules
 import os
 import re
 from setuptools import setup, find_packages
+
+REQUIREMENTS = [
+    'decorator',
+    'mysql-python',
+    'python-magic',
+    'python-openid',
+    'pytz',
+    'simplejson',
+]
 
 
 def description():
@@ -16,15 +24,6 @@ def version():
   with file(main_lib) as v_file:
     return re.match(".*__version__ = '(.*?)'", v_file.read(), re.S).group(1)
 
-
-requires = [
-    'decorator',
-    'mysql-python',
-    'python-magic',
-    'python-openid',
-    'pytz',
-    'simplejson',
-]
 
 setup(
     name='newWeb',
@@ -45,5 +44,4 @@ setup(
     packages=find_packages(),
     include_package_data=True,
     zip_safe=False,
-    install_requires=requires,
-)
+    install_requires=REQUIREMENTS)
