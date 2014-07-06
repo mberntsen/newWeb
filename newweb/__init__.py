@@ -1,5 +1,5 @@
 #!/usr/bin/python
-"""Underdark Web Framework -- uWeb"""
+"""newWeb Framework"""
 
 __version__ = '0.4.0-dev'
 

@@ -1,25 +1,14 @@
-= Uweb base =
-This is a uWeb base project that provides the basic needed files and layout to
-build an uWeb project
+# newWeb application scaffold
 
-Code-wise, it holds the following:
-* uWeb request routing and server setup (in 'www/router.py');
-* the router read the config file in base.conf
-* use of PageMaker, and Page classes (in 'pages.py');
-* use of the templateparser (in 'pages.py') and templates (in 'templates/').
+This is an empty newWeb base project that serves as the starting point for your
+project. The following parts are included and allow for easy extension:
 
-It doesn't contain the following:
-* Database connectivity.
+* newWeb request routing and server setup (in `__init__.py`)
+* a basic configuration file that is read upon app start (`config.ini`)
+* use of PageMaker (in 'pages.py') and example template usage (templates in `templates/`)
+* included Apache WSGI configuration and development server runner.
 
-= How to run =
-You can either set this project up for Apache + mod_python use, or standalone:
-* standalone
-  * `python www/router.py`
-  * The server is bound to 0.0.0.0:8082 (reachable via 'http://localhost:8082')
-* mod_python
-  * Symlink the www base folder to /var/www/uweb_base (sudo ln -sf ./www /var/www/uweb_base)
-  * Copy 'apache.conf' to /etc/apache2/sites-available/uweb_base
-  * Enable the site (`sudo a2ensite uweb_base`)
-  * Reload apache config (`sudo service apache2 reload`)
+# How to run
 
---- 2012-06-01 @ 14:48:10 CET (+0100)
+* Run `serve.py` from the commandline
+* Use the included `base.wsgi` script to set up Apache + mod_wsgi

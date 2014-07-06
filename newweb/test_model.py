@@ -431,8 +431,8 @@ class CompoundKeyRecordTests(unittest.TestCase):
 
 
 def DatabaseConnection():
-  """Returns an SQLTalk database connection to 'uweb_model_test'."""
-  return mysql.Connect('uweb_model_test', 'uweb_model_test')
+  """Returns an SQLTalk database connection to 'newweb_model_test'."""
+  return mysql.Connect('newweb_model_test', 'newweb_model_test')
 
 
 if __name__ == '__main__':
