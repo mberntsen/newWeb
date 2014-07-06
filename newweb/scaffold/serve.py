@@ -1,6 +1,4 @@
 """Starts a simple application development server."""
-# Third-party modules
-import uweb
 
 # Application
 import base
