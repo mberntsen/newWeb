@@ -1,5 +1,5 @@
 #!/usr/bin/python
-"""Underdark uWeb PageMaker Mixins for admin purposes."""
+"""newWeb PageMaker Mixins for admin purposes."""
 
 # Standard modules
 import datetime
@@ -8,8 +8,8 @@ import inspect
 import os
 
 # Package modules
-from uweb import templateparser
-from uweb import model
+from .. import model
+from .. import templateparser
 
 NOT_ALLOWED_METHODS = dir({}) + ['key', 'identifier']
 

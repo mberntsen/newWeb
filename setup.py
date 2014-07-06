@@ -12,7 +12,7 @@ def description():
 
 
 def version():
-  main_lib = os.path.join(os.path.dirname(__file__), 'uweb', '__init__.py')
+  main_lib = os.path.join(os.path.dirname(__file__), 'newweb', '__init__.py')
   with file(main_lib) as v_file:
     return re.match(".*__version__ = '(.*?)'", v_file.read(), re.S).group(1)
 
@@ -27,9 +27,9 @@ requires = [
 ]
 
 setup(
-    name='uWeb',
+    name='newWeb',
     version=version(),
-    description='Underdark\'s minimal web-framework',
+    description='A fork to bring uWeb closer to WSGI and proper design',
     long_description=description(),
     license='ISC',
     classifiers=[
@@ -42,7 +42,6 @@ setup(
     author_email='elmer.delooff@gmail.com',
     url='https://github.com/edelooff/newWeb',
     keywords='minimal web framework',
-    scripts=['uweb/scripts/uweb'],
     packages=find_packages(),
     include_package_data=True,
     zip_safe=False,

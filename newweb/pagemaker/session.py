@@ -1,5 +1,5 @@
 #!/usr/bin/python
-"""Underdark uWeb PageMaker Mixins for session management purposes."""
+"""newWeb PageMaker Mixins for session management purposes."""
 
 # Standard modules
 import binascii
@@ -8,7 +8,7 @@ import datetime
 import pytz
 
 # Package modules
-from uweb import model
+from .. import model
 
 # ##############################################################################
 # Record classes for session management
@@ -26,7 +26,7 @@ class Session(model.Record):
 # Pagemaker Mixin class for session management
 #
 class SessionMixin(object):
-  """Provides session management for the uWeb Framework"""
+  """Provides session management for newWeb"""
 
   class NoSessionError(Exception):
     """Custom exception for user not having a (unexpired) session cookie."""

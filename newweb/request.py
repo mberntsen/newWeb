@@ -1,5 +1,5 @@
 #!/usr/bin/python2.6
-"""Underdark micro-Web framework, uWeb, Request module."""
+"""newWeb request module."""
 
 # Standard modules
 import cgi

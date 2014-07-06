@@ -1,5 +1,5 @@
 #!/usr/bin/python
-"""Underdark uWeb Response object."""
+"""newWeb response classes."""
 
 # Standard modules
 import httplib

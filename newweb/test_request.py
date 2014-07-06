@@ -1,4 +1,4 @@
-#!/usr/bin/python2.5
+#!/usr/bin/python
 """Tests for the request module."""
 
 # Method could be a function
@@ -13,7 +13,7 @@ import unittest
 import urllib
 
 # Unittest target
-import request
+from . import request
 
 
 class IndexedFieldStorageTest(unittest.TestCase):
