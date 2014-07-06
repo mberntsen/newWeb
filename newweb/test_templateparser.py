@@ -1,4 +1,4 @@
-#!/usr/bin/python2.5
+#!/usr/bin/python
 """Tests for the templateparser module."""
 
 # Too many public methods
@@ -11,7 +11,7 @@ import time
 import unittest
 
 # Unittest target
-import templateparser
+from . import templateparser
 
 
 class Parser(unittest.TestCase):

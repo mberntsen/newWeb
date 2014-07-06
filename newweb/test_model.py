@@ -8,11 +8,12 @@
 import unittest
 
 # Custom modules
-from underdark.libs import app
+import newweb
+# Importing newWeb makes the SQLTalk library available as a side-effect
 from underdark.libs.sqltalk import mysql
 
 # Unittest target
-import model
+from . import model
 
 
 # ##############################################################################
@@ -434,9 +435,5 @@ def DatabaseConnection():
   return mysql.Connect('uweb_model_test', 'uweb_model_test')
 
 
-def main():
-  """Main unittest runner."""
-  unittest.main(testRunner=unittest.TextTestRunner(verbosity=2))
-
 if __name__ == '__main__':
-  app.Run()
+  unittest.main(testRunner=unittest.TextTestRunner(verbosity=2))
