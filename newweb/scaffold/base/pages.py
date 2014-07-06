@@ -1,19 +1,16 @@
 #!/usr/bin/python
-"""Html generators for the base uweb server"""
+"""Request handlers for the newWeb project scaffold"""
 
-import uweb
+import newweb
 
-class PageMaker(uweb.DebuggingPageMaker):
-  """Holds all the html generators for the webapp
-
-  Each page as a separate method.
-  """
+class PageMaker(newweb.DebuggingPageMaker):
+  """Holds all the request handlers for the application"""
 
   def Index(self):
-    """Returns the index.html template"""
+    """Returns the index template"""
     return self.parser.Parse('index.utp')
 
   def FourOhFour(self, path):
     """The request could not be fulfilled, this returns a 404."""
-    return uweb.Response(self.parser.Parse('404.utp', path=path),
-                         httpcode=404)
+    self.req.response.httpcode = 404
+    return self.parser.Parse('404.utp', path=path)

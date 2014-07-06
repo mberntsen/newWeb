@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>µWeb base project</title>
+    <title>newWeb project scaffold</title>
   </head>
   <body>
-    <h2>Hello <span title="world">µWeb</span></h2>
+    <h2>Hello <span title="world">newWeb</span></h2>
   </body>
 </html>
