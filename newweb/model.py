@@ -1,5 +1,5 @@
 #!/usr/bin/python
-"""uWeb model base classes."""
+"""NewWeb model base classes."""
 
 # Standard modules
 import datetime
@@ -1024,7 +1024,7 @@ class MongoRecord(BaseRecord):
 
 
 class Smorgasbord(object):
-  """A connection tracker for uWeb Record classes.
+  """A connection tracker for NewWeb Record classes.
 
   The idea is that you can set up a Smorgasbord with various different
   connection types (Mongo and relational), and have the smorgasbord provide the

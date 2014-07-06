@@ -1,5 +1,5 @@
 #!/usr/bin/python2.5
-"""uWeb TemplateParser
+"""newWeb TemplateParser
 
 Classes:
   Parser: Parses a template by replacing tags with their values.
