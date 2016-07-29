@@ -145,7 +145,7 @@ def router(routes):
       pattern, methods, handler = route
     except ValueError:
       pattern, handler = route
-      methods = ['GET', 'POST']
+      methods = ('GET', 'POST', 'PUT', 'DELETE', 'OPTIONS')
     req_routes.append((re.compile(pattern + '$', re.UNICODE), methods, handler))
 
   def request_router(url, method):
