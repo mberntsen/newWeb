@@ -126,26 +126,27 @@ def read_config(config_file):
 def router(routes):
   """Returns the first request handler that matches the request URL.
 
-  The `routes` argument is an iterable of 2-tuples, each of which contain a
-  pattern (regex) and the name of the handler to use for matching requests.
+  The `routes` argument is an iterable of 3-tuples, each of which contain a
+  pattern (regex), request methods and the name of the handler to use for matching requests.
 
-  Before returning the closure, all regexen are compiled, and handler methods
+  Before returning the closure, all regexes are compiled, and handler methods
   are retrieved from the provided `page_class`.
 
   Arguments:
-    @ routes: iterable of 2-tuples.
-      Each tuple is a pair of `pattern` and `handler`, both are strings.
+    @ routes: iterable of 3-tuples.
+      Each tuple is a set of `pattern`, `methods` and `handler`, all are strings.
 
   Returns:
     request_router: Configured closure that processes urls.
   """
   req_routes = []
+  default_methods = {'GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'}
   for route in routes:
     try:
       pattern, methods, handler = route
     except ValueError:
       pattern, handler = route
-      methods = ('GET', 'POST', 'PUT', 'DELETE', 'OPTIONS')
+      methods = default_routes
     req_routes.append((re.compile(pattern + '$', re.UNICODE), methods, handler))
 
   def request_router(url, method):
